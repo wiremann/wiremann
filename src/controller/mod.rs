@@ -2,6 +2,8 @@ pub mod commands;
 pub mod events;
 pub mod state;
 use crate::library::TrackId;
+use crate::ui::helpers::secs_to_slider;
+use crate::ui::wiremann::Wiremann;
 use crate::{controller::state::AppState, errors::ControllerError, library::gen_track_id};
 use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
@@ -44,9 +46,27 @@ impl Controller {
         &mut self,
         cx: &mut App,
         event: &AudioEvent,
+        view: Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             AudioEvent::Position(pos) => {
+                view.update(cx, |this, cx| {
+                    this.player_page.update(cx, |this, cx| {
+                        this.controlbar.update(cx, |this, cx| {
+                            this.playback_slider_state.update(cx, |this, cx| {
+                                let state = cx.global::<Controller>().state.read(cx);
+                                let current = if let Some(id) = state.playback.current {
+                                    state.library.tracks.get(&id)
+                                } else { None };
+
+                                let duration = if let Some(track) = current {
+                                    track.duration
+                                } else { 0 };
+                                this.set_value(secs_to_slider(pos.clone(), duration), cx);
+                            });
+                        });
+                    });
+                });
                 self.state.update(cx, |this, cx| {
                     this.playback.position = *pos;
                     cx.notify();
@@ -66,9 +86,17 @@ impl Controller {
                     cx.notify();
                 });
             }
-            AudioEvent::PlaybackStatus(status) => self.state.update(cx, |this,cx| {this.playback.status = *status;cx.notify()}),
+            AudioEvent::PlaybackStatus(status) => self.state.update(cx, |this, cx| {
+                this.playback.status = *status;
+                cx.notify()
+            }),
             AudioEvent::TrackEnded => {}
-            AudioEvent::Volume(volume) => self.state.update(cx, |this,cx| {this.playback.volume = *volume; cx.notify()}),
+            AudioEvent::Volume(volume) => {
+                self.state.update(cx, |this, cx| {
+                    this.playback.volume = *volume;
+                    cx.notify()
+                })
+            }
         }
         Ok(())
     }
@@ -148,7 +176,7 @@ impl Controller {
 
     pub fn next(&self) {}
     pub fn prev(&self) {}
-    
+
     pub fn seek(&self, pos: u64) {
         let _ = self.audio_tx.send(AudioCommand::Seek(pos));
     }

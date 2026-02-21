@@ -34,7 +34,7 @@ impl Wiremann {
             &vol_slider_state,
             |_, _, event: &SliderEvent, cx| match event {
                 SliderEvent::Change(value) => {
-                    cx.global::<Controller>().set_volume(value.start());
+                    cx.global::<Controller>().set_volume(value.start() / 100.0);
                     cx.notify();
                 }
             },
