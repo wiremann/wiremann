@@ -1,6 +1,7 @@
 use crossbeam_channel::RecvError;
 use lofty::error::LoftyError;
 use std::time::SystemTimeError;
+use image::ImageError;
 use rodio::source::SeekError;
 use thiserror::Error;
 
@@ -26,6 +27,8 @@ pub enum ScannerError {
     LoadFolder(String),
     #[error("I/O Error occurred: `{0}`")]
     IoError(#[from] std::io::Error),
+    #[error("Image Error occurred: `{0}`")]
+    ImageError(#[from] ImageError),
     #[error("Lofty Error occurred: `{0}`")]
     LoftyError(#[from] LoftyError),
     #[error("SystemTime Error occurred: `{0}`")]

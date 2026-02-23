@@ -6,9 +6,15 @@ use crate::{
     library::TrackId,
 };
 use crossbeam_channel::{Receiver, Sender};
+use gpui::RenderImage;
+use image::imageops::thumbnail;
+use image::{Frame, ImageReader};
 use lofty::{prelude::*, probe::Probe};
 use rayon::prelude::*;
+use smallvec::smallvec;
 use std::collections::HashSet;
+use std::io::Cursor;
+use std::sync::Arc;
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -165,7 +171,7 @@ impl Scanner {
                 Some(data) => Some(data.data().to_vec()),
                 None => None,
             };
-            
+
             return Ok(thumbnail);
         }
 
@@ -234,5 +240,21 @@ impl Scanner {
         let _ = self.tx.send(ScannerEvent::Playlist(playlist));
 
         Ok(())
+    }
+
+    fn render_album_art(&self, bytes: Vec<u8>, is_thumbnail: bool) -> Result<Arc<RenderImage>, ScannerError> {
+        let mut image = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?.decode()?.into_rgba8();
+
+        for px in image.pixels_mut() {
+            px.0.swap(0, 2);
+        }
+
+        let frame = if is_thumbnail {
+            Frame::new(thumbnail(&image, 64, 64))
+        } else {
+            Frame::new(image)
+        };
+
+        Ok(Arc::new(RenderImage::new(smallvec![frame])))
     }
 }
