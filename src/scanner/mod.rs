@@ -11,9 +11,8 @@ use image::imageops::thumbnail;
 use image::{Frame, ImageReader};
 use lofty::{prelude::*, probe::Probe};
 use rayon::prelude::*;
-use rayon::ThreadPoolBuilder;
 use smallvec::smallvec;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
@@ -66,107 +65,6 @@ impl Scanner {
         }
     }
 
-    fn scan_folder(
-        &mut self,
-        path: PathBuf,
-        existing_tracks: HashSet<TrackId>,
-    ) -> Result<(), ScannerError> {
-        let supported = ["mp3", "flac", "wav", "ogg", "m4a"];
-        let mut track_ids = vec![];
-        let mut tracks = vec![];
-        let mut images = vec![];
-        if path.is_dir() {
-            let files: Vec<PathBuf> = WalkDir::new(path.clone())
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_file())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .and_then(|ext| ext.to_str())
-                        .map(|ext| supported.contains(&ext.to_lowercase().as_str()))
-                        .unwrap_or(false)
-                })
-                .map(|e| e.path().to_path_buf())
-                .collect();
-
-            let results: Vec<ScanResult> = files
-                .par_iter()
-                .map(|entry| {
-                    let track_id = gen_track_id(entry)?;
-
-                    if existing_tracks.contains(&track_id) {
-                        Ok(ScanResult {
-                            id: track_id,
-                            track: None,
-                            image: None,
-                        })
-                    } else {
-                        let (track, image) =
-                            self.get_track_metadata(entry.clone(), track_id.clone())?;
-
-                        Ok(ScanResult {
-                            id: track_id,
-                            track: Some(track),
-                            image,
-                        })
-                    }
-                })
-                .collect::<Result<_, ScannerError>>()?;
-            for result in results {
-                track_ids.push(result.id);
-
-                if let Some(track) = result.track {
-                    tracks.push(track);
-                }
-
-                if let Some(img) = result.image {
-                    images.push((result.id, img));
-                }
-            }
-        }
-
-        let name = path
-            .file_name()
-            .and_then(|os_str| os_str.to_str())
-            .map(|s| s.to_string())
-            .unwrap_or("Unnamed Playlist".to_string());
-
-        let playlist = Playlist {
-            id: PlaylistId(Uuid::new_v4()),
-            name,
-            source: PlaylistSource::Folder(path),
-            tracks: track_ids,
-        };
-
-        let _ = self.tx.send(ScannerEvent::Tracks(tracks.clone()));
-        let _ = self.tx.send(ScannerEvent::Playlist(playlist));
-
-        let tx = self.tx.clone();
-
-        std::thread::spawn(move || {
-            let threads = std::cmp::max(1, num_cpus::get() - 2);
-
-            let pool = ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .unwrap();
-            let thumbnails: HashMap<TrackId, Arc<RenderImage>> = pool.install(|| {
-                images
-                    .par_iter()
-                    .filter_map(|t| {
-                        let img = render_album_art(&t.1, true).ok()?;
-                        Some((t.0, img))
-                    })
-                    .collect()
-            });
-
-            let _ = tx.send(ScannerEvent::Thumbnails(thumbnails));
-        });
-
-        Ok(())
-    }
-
     fn spawn_metadata_worker(
         &self,
         meta_rx: Receiver<ScanJob>,
@@ -217,6 +115,24 @@ impl Scanner {
         });
 
         Ok(())
+    }
+
+    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>) -> Result<(), ScannerError> {
+        let events_tx = self.tx.clone();
+
+        loop {
+            select! {
+                recv(thumb_rx) -> job => {
+                    match job {
+                        ScanJob::Thumbnail(id, bytes) => {
+                            let image = render_album_art(&bytes, true)?;
+                        }
+                        ScanJob::AlbumArt(path, track_id) => {}
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 
     fn enqueue_track(&self, path: PathBuf, track_id: TrackId, meta_tx: Sender<ScanJob>) -> Result<(), ScannerError> {
