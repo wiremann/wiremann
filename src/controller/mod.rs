@@ -105,7 +105,7 @@ impl Controller {
         &mut self,
         cx: &mut App,
         event: &ScannerEvent,
-        _view: Entity<Wiremann>,
+        view: Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::Tracks(tracks) => {
@@ -133,6 +133,8 @@ impl Controller {
                 let mut image_cache = cx.global_mut::<ImageCache>();
 
                 image_cache.current = Some(image.clone());
+                
+                cx.notify(view.entity_id());
             }
             ScannerEvent::Thumbnails(thumbnails) => {
                 let mut thumbnail_cache = cx.global_mut::<ImageCache>();
