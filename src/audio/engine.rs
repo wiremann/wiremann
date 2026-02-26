@@ -7,7 +7,7 @@ use crate::{
     controller::{commands::AudioCommand, events::AudioEvent},
     errors::AudioError,
 };
-use rodio::{OutputStream, OutputStreamBuilder, Sink, decoder::DecoderBuilder};
+use rodio::{decoder::DecoderBuilder, OutputStream, OutputStreamBuilder, Sink};
 
 pub struct Audio {
     sink: Sink,
@@ -56,6 +56,9 @@ impl Audio {
 
     fn load_path(&mut self, path: PathBuf) -> Result<(), AudioError> {
         self.sink.stop();
+        
+        let prev_vol = self.sink.volume();
+        
         self.sink = Sink::connect_new(self.stream_handle.mixer());
 
         let file = File::open(path.clone()).unwrap();
@@ -68,8 +71,12 @@ impl Audio {
             .unwrap();
 
         self.sink.append(source);
+        
+        self.sink.set_volume(prev_vol);
 
         let _ = self.tx.send(AudioEvent::TrackLoaded(path));
+
+        self.play()?;
 
         Ok(())
     }
