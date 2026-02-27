@@ -90,6 +90,11 @@ impl Controller {
 
                 self.state.update(cx, |this, cx| {
                     this.playback.current = Some(track_id);
+
+                    if let Some(idx) = this.queue.get_index(track_id) {
+                        this.queue.index = idx;
+                    }
+
                     cx.notify();
                 });
             }
@@ -153,6 +158,21 @@ impl Controller {
             .send(ScannerCommand::GetCurrentAlbumArt(path));
     }
 
+    pub fn load_queue_current(&self, cx: &App) {
+        let queue = &self.state.read(cx).queue;
+        let library = &self.state.read(cx).library;
+
+        if let Some(track_id) = queue.get_id() {
+            if let Some(track) = library.tracks.get(&track_id) {
+                let path = track.path.clone();
+                let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
+                let _ = self
+                    .scanner_tx
+                    .send(ScannerCommand::GetCurrentAlbumArt(path));
+            }
+        }
+    }
+
     pub fn get_pos(&self) {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
@@ -201,8 +221,20 @@ impl Controller {
 
     pub fn set_shuffle(&self, _cx: &mut App) {}
 
-    pub fn next(&self) {}
-    pub fn prev(&self) {}
+    pub fn next(&self, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            this.queue.index = (this.queue.index + 1).clamp(0, this.library.tracks.len());
+        });
+
+        self.load_queue_current(cx);
+    }
+    pub fn prev(&self, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            this.queue.index = this.queue.index.saturating_sub(1);
+        });
+
+        self.load_queue_current(cx);
+    }
 
     pub fn seek(&self, pos: u64) {
         let _ = self.audio_tx.send(AudioCommand::Seek(pos));
