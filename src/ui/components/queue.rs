@@ -107,6 +107,9 @@ pub struct Queue {
     pub views: Entity<AHashMap<PathBuf, Entity<Item>>>,
     pub scroll_handle: UniformListScrollHandle,
     pub stop_auto_scroll: Entity<bool>,
+
+    last_tracks: Vec<TrackId>,
+    last_order: Vec<usize>,
 }
 
 impl Queue {
@@ -115,6 +118,9 @@ impl Queue {
             views: cx.new(|_| AHashMap::new()),
             scroll_handle,
             stop_auto_scroll: cx.new(|_| false),
+
+            last_tracks: vec![],
+            last_order: vec![],
         })
     }
 
@@ -161,7 +167,22 @@ impl Render for Queue {
         let state = cx.global::<Controller>().state.read(cx).clone();
 
         let tracks = state.queue.tracks.clone();
-        let queue_order = state.queue.order.clone();
+        let order = state.queue.order.clone();
+
+        let needs_reset =
+            self.last_tracks == tracks
+                ||
+                self.last_order != order;
+
+        if needs_reset {
+            self.views.update(cx, |map, _| map.clear());
+
+            self.last_tracks = tracks.clone();
+            self.last_order = order.clone();
+        }
+
+        let tracks = self.last_tracks.clone();
+        let queue_order = self.last_order.clone();
         let len = queue_order.len();
         let scroll_handle = self.scroll_handle.clone();
 
@@ -210,11 +231,11 @@ impl Render for Queue {
                         })
                         .collect()
                 })
-                .w_full()
-                .h_full()
-                .flex()
-                .flex_col()
-                .track_scroll(&scroll_handle),
+                    .w_full()
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .track_scroll(&scroll_handle),
             )
     }
 }
