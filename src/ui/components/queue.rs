@@ -110,6 +110,7 @@ pub struct Queue {
 
     last_tracks: Vec<TrackId>,
     last_order: Vec<usize>,
+    last_current: Option<TrackId>,
 }
 
 impl Queue {
@@ -121,6 +122,7 @@ impl Queue {
 
             last_tracks: vec![],
             last_order: vec![],
+            last_current: None,
         })
     }
 
@@ -168,17 +170,28 @@ impl Render for Queue {
 
         let tracks = state.queue.tracks.clone();
         let order = state.queue.order.clone();
+        let current = state.playback.current.clone();
 
-        let needs_reset =
-            self.last_tracks == tracks
+        let queue_changed =
+            self.last_tracks != tracks
                 ||
                 self.last_order != order;
+        let current_changed = self.last_current != current;
 
-        if needs_reset {
+        if queue_changed {
             self.views.update(cx, |map, _| map.clear());
 
             self.last_tracks = tracks.clone();
             self.last_order = order.clone();
+        }
+
+        if (queue_changed || current_changed) && !self.stop_auto_scroll.read(cx) {
+            let this = self.clone();
+            cx.defer(move |cx| {
+                this.scroll_to_item(cx);
+            });
+
+            self.last_current = current;
         }
 
         let tracks = self.last_tracks.clone();
@@ -188,7 +201,7 @@ impl Render for Queue {
 
         div()
             .id("queue_container")
-            .on_hover(move |_, _, cx| stop_auto_scroll.update(cx, |this, _| *this = false))
+            .on_hover(move |hovered, _, cx| stop_auto_scroll.update(cx, |this, cx| *this = *hovered))
             .size_full()
             .child(
                 uniform_list("queue", len, move |range, _, cx| {
