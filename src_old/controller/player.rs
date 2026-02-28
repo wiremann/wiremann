@@ -45,6 +45,7 @@ pub enum AudioCommand {
     ScannerState(ScannerState),
     Repeat,
     Shuffle,
+    SetAppState { app_state_cache: AppStateCache, scanner_cmd_tx: Sender<ScannerCommand> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,7 +59,7 @@ pub enum AudioEvent {
 pub enum ScannerCommand {
     Load(String),
     GetPlayerCache,
-    WritePlayerCache((PlayerState, ScannerState))
+    WritePlayerCache((PlayerState, ScannerState)),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,7 +114,6 @@ impl Controller {
         let _ = self.audio_cmd_tx.send(AudioCommand::LoadId(id));
     }
 
-
     pub fn volume(&self, volume: f32) {
         let _ = self.audio_cmd_tx.send(AudioCommand::Volume(volume / 100.0));
     }
@@ -135,7 +135,9 @@ impl Controller {
     }
 
     pub fn set_scanner_state_in_engine(&self, scanner_state: ScannerState) {
-        let _ = self.audio_cmd_tx.send(AudioCommand::ScannerState(scanner_state));
+        let _ = self
+            .audio_cmd_tx
+            .send(AudioCommand::ScannerState(scanner_state));
     }
 
     pub fn load_playlist(&self, path: String) {
@@ -155,7 +157,16 @@ impl Controller {
     }
 
     pub fn write_app_state_cache(&self) {
-        let _ = self.scanner_cmd_tx.send(ScannerCommand::WritePlayerCache((self.player_state.clone(), self.scanner_state.clone())));
+        let _ = self.scanner_cmd_tx.send(ScannerCommand::WritePlayerCache((
+            self.player_state.clone(),
+            self.scanner_state.clone(),
+        )));
+    }
+
+    pub fn send_app_state_cache(&self, app_state_cache: AppStateCache, scanner_cmd_tx: Sender<ScannerCommand>) {
+        let _ = self
+            .audio_cmd_tx
+            .send(AudioCommand::SetAppState { app_state_cache, scanner_cmd_tx });
     }
 }
 
@@ -192,7 +203,7 @@ pub enum PlayerStateEvent {
     Position(u64),
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Track {
     pub path: PathBuf,
     pub meta: Metadata,

@@ -1,10 +1,14 @@
-use crate::controller::Controller;
-use crate::ui::components;
-use crate::ui::components::controlbar::ControlBar;
-use crate::ui::components::slider::{SliderEvent, SliderState};
-use crate::ui::helpers::slider_to_secs;
-use crate::ui::theme::Theme;
-use components::{image_cache::ImageCache, pages::player::PlayerPage, titlebar::Titlebar, Page};
+use super::{
+    components::{
+        controlbar::ControlBar,
+        pages::player::PlayerPage,
+        slider::{SliderEvent, SliderState},
+        titlebar::Titlebar,
+    },
+    image_cache::ImageCache,
+    theme::Theme,
+};
+use crate::{audio::engine::PlaybackState, controller::player::Controller, ui::components::Page};
 use gpui::*;
 
 pub struct Wiremann {
@@ -34,40 +38,29 @@ impl Wiremann {
             &vol_slider_state,
             |_, _, event: &SliderEvent, cx| match event {
                 SliderEvent::Change(value) => {
-                    let controller = cx.global::<Controller>().clone();
-
-                    controller.set_volume(value.start() / 100.0, cx);
+                    cx.global::<Controller>().volume(value.start());
                     cx.notify();
                 }
             },
         )
-            .detach();
+        .detach();
 
         cx.subscribe(
             &playback_slider_state,
             |_, _, event: &SliderEvent, cx| match event {
                 SliderEvent::Change(value) => {
                     let controller = cx.global::<Controller>();
-                    let state = controller.state.read(cx);
-                    let current = if let Some(id) = state.playback.current {
-                        state.library.tracks.get(&id)
-                    } else {
-                        None
-                    };
-
-                    let duration = if let Some(track) = current {
-                        track.duration
-                    } else {
-                        0
-                    };
-
-                    controller.seek(slider_to_secs(value.start(), duration));
+                    if controller.player_state.state == PlaybackState::Playing {
+                        if let Some(meta) = controller.player_state.clone().meta {
+                            controller.seek(slider_to_secs(value.start(), meta.duration));
+                        }
+                    }
 
                     cx.notify();
                 }
             },
         )
-            .detach();
+        .detach();
 
         cx.set_global(Theme::default());
         cx.set_global(Page::Player);
@@ -77,20 +70,12 @@ impl Wiremann {
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
 
-        let controller = cx.global::<Controller>().clone();
+        // cx.global::<Controller>()
+        //     .load_playlist("E:\\music\\violence ft. doomguy".to_string());
+        // cx.global::<Controller>()
+        //     .load("E:\\music\\violence ft. doomguy\\468 - GIVE ME A REASON.mp3".to_string());
 
-        controller.load_audio("E:\\music\\$UMH4RD$HIT\\002 - Push Ups.mp3".into());
-
-        let tracks = controller
-            .state
-            .read(cx)
-            .library
-            .tracks
-            .keys()
-            .cloned()
-            .collect();
-        cx.global::<Controller>()
-            .scan_folder(tracks, "E:\\music\\$UMH4RD$HIT".into());
+        cx.global::<Controller>().get_app_state_cache();
 
         Self {
             titlebar,
@@ -117,4 +102,8 @@ impl Render for Wiremann {
                 _ => div(),
             })
     }
+}
+
+fn slider_to_secs(slider: f32, duration_secs: u64) -> u64 {
+    ((slider.clamp(0.0, 100.0) / 100.0) * duration_secs as f32) as u64
 }

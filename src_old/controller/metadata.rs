@@ -35,9 +35,7 @@ impl Metadata {
         };
 
         let thumbnail = match tag.pictures().get(0) {
-            Some(data) => {
-                Some(data.data().to_vec())
-            }
+            Some(data) => Some(data.data().to_vec()),
             None => None,
         };
 
@@ -53,10 +51,7 @@ impl Metadata {
             .get_string(ItemKey::AlbumTitle)
             .unwrap_or("None")
             .to_string();
-        let genre = tag
-            .get_string(ItemKey::Genre)
-            .unwrap_or("None")
-            .to_string();
+        let genre = tag.get_string(ItemKey::Genre).unwrap_or("None").to_string();
         let duration = tagged_file.properties().duration().as_secs();
         let writer = tag
             .get_string(ItemKey::Writer)
@@ -71,10 +66,7 @@ impl Metadata {
             .get_string(ItemKey::Publisher)
             .unwrap_or("None")
             .to_string();
-        let label = tag
-            .get_string(ItemKey::Label)
-            .unwrap_or("None")
-            .to_string();
+        let label = tag.get_string(ItemKey::Label).unwrap_or("None").to_string();
 
         Ok(Metadata {
             title,

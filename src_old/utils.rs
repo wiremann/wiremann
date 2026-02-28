@@ -18,17 +18,13 @@ pub fn drop_image_from_app(cx: &mut App, image: Arc<RenderImage>) {
     }
 }
 
-
 pub fn rgb_to_bgr(img: &mut RgbaImage) {
     for px in img.pixels_mut() {
         px.0.swap(0, 2);
     }
 }
 
-pub fn decode_thumbnail(
-    data: Box<[u8]>,
-    small: bool,
-) -> anyhow::Result<Arc<RenderImage>> {
+pub fn decode_thumbnail(data: Box<[u8]>, small: bool) -> anyhow::Result<Arc<RenderImage>> {
     let mut image = ImageReader::new(Cursor::new(data))
         .with_guessed_format()?
         .decode()?

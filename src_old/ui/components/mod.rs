@@ -1,9 +1,8 @@
 pub mod controlbar;
-pub mod image_cache;
 pub mod navbar;
 pub mod pages;
-pub mod queue;
-pub mod scrollbar;
+mod queue;
+mod scrollbar;
 pub mod slider;
 pub mod titlebar;
 

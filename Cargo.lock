@@ -688,6 +688,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq",
+ "cpufeatures 0.2.17",
+]
+
+[[package]]
 name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1098,6 +1112,12 @@ dependencies = [
  "once_cell",
  "tiny-keccak",
 ]
+
+[[package]]
+name = "constant_time_eq"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "convert_case"
@@ -7430,6 +7450,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "bitcode",
+ "blake3",
  "crossbeam",
  "crossbeam-channel",
  "dirs 4.0.0",
@@ -7446,6 +7467,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "smallvec",
+ "thiserror 2.0.18",
  "uuid",
  "walkdir",
 ]

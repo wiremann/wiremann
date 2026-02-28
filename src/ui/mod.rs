@@ -1,6 +1,12 @@
 pub mod assets;
 pub mod components;
-pub mod icons;
-pub mod theme;
+pub mod helpers;
+mod icons;
+pub mod res_handler;
+mod theme;
 pub mod wiremann;
-pub mod image_cache;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum UiError {}
