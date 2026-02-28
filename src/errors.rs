@@ -47,4 +47,6 @@ pub enum ControllerError {
 pub enum CacherError {
     #[error("Recv Error occurred: `{0}`")]
     RecvError(#[from] RecvError),
+    #[error("I/O Error occurred: `{0}`")]
+    IoError(#[from] std::io::Error),
 }

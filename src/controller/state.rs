@@ -2,6 +2,7 @@ use crate::{
     library::playlists::{Playlist, PlaylistId},
     library::{Track, TrackId},
 };
+use bitcode::{Decode, Encode};
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -17,7 +18,7 @@ pub struct LibraryState {
     pub playlists: HashMap<PlaylistId, Playlist>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Encode, Decode)]
 pub enum PlaybackStatus {
     #[default]
     Stopped,
