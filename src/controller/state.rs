@@ -2,8 +2,7 @@ use crate::{
     library::playlists::{Playlist, PlaylistId},
     library::{Track, TrackId},
 };
-use gpui::RenderImage;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AppState {
