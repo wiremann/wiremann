@@ -51,6 +51,8 @@ pub enum CacherError {
     IoError(#[from] std::io::Error),
     #[error("Bitcode Error occurred: `{0}`")]
     BitcodeError(#[from] bitcode::Error),
-    #[error("Serde Error occurred: `{0}`")]
-    SerdeError(#[from] ron::Error),
+    #[error("RON Error occurred: `{0}`")]
+    RonError(#[from] ron::Error),
+    #[error("RON Spanned Error occurred: `{0}`")]
+    RonSpannedError(#[from] ron::de::SpannedError),
 }

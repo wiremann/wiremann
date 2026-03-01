@@ -1,6 +1,6 @@
 use crate::controller::commands::CacherCommand;
 use crate::controller::events::CacherEvent;
-use crate::controller::state::{LibraryState, PlaybackState, PlaybackStatus, QueueState};
+use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
@@ -230,6 +230,10 @@ impl Cacher {
                 }
                 CacherCommand::WriteAlbumArt { id, image } => self.write_cached_image(id, ImageKind::AlbumArt, &image)?,
                 CacherCommand::WriteThumbnail { id, image } => self.write_cached_image(id, ImageKind::Thumbnail, &image)?,
+                CacherCommand::GetAppState => {
+                    let state = self.load_app_state()?;
+                    let _ = self.tx.send(CacherEvent::AppState(state));
+                }
                 _ => {}
             }
         }
@@ -321,6 +325,42 @@ impl Cacher {
 
         Ok(())
     }
+
+    fn load_app_state(&self) -> Result<AppState, CacherError> {
+        let library = self.read_library_state()?;
+        let playback = self.read_playback_state()?;
+        let queue = self.read_queue_state()?;
+
+        Ok(AppState {
+            library,
+            playback,
+            queue,
+        })
+    }
+
+    fn read_queue_state(&self) -> Result<QueueState, CacherError> {
+        let path = self.base_dir.join("queue.bin");
+
+        if !path.exists() {
+            return Ok(QueueState::default());
+        }
+
+        let cached: CachedQueueState = read_cache(&path)?;
+        Ok(cached.into())
+    }
+
+    fn read_playback_state(&self) -> Result<PlaybackState, CacherError> {
+        let path = self.base_dir.join("session.bin");
+
+        if !path.exists() {
+            return Ok(PlaybackState::default());
+        }
+
+        let ron = fs::read_to_string(path)?;
+        let cached: CachedPlaybackState = ron::de::from_str(&ron)?;
+
+        Ok(cached.into())
+    }
 }
 
 fn write_cache<T: Encode>(
@@ -348,7 +388,7 @@ fn write_cache<T: Encode>(
 
 fn read_cache<T>(
     path: &PathBuf,
-) -> Result<Option<T>, CacherError>
+) -> Result<T, CacherError>
 where
     T: for<'a> Decode<'a>,
 {
@@ -364,5 +404,5 @@ where
         return Ok(None);
     }
 
-    Ok(Some(file.payload))
+    Ok(file.payload)
 }
