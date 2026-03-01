@@ -145,16 +145,20 @@ impl Controller {
                     cx.notify();
                 });
             }
-            ScannerEvent::Playlist(playlist) => self.state.update(cx, |this, cx| {
-                this.library
-                    .playlists
-                    .insert(playlist.id.clone(), playlist.clone());
-                this.playback.current_playlist = Some(playlist.id.clone());
-                this.queue.tracks = playlist.tracks.clone();
-                this.queue.order = (0..playlist.tracks.len()).collect();
+            ScannerEvent::Playlist(playlist) => {
+                self.state.update(cx, |this, cx| {
+                    this.library
+                        .playlists
+                        .insert(playlist.id.clone(), playlist.clone());
+                    this.playback.current_playlist = Some(playlist.id.clone());
+                    this.queue.tracks = playlist.tracks.clone();
+                    this.queue.order = (0..playlist.tracks.len()).collect();
 
-                cx.notify();
-            }),
+                    cx.notify();
+                });
+                let state = self.state.read(cx).clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteAppState(state));
+            }
             ScannerEvent::AlbumArt(image) => {
                 let mut image_cache = cx.global_mut::<ImageCache>();
 
@@ -175,7 +179,7 @@ impl Controller {
         &mut self,
         cx: &mut App,
         event: &CacherEvent,
-        view: Entity<Wiremann>,
+        _view: Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             CacherEvent::AppState(state) => self.state.update(cx, |this, cx| *this = state.clone()),
@@ -282,6 +286,9 @@ impl Controller {
                 this.queue.index = current;
             }
         });
+
+        let state = self.state.read(cx).clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteAppState(state));
     }
 
     pub fn next(&self, cx: &mut App) {

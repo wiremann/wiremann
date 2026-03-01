@@ -5,15 +5,13 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
-crossbeam = "0.8.4"
 crossbeam-channel = "0.5.15"
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui-component = { git = "https://github.com/anantnrg/gpui-component" }
-gpui-component-assets = { git = "https://github.com/anantnrg/gpui-component" }
 image = "0.25.9"
 lofty = "0.23.1"
 rayon = "1.11.0"
-rodio = { version = "0.21.1", features = ["symphonia-all"] }
+rodio = { version = "0.22.1", features = ["symphonia-all"] }
 rust-embed = "8.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 smallvec = "1.15.1"

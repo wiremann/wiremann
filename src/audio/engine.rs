@@ -7,11 +7,11 @@ use crate::{
     controller::{commands::AudioCommand, events::AudioEvent},
     errors::AudioError,
 };
-use rodio::{decoder::DecoderBuilder, OutputStream, OutputStreamBuilder, Sink};
+use rodio::{decoder::DecoderBuilder, DeviceSinkBuilder, MixerDeviceSink, Player};
 
 pub struct Audio {
-    sink: Sink,
-    stream_handle: OutputStream,
+    player: Player,
+    stream_handle: MixerDeviceSink,
 
     pub rx: Receiver<AudioCommand>,
     pub tx: Sender<AudioEvent>,
@@ -23,12 +23,12 @@ impl Audio {
     pub fn new() -> (Self, Sender<AudioCommand>, Receiver<AudioEvent>) {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
-        let stream_handle = OutputStreamBuilder::open_default_stream().unwrap();
-        let sink = Sink::connect_new(&stream_handle.mixer());
+        let stream_handle = DeviceSinkBuilder::open_default_sink().unwrap();
+        let player = Player::connect_new(&stream_handle.mixer());
 
         let engine = Audio {
             stream_handle,
-            sink,
+            player,
             rx: cmd_rx,
             tx: event_tx,
             track_ended: false,
@@ -55,11 +55,11 @@ impl Audio {
     }
 
     fn load_path(&mut self, path: PathBuf) -> Result<(), AudioError> {
-        self.sink.stop();
+        self.player.stop();
 
-        let prev_vol = self.sink.volume();
+        let prev_vol = self.player.volume();
 
-        self.sink = Sink::connect_new(self.stream_handle.mixer());
+        self.player = Player::connect_new(self.stream_handle.mixer());
 
         let file = File::open(path.clone()).unwrap();
         let len = file.metadata().unwrap().len();
@@ -70,11 +70,11 @@ impl Audio {
             .build()
             .unwrap();
 
-        self.sink.append(source);
+        self.player.append(source);
 
         self.track_ended = false;
 
-        self.sink.set_volume(prev_vol);
+        self.player.set_volume(prev_vol);
 
         let _ = self.tx.send(AudioEvent::TrackLoaded(path));
 
@@ -86,12 +86,12 @@ impl Audio {
     fn emit_position(&self) -> Result<(), AudioError> {
         let _ = self
             .tx
-            .send(AudioEvent::Position(self.sink.get_pos().as_secs()));
+            .send(AudioEvent::Position(self.player.get_pos().as_secs()));
         Ok(())
     }
 
     fn play(&self) -> Result<(), AudioError> {
-        self.sink.play();
+        self.player.play();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Playing));
@@ -100,7 +100,7 @@ impl Audio {
     }
 
     fn pause(&self) -> Result<(), AudioError> {
-        self.sink.pause();
+        self.player.pause();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Paused));
@@ -109,7 +109,7 @@ impl Audio {
     }
 
     fn stop(&self) -> Result<(), AudioError> {
-        self.sink.stop();
+        self.player.stop();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Stopped));
@@ -119,19 +119,19 @@ impl Audio {
 
     fn set_volume(&self, volume: f32) -> Result<(), AudioError> {
         let volume = volume.clamp(0.0, 1.0);
-        self.sink.set_volume(volume);
+        self.player.set_volume(volume);
 
         Ok(())
     }
 
     fn seek(&self, pos: u64) -> Result<(), AudioError> {
-        self.sink.try_seek(Duration::from_secs(pos))?;
+        self.player.try_seek(Duration::from_secs(pos))?;
 
         Ok(())
     }
 
     fn check_track_ended(&mut self) -> Result<(), AudioError> {
-        if self.sink.empty() && !self.track_ended {
+        if self.player.empty() && !self.track_ended {
             self.track_ended = true;
 
             let _ = self.tx.send(AudioEvent::TrackEnded);
