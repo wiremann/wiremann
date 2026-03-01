@@ -31,6 +31,12 @@ pub enum CacherCommand {
     GetThumbnail(TrackId),
     GetAlbumArt(TrackId),
     WriteAppState(AppState),
-    WriteThumbnail(Vec<u8>),
-    WriteAlbumArt(Vec<u8>),
+    WriteThumbnail {
+        id: TrackId,
+        image: Vec<u8>,
+    },
+    WriteAlbumArt {
+        id: TrackId,
+        image: Vec<u8>,
+    },
 }

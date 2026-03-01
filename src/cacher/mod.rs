@@ -228,6 +228,8 @@ impl Cacher {
                     self.write_playback_state(&app_state.playback)?;
                     self.write_queue_state(&app_state.queue)?;
                 }
+                CacherCommand::WriteAlbumArt { id, image } => self.write_cached_image(id, ImageKind::AlbumArt, &image)?,
+                CacherCommand::WriteThumbnail { id, image } => self.write_cached_image(id, ImageKind::Thumbnail, &image)?,
                 _ => {}
             }
         }
@@ -295,6 +297,29 @@ impl Cacher {
             .join("images")
             .join(folder)
             .join(name)
+    }
+
+    fn write_cached_image(&self, id: TrackId, kind: ImageKind, bytes: &[u8]) -> Result<(), CacherError> {
+        let final_path = self.cached_image_path(id, kind);
+        let tmp_path = final_path.with_extension("tmp");
+
+        if final_path.exists() {
+            return Ok(());
+        }
+
+        fs::create_dir_all(final_path.parent().unwrap())?;
+
+        let compressed = zstd::encode_all(bytes, 3)?;
+
+        {
+            let mut file = fs::File::create(&tmp_path)?;
+            file.write_all(&compressed)?;
+            file.sync_all()?;
+        }
+
+        fs::rename(tmp_path, final_path)?;
+
+        Ok(())
     }
 }
 
