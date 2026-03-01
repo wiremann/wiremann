@@ -7457,6 +7457,7 @@ dependencies = [
  "gpui",
  "gpui-component",
  "gpui-component-assets",
+ "hex",
  "image",
  "lofty",
  "num_cpus",

@@ -27,6 +27,10 @@ struct CacheFile<T> {
     payload: T,
 }
 
+enum ImageKind {
+    Thumbnail,
+    AlbumArt,
+}
 #[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
 struct CachedTrack {
     pub id: [u8; 32],
@@ -45,7 +49,7 @@ struct CachedTrack {
 enum CachedPlaylistSource {
     User,
     #[default]
-    Folder(String),
+    Folder,
     Generated,
 }
 
@@ -123,7 +127,7 @@ impl From<&LibraryState> for CachedTracks {
         let tracks = state
             .tracks
             .iter()
-            .map(|(id, track)| (*id.0, CachedTrack::from(track.as_ref())))
+            .map(|(id, track)| (id.0, CachedTrack::from(track.as_ref())))
             .collect();
 
         Self { tracks }
@@ -152,7 +156,7 @@ impl From<&PlaybackState> for CachedPlaybackState {
     fn from(p: &PlaybackState) -> Self {
         Self {
             current: p.current.map(|id| id.0),
-            current_playlist: p.current_playlist.map(|id| id.to_string()),
+            current_playlist: p.current_playlist.map(|id| id.0.to_string()),
             status: p.status,
             position: p.position,
             volume: p.volume,
@@ -220,20 +224,20 @@ impl Cacher {
         loop {
             match self.rx.recv()? {
                 CacherCommand::WriteAppState(app_state) => {
-                    self.write_library_state(app_state.library)?;
-                    self.write_playback_state(app_state.playback)?;
-                    self.write_queue_state(app_state.queue)?;
+                    self.write_library_state(&app_state.library)?;
+                    self.write_playback_state(&app_state.playback)?;
+                    self.write_queue_state(&app_state.queue)?;
                 }
                 _ => {}
             }
         }
     }
 
-    fn write_library_state(&self, state: LibraryState) -> Result<(), CacherError> {
+    fn write_library_state(&self, state: &LibraryState) -> Result<(), CacherError> {
         let dir = self.base_dir.join("library");
         fs::create_dir_all(&dir)?;
 
-        let tracks = CachedTracks::from(&state);
+        let tracks = CachedTracks::from(state);
 
         write_cache(
             &dir.join("tracks.tmp"),
@@ -244,11 +248,11 @@ impl Cacher {
         Ok(())
     }
 
-    fn write_playback_state(&self, state: PlaybackState) -> Result<(), CacherError> {
+    fn write_playback_state(&self, state: &PlaybackState) -> Result<(), CacherError> {
         let tmp_path = self.base_dir.join("session.tmp");
-        let final_path = self.base_dir.join("session.bin");
+        let final_path = self.base_dir.join("session.ron");
 
-        let payload = CachedPlaybackState::from(&state);
+        let payload = CachedPlaybackState::from(state);
 
         let ron = ron::ser::to_string_pretty(&payload, Default::default())?;
 
@@ -263,11 +267,11 @@ impl Cacher {
         Ok(())
     }
 
-    fn write_queue_state(&self, state: QueueState) -> Result<(), CacherError> {
+    fn write_queue_state(&self, state: &QueueState) -> Result<(), CacherError> {
         let tmp_path = self.base_dir.join("queue.tmp");
         let final_path = self.base_dir.join("queue.bin");
 
-        let queue = CachedQueueState::from(&state);
+        let queue = CachedQueueState::from(state);
 
         write_cache(
             &tmp_path,
@@ -276,6 +280,21 @@ impl Cacher {
         )?;
 
         Ok(())
+    }
+
+    fn cached_image_path(&self, id: TrackId, kind: ImageKind) -> PathBuf {
+        let hex = hex::encode(id.0);
+        let folder = &hex[0..2];
+
+        let name = match kind {
+            ImageKind::Thumbnail => format!("{hex}_thumb.bgra.zstd"),
+            ImageKind::AlbumArt => format!("{hex}_art.bgra.zstd"),
+        };
+
+        self.base_dir
+            .join("images")
+            .join(folder)
+            .join(name)
     }
 }
 
@@ -302,9 +321,12 @@ fn write_cache<T: Encode>(
     Ok(())
 }
 
-fn read_cache<T: Decode>(
+fn read_cache<T>(
     path: &PathBuf,
-) -> Result<Option<T>, CacherError> {
+) -> Result<Option<T>, CacherError>
+where
+    T: for<'a> Decode<'a>,
+{
     if !path.exists() {
         return Ok(None);
     }
