@@ -22,18 +22,15 @@ pub struct Cacher {
 }
 
 enum CacheJob {
-    WriteLibrary(LibraryState),
-    WritePlayback(PlaybackState),
-    WriteQueue(QueueState),
-
+    WriteAppState(AppState),
     WriteImage {
         id: TrackId,
         kind: ImageKind,
-        bytes: Vec<u8>,
+        image: Vec<u8>,
     },
-
     LoadAppState,
     LoadThumbnails(Vec<TrackId>),
+    LoadAlbumArt(TrackId),
 }
 
 #[derive(Encode, Decode)]
@@ -277,18 +274,30 @@ impl Cacher {
     }
 
     pub fn run(&self) -> Result<(), CacherError> {
+        let (app_state_tx, app_state_rx) = crossbeam_channel::unbounded();
+        let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
+        let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
+
+        self.spawn_app_state_worker(app_state_rx)?;
+        self.spawn_thumbnail_workers(thumb_rx)?;
+        self.spawn_album_art_worker(album_art_rx)?;
+
         loop {
             match self.rx.recv()? {
                 CacherCommand::WriteAppState(app_state) => {
-                    self.write_library_state(&app_state.library)?;
-                    self.write_playback_state(&app_state.playback)?;
-                    self.write_queue_state(&app_state.queue)?;
+                    // self.write_library_state(&app_state.library)?;
+                    // self.write_playback_state(&app_state.playback)?;
+                    // self.write_queue_state(&app_state.queue)?;
+                    let _ = app_state_tx.send(CacheJob::WriteAppState(app_state));
                 }
-                CacherCommand::WriteAlbumArt { id, image } => self.write_cached_image(id, ImageKind::AlbumArt, &image)?,
-                CacherCommand::WriteThumbnail { id, image } => self.write_cached_image(id, ImageKind::Thumbnail, &image)?,
+                CacherCommand::WriteAlbumArt { id, image } => {
+                    let _ = album_art_tx.send(CacheJob::WriteImage { id, kind: ImageKind::AlbumArt, image });
+                }
+                CacherCommand::WriteThumbnail { id, image } => {
+                    let _ = thumb_tx.send(CacheJob::WriteImage { id, kind: ImageKind::Thumbnail, image });
+                }
                 CacherCommand::GetAppState => {
-                    let state = self.load_app_state()?;
-                    let _ = self.tx.send(CacherEvent::AppState(state));
+                    let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
                 _ => {}
             }
