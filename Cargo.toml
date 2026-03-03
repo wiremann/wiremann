@@ -10,7 +10,6 @@ gpui = { git = "https://github.com/zed-industries/zed" }
 gpui-component = { git = "https://github.com/anantnrg/gpui-component" }
 image = "0.25.9"
 lofty = "0.23.2"
-rayon = "1.11.0"
 rodio = { version = "0.22.1", features = ["symphonia-all"] }
 rust-embed = "8.11.0"
 serde = { version = "1.0.228", features = ["derive"] }

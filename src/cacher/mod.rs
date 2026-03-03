@@ -3,9 +3,9 @@ use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{Track, TrackId, gen_track_id};
+use crate::library::{gen_track_id, Track, TrackId};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{Receiver, Sender, select, tick};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::Frame;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,9 @@ pub struct Cacher {
 }
 
 enum CacheJob {
-    WriteAppState(AppState),
+    WriteLibraryState(LibraryState),
+    WritePlaybackState(PlaybackState),
+    WriteQueueState(QueueState),
     WriteImage {
         id: TrackId,
         kind: ImageKind,
@@ -302,8 +304,14 @@ impl Cacher {
 
         loop {
             match self.rx.recv()? {
-                CacherCommand::WriteAppState(app_state) => {
-                    let _ = app_state_tx.send(CacheJob::WriteAppState(app_state));
+                CacherCommand::WriteLibraryState(state) => {
+                    let _ = app_state_tx.send(CacheJob::WriteLibraryState(state));
+                }
+                CacherCommand::WritePlaybackState(state) => {
+                    let _ = app_state_tx.send(CacheJob::WritePlaybackState(state));
+                }
+                CacherCommand::WriteQueueState(state) => {
+                    let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
                 }
                 CacherCommand::WriteImage {
                     id,
@@ -513,12 +521,15 @@ impl Cacher {
                 while let Ok(job) = rx.recv() {
                     let result: Result<(), CacherError> = (|| {
                         match job {
-                            CacheJob::WriteAppState(state) => {
-                                cacher.write_library_state(&state.library)?;
-                                cacher.write_playback_state(&state.playback)?;
-                                cacher.write_queue_state(&state.queue)?;
+                            CacheJob::WriteLibraryState(state) => {
+                                cacher.write_library_state(&state)?;
                             }
-
+                            CacheJob::WritePlaybackState(state) => {
+                                cacher.write_playback_state(&state)?;
+                            }
+                            CacheJob::WriteQueueState(state) => {
+                                cacher.write_queue_state(&state)?;
+                            }
                             CacheJob::LoadAppState => {
                                 let state = cacher.load_app_state()?;
                                 let _ = cacher.tx.send(CacherEvent::AppState(state));

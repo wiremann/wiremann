@@ -1,5 +1,5 @@
 use crate::cacher::ImageKind;
-use crate::controller::state::AppState;
+use crate::controller::state::{LibraryState, PlaybackState, QueueState};
 use crate::library::TrackId;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -31,7 +31,9 @@ pub enum CacherCommand {
     GetAppState,
     GetAlbumArt(PathBuf),
     GetThumbnails(HashSet<TrackId>),
-    WriteAppState(AppState),
+    WriteLibraryState(LibraryState),
+    WritePlaybackState(PlaybackState),
+    WriteQueueState(QueueState),
     WriteImage {
         id: TrackId,
         kind: ImageKind,
