@@ -136,9 +136,6 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::Tracks(tracks) => {
-                let ids: HashSet<_> = tracks.iter().map(|t| t.id.clone()).collect();
-
-                let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
                 self.state.update(cx, |this, cx| {
                     this.library.tracks.reserve(tracks.len());
                     for track in tracks {
@@ -157,6 +154,10 @@ impl Controller {
                     this.playback.current_playlist = Some(playlist.id.clone());
                     this.queue.tracks = playlist.tracks.clone();
                     this.queue.order = (0..playlist.tracks.len()).collect();
+
+                    let ids: HashSet<_> = this.queue.tracks.iter().map(|t| t.clone()).collect();
+
+                    let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
 
                     cx.notify();
                 });
@@ -177,21 +178,23 @@ impl Controller {
 
                 let thumbnails = thumbnails.clone();
 
-                let tx = self.cacher_tx.clone();
-
-                cx.background_executor().spawn(async move {
-                    for (id, image) in thumbnails {
-                        let width = image.size(0).width.0 as u32;
-                        let height = image.size(0).height.0 as u32;
-                        match image.as_bytes(0) {
-                            Some(image) => {
-                                let image = image.to_vec();
-                                let _ = tx.send(CacherCommand::WriteImage { id, kind: ImageKind::Thumbnail, width, height, image });
-                            }
-                            None => {}
+                for (id, image) in thumbnails {
+                    let width = image.size(0).width.0 as u32;
+                    let height = image.size(0).height.0 as u32;
+                    match image.as_bytes(0) {
+                        Some(image) => {
+                            let image = image.to_vec();
+                            let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                                id,
+                                kind: ImageKind::Thumbnail,
+                                width,
+                                height,
+                                image,
+                            });
                         }
+                        None => {}
                     }
-                }).detach();
+                }
             }
         }
         Ok(())
@@ -208,18 +211,6 @@ impl Controller {
             CacherEvent::Thumbnails(thumbnails) => {
                 let mut thumbnail_cache = cx.global_mut::<ImageCache>();
                 thumbnail_cache.thumbs.extend(thumbnails.clone());
-            }
-            CacherEvent::MissingThumbnails(ids) => {
-                let tracks = self.state.read(cx).library.tracks.clone();
-
-                for id in ids {
-                    match tracks.get(&id) {
-                        Some(track) => {
-                            let _ = self.scanner_tx.send(ScannerCommand::GetThumbnail { path: track.path.clone(), track_id: id.clone() });
-                        }
-                        None => {}
-                    }
-                }
             }
             _ => {}
         }
@@ -253,11 +244,10 @@ impl Controller {
     }
 
     pub fn scan_folder(&self, tracks: HashSet<TrackId>, path: PathBuf) {
-        let _ = self
-            .scanner_tx
-            .send(ScannerCommand::ScanFolder { path, tracks: tracks.clone() });
-
-        let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(tracks));
+        let _ = self.scanner_tx.send(ScannerCommand::ScanFolder {
+            path,
+            tracks: tracks.clone(),
+        });
     }
 
     pub fn play(&self) {
@@ -282,7 +272,13 @@ impl Controller {
         self.state.update(cx, |this, cx| {
             this.playback.mute = !this.playback.mute;
 
-            let _ = self.audio_tx.send(AudioCommand::SetVolume(if this.playback.mute { 0.0 } else { this.playback.volume }));
+            let _ = self
+                .audio_tx
+                .send(AudioCommand::SetVolume(if this.playback.mute {
+                    0.0
+                } else {
+                    this.playback.volume
+                }));
         })
     }
 
@@ -293,7 +289,9 @@ impl Controller {
 
         let muted = self.state.read(cx).playback.mute;
 
-        let _ = self.audio_tx.send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
+        let _ = self
+            .audio_tx
+            .send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
     }
 
     pub fn set_shuffle(&self, cx: &mut App) {
@@ -308,14 +306,11 @@ impl Controller {
 
             if this.playback.shuffling {
                 let mut rng = rng();
-                this.queue.order =
-                    (0..this.queue.tracks.len()).collect();
+                this.queue.order = (0..this.queue.tracks.len()).collect();
 
                 this.queue.order.shuffle(&mut rng);
 
-                if let Some(pos) =
-                    this.queue.order.iter().position(|&x| x == current)
-                {
+                if let Some(pos) = this.queue.order.iter().position(|&x| x == current) {
                     this.queue.order.swap(0, pos);
                 }
 

@@ -24,10 +24,6 @@ pub enum ScannerCommand {
         path: PathBuf,
         tracks: HashSet<TrackId>,
     },
-    GetThumbnail {
-        path: PathBuf,
-        track_id: TrackId,
-    },
     GetCurrentAlbumArt(PathBuf),
 }
 
