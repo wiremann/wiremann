@@ -1,11 +1,11 @@
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{gen_track_id, Track};
+use crate::library::{Track, gen_track_id};
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent},
     errors::ScannerError,
     library::TrackId,
 };
-use crossbeam_channel::{select, tick, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, select, tick};
 use gpui::RenderImage;
 use image::imageops::thumbnail;
 use image::{Frame, ImageReader};
@@ -13,8 +13,8 @@ use lofty::{prelude::*, probe::Probe};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
 use uuid::Uuid;
@@ -48,7 +48,11 @@ impl Scanner {
         (scanner, cmd_tx, event_rx)
     }
 
-    pub fn run(&mut self, metadata_workers: usize, thumbnail_workers: usize) -> Result<(), ScannerError> {
+    pub fn run(
+        &mut self,
+        metadata_workers: usize,
+        thumbnail_workers: usize,
+    ) -> Result<(), ScannerError> {
         let (meta_tx, meta_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
@@ -94,43 +98,43 @@ impl Scanner {
 
                 loop {
                     select! {
-                    recv(meta_rx) -> job => {
-                        match job {
-                            Ok(ScanJob::Metadata(path, track_id)) => {
-                                match get_track_metadata(path, track_id) {
-                                    Ok((track, image)) => {
-                                        let id = track.id.clone();
-                                        batch.push(track);
+                        recv(meta_rx) -> job => {
+                            match job {
+                                Ok(ScanJob::Metadata(path, track_id)) => {
+                                    match get_track_metadata(path, track_id) {
+                                        Ok((track, image)) => {
+                                            let id = track.id.clone();
+                                            batch.push(track);
 
-                                        if batch.len() >= 16 {
-                                            let _ = events_tx.send(
-                                                ScannerEvent::Tracks(std::mem::take(&mut batch))
-                                            );
-                                        }
+                                            if batch.len() >= 16 {
+                                                let _ = events_tx.send(
+                                                    ScannerEvent::Tracks(std::mem::take(&mut batch))
+                                                );
+                                            }
 
-                                        if let Some(bytes) = image {
-                                            let _ = thumb_tx.send(ScanJob::Thumbnail(id, bytes));
-                                            thumbnail_jobs.fetch_add(1, Ordering::AcqRel);
+                                            if let Some(bytes) = image {
+                                                let _ = thumb_tx.send(ScanJob::Thumbnail(id, bytes));
+                                                thumbnail_jobs.fetch_add(1, Ordering::AcqRel);
+                                            }
                                         }
+                                        Err(err) => eprintln!("Failed to get track metadata: {}", err),
                                     }
-                                    Err(err) => eprintln!("Failed to get track metadata: {}", err),
+                                    if metadata_jobs.fetch_sub(1, Ordering::AcqRel) == 1  && thumbnail_jobs.load(Ordering::Relaxed) == 0 {
+                                        let _ = events_tx.send(ScannerEvent::ScanFinished);
+                                    }
                                 }
-                                if metadata_jobs.fetch_sub(1, Ordering::AcqRel) == 1  && thumbnail_jobs.load(Ordering::Relaxed) == 0 {
-                                    let _ = events_tx.send(ScannerEvent::ScanFinished);
-                                }
+                                _ => {}
                             }
-                            _ => {}
                         }
-                    }
 
-                     recv(ticker) -> _ => {
-                        if !batch.is_empty() {
-                            let _ = events_tx.send(
-                                ScannerEvent::Tracks(std::mem::take(&mut batch))
-                            );
+                         recv(ticker) -> _ => {
+                            if !batch.is_empty() {
+                                let _ = events_tx.send(
+                                    ScannerEvent::Tracks(std::mem::take(&mut batch))
+                                );
+                            }
                         }
                     }
-                }
                 }
             });
         }
@@ -138,7 +142,11 @@ impl Scanner {
         Ok(())
     }
 
-    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>, workers: usize) -> Result<(), ScannerError> {
+    fn spawn_thumbnail_workers(
+        &self,
+        thumb_rx: Receiver<ScanJob>,
+        workers: usize,
+    ) -> Result<(), ScannerError> {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
@@ -176,7 +184,9 @@ impl Scanner {
                             }
                         }
                     }
-                    if thumbnail_jobs.fetch_sub(1, Ordering::AcqRel) == 1 && metadata_jobs.load(Ordering::Relaxed) == 0 {
+                    if thumbnail_jobs.fetch_sub(1, Ordering::AcqRel) == 1
+                        && metadata_jobs.load(Ordering::Relaxed) == 0
+                    {
                         let _ = events_tx.send(ScannerEvent::ScanFinished);
                     }
                 }

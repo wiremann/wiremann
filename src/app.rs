@@ -5,10 +5,10 @@ use std::{
 };
 
 use crate::cacher::Cacher;
-use crate::worker_config::{calculate_worker_config, WorkerConfig};
+use crate::worker_config::{WorkerConfig, calculate_worker_config};
 use crate::{
     audio::engine::Audio,
-    controller::{state::AppState, Controller},
+    controller::{Controller, state::AppState},
     errors::AppError,
     scanner::Scanner,
     ui::{
@@ -17,7 +17,9 @@ use crate::{
         wiremann::Wiremann,
     },
 };
-use gpui::{px, size, AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions};
+use gpui::{
+    AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions, px, size,
+};
 use gpui_component::Root;
 
 pub fn run() -> Result<(), AppError> {
@@ -29,7 +31,11 @@ pub fn run() -> Result<(), AppError> {
         let bounds = Bounds::centered(None, size(px(1280.0), px(760.0)), cx);
         assets.load_fonts(cx).expect("Could not load fonts");
 
-        let WorkerConfig { metadata_workers, thumbnail_workers, cacher_workers } = calculate_worker_config();
+        let WorkerConfig {
+            metadata_workers,
+            thumbnail_workers,
+            cacher_workers,
+        } = calculate_worker_config();
 
         let (mut audio, audio_tx, audio_rx) = Audio::new();
         let (mut scanner, scanner_tx, scanner_rx) = Scanner::new();
@@ -131,7 +137,7 @@ pub fn run() -> Result<(), AppError> {
                                     .await;
                             }
                         })
-                            .detach();
+                        .detach();
 
                         let view_clone = view.clone();
 
@@ -154,7 +160,7 @@ pub fn run() -> Result<(), AppError> {
                                 eprintln!("controller error: {e:?}");
                             }
                         })
-                            .detach();
+                        .detach();
 
                         Root::new(view, window, cx)
                     })
@@ -163,7 +169,7 @@ pub fn run() -> Result<(), AppError> {
 
             Ok::<_, AppError>(())
         })
-            .detach();
+        .detach();
     });
 
     Ok(())

@@ -3,9 +3,9 @@ use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{gen_track_id, Track, TrackId};
+use crate::library::{Track, TrackId, gen_track_id};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{select, tick, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, select, tick};
 use gpui::RenderImage;
 use image::Frame;
 use serde::{Deserialize, Serialize};
@@ -551,7 +551,11 @@ impl Cacher {
         Ok(())
     }
 
-    fn spawn_thumbnail_workers(&self, rx: Receiver<CacheJob>, workers: usize) -> Result<(), CacherError> {
+    fn spawn_thumbnail_workers(
+        &self,
+        rx: Receiver<CacheJob>,
+        workers: usize,
+    ) -> Result<(), CacherError> {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
