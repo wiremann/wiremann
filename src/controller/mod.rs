@@ -211,8 +211,9 @@ impl Controller {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
                 thumbnail_cache.thumbs.extend(thumbnails.clone());
-
-                let thumbnails = thumbnails.clone();
+            }
+            ScannerEvent::ScanFinished => {
+                let thumbnails = cx.global::<ImageCache>().thumbs.clone();
 
                 for (id, image) in thumbnails {
                     let width = image.size(0).width.0 as u32;

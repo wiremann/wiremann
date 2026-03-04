@@ -20,6 +20,7 @@ pub enum ScannerEvent {
     Playlist(Playlist),
     AlbumArt(TrackId, Arc<RenderImage>),
     Thumbnails(HashMap<TrackId, Arc<RenderImage>>),
+    ScanFinished,
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -13,6 +13,7 @@ use lofty::{prelude::*, probe::Probe};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
@@ -48,8 +49,11 @@ impl Scanner {
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
 
-        self.spawn_metadata_worker(meta_rx, thumb_tx.clone())?;
-        self.spawn_thumbnail_workers(thumb_rx, workers)?;
+        let thumbs_remaining = Arc::new(AtomicUsize::new(0));
+        let metadata_done = Arc::new(AtomicBool::new(false));
+
+        self.spawn_metadata_worker(meta_rx, thumb_tx.clone(), metadata_done.clone(), thumbs_remaining.clone())?;
+        self.spawn_thumbnail_workers(thumb_rx, workers, metadata_done.clone(), thumbs_remaining.clone())?;
         self.spawn_album_art_worker(album_art_rx)?;
 
         loop {
@@ -71,6 +75,8 @@ impl Scanner {
         &self,
         meta_rx: Receiver<ScanJob>,
         thumb_tx: Sender<ScanJob>,
+        metadata_done: Arc<AtomicBool>,
+        thumbs_remaining: Arc<AtomicUsize>,
     ) -> Result<(), ScannerError> {
         let events_tx = self.tx.clone();
 
@@ -95,6 +101,7 @@ impl Scanner {
                                         }
 
                                         if let Some(bytes) = image {
+                                            thumbs_remaining.fetch_add(1, Ordering::Relaxed);
                                             let _ = thumb_tx.send(ScanJob::Thumbnail(id, bytes));
                                         }
                                     }
@@ -119,7 +126,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>, workers: usize) -> Result<(), ScannerError> {
+    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>, workers: usize, metadata_done: Arc<AtomicBool>, thumbs_remaining: Arc<AtomicUsize>) -> Result<(), ScannerError> {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
