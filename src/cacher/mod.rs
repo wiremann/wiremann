@@ -3,9 +3,9 @@ use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{Track, TrackId, gen_track_id};
+use crate::library::{gen_track_id, Track, TrackId};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{Receiver, Sender, select, tick};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::Frame;
 use serde::{Deserialize, Serialize};
@@ -293,13 +293,13 @@ impl Cacher {
         (cacher, cmd_tx, event_rx)
     }
 
-    pub fn run(&self) -> Result<(), CacherError> {
+    pub fn run(&self, workers: usize) -> Result<(), CacherError> {
         let (app_state_tx, app_state_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
 
         self.spawn_app_state_worker(app_state_rx)?;
-        self.spawn_thumbnail_workers(thumb_rx)?;
+        self.spawn_thumbnail_workers(thumb_rx, workers)?;
         self.spawn_album_art_worker(album_art_rx)?;
 
         loop {
@@ -551,11 +551,10 @@ impl Cacher {
         Ok(())
     }
 
-    fn spawn_thumbnail_workers(&self, rx: Receiver<CacheJob>) -> Result<(), CacherError> {
+    fn spawn_thumbnail_workers(&self, rx: Receiver<CacheJob>, workers: usize) -> Result<(), CacherError> {
         let ticker = tick(Duration::from_millis(128));
-        let threads = num_cpus::get() - 2;
 
-        for _ in 0..threads {
+        for _ in 0..workers {
             let cacher = self.clone();
             let ticker = ticker.clone();
             let thumb_rx = rx.clone();

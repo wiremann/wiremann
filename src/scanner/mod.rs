@@ -1,11 +1,11 @@
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{Track, gen_track_id};
+use crate::library::{gen_track_id, Track};
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent},
     errors::ScannerError,
     library::TrackId,
 };
-use crossbeam_channel::{Receiver, Sender, select, tick};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::imageops::thumbnail;
 use image::{Frame, ImageReader};
@@ -43,13 +43,13 @@ impl Scanner {
         (scanner, cmd_tx, event_rx)
     }
 
-    pub fn run(&mut self) -> Result<(), ScannerError> {
+    pub fn run(&mut self, workers: usize) -> Result<(), ScannerError> {
         let (meta_tx, meta_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
 
         self.spawn_metadata_worker(meta_rx, thumb_tx.clone())?;
-        self.spawn_thumbnail_workers(thumb_rx)?;
+        self.spawn_thumbnail_workers(thumb_rx, workers)?;
         self.spawn_album_art_worker(album_art_rx)?;
 
         loop {
@@ -119,11 +119,10 @@ impl Scanner {
         Ok(())
     }
 
-    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>) -> Result<(), ScannerError> {
+    fn spawn_thumbnail_workers(&self, thumb_rx: Receiver<ScanJob>, workers: usize) -> Result<(), ScannerError> {
         let ticker = tick(Duration::from_millis(128));
-        let threads = num_cpus::get() - 2;
 
-        for _ in 0..threads {
+        for _ in 0..workers {
             let events_tx = self.tx.clone();
             let ticker = ticker.clone();
             let thumb_rx = thumb_rx.clone();

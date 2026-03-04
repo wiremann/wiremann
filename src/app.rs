@@ -5,9 +5,10 @@ use std::{
 };
 
 use crate::cacher::Cacher;
+use crate::worker_config::{calculate_worker_config, WorkerConfig};
 use crate::{
     audio::engine::Audio,
-    controller::{Controller, state::AppState},
+    controller::{state::AppState, Controller},
     errors::AppError,
     scanner::Scanner,
     ui::{
@@ -27,6 +28,8 @@ pub fn run() -> Result<(), AppError> {
         gpui_component::init(cx);
         let bounds = Bounds::centered(None, size(px(1280.0), px(760.0)), cx);
         assets.load_fonts(cx).expect("Could not load fonts");
+
+        let WorkerConfig { scanner_workers, cacher_workers } = calculate_worker_config();
 
         let (mut audio, audio_tx, audio_rx) = Audio::new();
         let (mut scanner, scanner_tx, scanner_rx) = Scanner::new();
@@ -49,13 +52,13 @@ pub fn run() -> Result<(), AppError> {
         });
 
         thread::spawn(move || {
-            if let Err(e) = scanner.run() {
+            if let Err(e) = scanner.run(scanner_workers) {
                 eprintln!("Scanner thread crashed with error: {:?}", e);
             }
         });
 
         thread::spawn(move || {
-            if let Err(e) = cacher.run() {
+            if let Err(e) = cacher.run(cacher_workers) {
                 eprintln!("Cacher thread crashed with error: {:?}", e);
             }
         });
@@ -128,7 +131,7 @@ pub fn run() -> Result<(), AppError> {
                                     .await;
                             }
                         })
-                        .detach();
+                            .detach();
 
                         let view_clone = view.clone();
 
@@ -151,7 +154,7 @@ pub fn run() -> Result<(), AppError> {
                                 eprintln!("controller error: {e:?}");
                             }
                         })
-                        .detach();
+                            .detach();
 
                         Root::new(view, window, cx)
                     })
@@ -160,7 +163,7 @@ pub fn run() -> Result<(), AppError> {
 
             Ok::<_, AppError>(())
         })
-        .detach();
+            .detach();
     });
 
     Ok(())
