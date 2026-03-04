@@ -109,7 +109,7 @@ impl Controller {
                     this.playback.current = Some(track_id);
 
                     if let Some(idx) = this.queue.get_index(track_id) {
-                        this.queue.index = idx;
+                        this.playback.current_index = idx;
                     }
 
                     cx.notify();
@@ -238,17 +238,16 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             CacherEvent::AppState(state) => {
-                println!("playback state: {:?}", state.playback);
                 let playback_state = state.playback.clone();
-                self.state.update(cx, |this, cx| {
+                self.state.update(cx, |this, _| {
                     *this = state.clone();
+
+                    let ids: HashSet<_> = this.queue.tracks.iter().map(|t| t.clone()).collect();
+                    let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
                 });
 
                 self.load_queue_current(cx);
                 self.set_volume(playback_state.volume, cx);
-                if playback_state.mute {
-                    self.set_mute(cx);
-                }
                 self.seek(playback_state.position);
 
                 match playback_state.status {
@@ -256,6 +255,16 @@ impl Controller {
                     PlaybackStatus::Paused => self.pause(),
                     PlaybackStatus::Playing => self.play(),
                 }
+
+                view.update(cx, |this, cx| {
+                    this.player_page.update(cx, |this, cx| {
+                        this.controlbar.update(cx, |this, cx| {
+                            this.vol_slider_state.update(cx, |this, cx| {
+                                this.set_value(playback_state.volume * 100.0, cx);
+                            });
+                        });
+                    });
+                });
             }
             CacherEvent::Thumbnails(thumbnails) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
@@ -298,11 +307,10 @@ impl Controller {
     }
 
     pub fn load_queue_current(&self, cx: &App) {
-        let queue = &self.state.read(cx).queue;
-        let library = &self.state.read(cx).library;
+        let state = self.state.read(cx);
 
-        if let Some(track_id) = queue.get_id() {
-            if let Some(track) = library.tracks.get(&track_id) {
+        if let Some(track_id) = state.queue.get_id(state.playback.current_index) {
+            if let Some(track) = state.library.tracks.get(&track_id) {
                 let path = track.path.clone();
                 let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
                 let _ = self
@@ -382,7 +390,7 @@ impl Controller {
                 return;
             }
 
-            let current = this.queue.order[this.queue.index];
+            let current = this.queue.order[this.playback.current_index];
 
             if this.playback.shuffling {
                 let mut rng = rng();
@@ -394,11 +402,11 @@ impl Controller {
                     this.queue.order.swap(0, pos);
                 }
 
-                this.queue.index = 0;
+                this.playback.current_index = 0;
             } else {
                 this.queue.order = (0..this.queue.tracks.len()).collect();
 
-                this.queue.index = current;
+                this.playback.current_index = current;
             }
         });
 
@@ -409,7 +417,7 @@ impl Controller {
 
     pub fn next(&self, cx: &mut App) {
         self.state.update(cx, |this, _| {
-            this.queue.index = (this.queue.index + 1).clamp(0, this.library.tracks.len());
+            this.playback.current_index = (this.playback.current_index + 1).clamp(0, this.library.tracks.len());
         });
 
         self.load_queue_current(cx);
@@ -420,7 +428,7 @@ impl Controller {
     }
     pub fn prev(&self, cx: &mut App) {
         self.state.update(cx, |this, _| {
-            this.queue.index = this.queue.index.saturating_sub(1);
+            this.playback.current_index = this.playback.current_index.saturating_sub(1);
         });
 
         self.load_queue_current(cx);

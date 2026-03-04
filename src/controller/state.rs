@@ -30,6 +30,7 @@ pub enum PlaybackStatus {
 pub struct PlaybackState {
     pub current: Option<TrackId>,
     pub current_playlist: Option<PlaylistId>,
+    pub current_index: usize,
 
     pub status: PlaybackStatus,
     pub position: u64,
@@ -44,7 +45,6 @@ pub struct PlaybackState {
 pub struct QueueState {
     pub tracks: Vec<TrackId>,
     pub order: Vec<usize>,
-    pub index: usize,
 }
 
 impl Default for PlaybackState {
@@ -52,6 +52,7 @@ impl Default for PlaybackState {
         PlaybackState {
             current: None,
             current_playlist: None,
+            current_index: 0,
             status: PlaybackStatus::Stopped,
             position: 0,
             volume: 1.0,

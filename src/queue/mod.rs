@@ -2,9 +2,9 @@ use crate::controller::state::QueueState;
 use crate::library::TrackId;
 
 impl QueueState {
-    pub fn get_id(&self) -> Option<TrackId> {
+    pub fn get_id(&self, index: usize) -> Option<TrackId> {
         self.order
-            .get(self.index)
+            .get(index)
             .and_then(|&i| self.tracks.get(i))
             .copied()
     }

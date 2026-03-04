@@ -99,6 +99,7 @@ struct CachedLibraryState {
 struct CachedPlaybackState {
     pub current: Option<[u8; 32]>,
     pub current_playlist: Option<String>,
+    pub current_index: usize,
 
     pub status: PlaybackStatus,
     pub position: u64,
@@ -113,7 +114,6 @@ struct CachedPlaybackState {
 pub struct CachedQueueState {
     pub tracks: Vec<[u8; 32]>,
     pub order: Vec<usize>,
-    pub index: usize,
 }
 
 impl From<&Track> for CachedTrack {
@@ -226,6 +226,7 @@ impl From<&PlaybackState> for CachedPlaybackState {
         Self {
             current: p.current.map(|id| id.0),
             current_playlist: p.current_playlist.map(|id| id.0.to_string()),
+            current_index: p.current_index,
             status: p.status,
             position: p.position,
             volume: p.volume,
@@ -243,6 +244,7 @@ impl From<CachedPlaybackState> for PlaybackState {
             current_playlist: c
                 .current_playlist
                 .and_then(|s| Some(PlaylistId(Uuid::from_str(&s).unwrap_or_default()))),
+            current_index: c.current_index,
             status: c.status,
             position: c.position,
             volume: c.volume,
@@ -258,7 +260,6 @@ impl From<&QueueState> for CachedQueueState {
         Self {
             tracks: q.tracks.iter().map(|id| id.0).collect(),
             order: q.order.clone(),
-            index: q.index,
         }
     }
 }
@@ -268,7 +269,6 @@ impl From<CachedQueueState> for QueueState {
         Self {
             tracks: c.tracks.into_iter().map(TrackId).collect(),
             order: c.order,
-            index: c.index,
         }
     }
 }
