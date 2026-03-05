@@ -24,7 +24,7 @@ impl Audio {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
         let stream_handle = DeviceSinkBuilder::open_default_sink().unwrap();
-        let player = Player::connect_new(&stream_handle.mixer());
+        let player = Player::connect_new(stream_handle.mixer());
 
         let engine = Audio {
             stream_handle,
@@ -41,13 +41,13 @@ impl Audio {
         loop {
             while let Ok(cmd) = self.rx.try_recv() {
                 match cmd {
-                    AudioCommand::Load(path) => self.load_path(PathBuf::from(path))?,
-                    AudioCommand::GetPosition => self.emit_position()?,
-                    AudioCommand::CheckTrackEnded => self.check_track_ended()?,
-                    AudioCommand::Play => self.play()?,
-                    AudioCommand::Pause => self.pause()?,
-                    AudioCommand::Stop => self.stop()?,
-                    AudioCommand::SetVolume(v) => self.set_volume(v)?,
+                    AudioCommand::Load(path) => self.load_path(path)?,
+                    AudioCommand::GetPosition => self.emit_position(),
+                    AudioCommand::CheckTrackEnded => self.check_track_ended(),
+                    AudioCommand::Play => self.play(),
+                    AudioCommand::Pause => self.pause(),
+                    AudioCommand::Stop => self.stop(),
+                    AudioCommand::SetVolume(v) => self.set_volume(v),
                     AudioCommand::Seek(u64) => self.seek(u64)?,
                 }
             }
@@ -77,50 +77,41 @@ impl Audio {
 
         let _ = self.tx.send(AudioEvent::TrackLoaded(path));
 
-        self.play()?;
+        self.play();
 
         Ok(())
     }
 
-    fn emit_position(&self) -> Result<(), AudioError> {
+    fn emit_position(&self) {
         let _ = self
             .tx
             .send(AudioEvent::Position(self.player.get_pos().as_secs()));
-        Ok(())
     }
 
-    fn play(&self) -> Result<(), AudioError> {
+    fn play(&self) {
         self.player.play();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Playing));
-
-        Ok(())
     }
 
-    fn pause(&self) -> Result<(), AudioError> {
+    fn pause(&self) {
         self.player.pause();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Paused));
-
-        Ok(())
     }
 
-    fn stop(&self) -> Result<(), AudioError> {
+    fn stop(&self) {
         self.player.stop();
         let _ = self
             .tx
             .send(AudioEvent::PlaybackStatus(PlaybackStatus::Stopped));
-
-        Ok(())
     }
 
-    fn set_volume(&self, volume: f32) -> Result<(), AudioError> {
+    fn set_volume(&self, volume: f32){
         let volume = volume.clamp(0.0, 1.0);
         self.player.set_volume(volume);
-
-        Ok(())
     }
 
     fn seek(&self, pos: u64) -> Result<(), AudioError> {
@@ -129,13 +120,11 @@ impl Audio {
         Ok(())
     }
 
-    fn check_track_ended(&mut self) -> Result<(), AudioError> {
+    fn check_track_ended(&mut self) {
         if self.player.empty() && !self.track_ended {
             self.track_ended = true;
 
             let _ = self.tx.send(AudioEvent::TrackEnded);
         }
-
-        Ok(())
     }
 }

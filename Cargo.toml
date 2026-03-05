@@ -28,9 +28,9 @@ hex = "0.4.3"
 zstd = "0.13.3"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
+debug = 0
 incremental = true
-
-[profile.dev.package."*"]
-opt-level = 2
-incremental = true
+codegen-units = 256
+lto = false
+panic = "abort"
