@@ -9,11 +9,11 @@ use std::{
 };
 
 use gpui::{
-    AbsoluteLength, App, Background, BorderStyle, Bounds, Corners, CursorStyle, DispatchPhase,
-    Edges, Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId,
-    InteractiveElement, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    ParentElement, Pixels, Refineable, RenderOnce, ScrollHandle, ScrollWheelEvent, Style,
-    StyleRefinement, Styled, UniformListScrollHandle, Window, black, div, px, quad, rgb, white,
+    black, div, px, quad, rgb, white, AbsoluteLength, App,
+    Background, BorderStyle, Bounds, Corners, CursorStyle, DispatchPhase, Edges,
+    Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId,
+    InteractiveElement, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement,
+    Pixels, Refineable, RenderOnce, ScrollHandle, ScrollWheelEvent, Style, StyleRefinement, Styled, UniformListScrollHandle, Window,
 };
 
 use crate::ui::theme::Theme;
@@ -25,6 +25,7 @@ pub enum ScrollableHandle {
 }
 
 impl ScrollableHandle {
+    #[must_use]
     pub fn bounds(&self) -> Bounds<Pixels> {
         match self {
             ScrollableHandle::Regular(h) => h.bounds(),
@@ -33,6 +34,7 @@ impl ScrollableHandle {
     }
 
     /// negative offset
+    #[must_use]
     pub fn offset(&self) -> gpui::Point<Pixels> {
         match self {
             ScrollableHandle::Regular(h) => h.offset(),
@@ -41,6 +43,7 @@ impl ScrollableHandle {
     }
 
     /// max offset, this is positive
+    #[must_use]
     pub fn max_offset(&self) -> gpui::Size<Pixels> {
         match self {
             ScrollableHandle::Regular(h) => h.max_offset(),
@@ -60,6 +63,7 @@ impl ScrollableHandle {
         }
     }
 
+    #[must_use]
     pub fn total_content_height(&self) -> f32 {
         match self {
             ScrollableHandle::Regular(h) => (h.bounds().size.height + h.max_offset().height).into(),
@@ -104,11 +108,15 @@ pub struct Scrollbar {
 }
 
 impl Scrollbar {
+    #[allow(clippy::return_self_not_must_use)]
+    #[must_use]
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
         self.id = Some(id.into());
         self
     }
 
+    #[allow(clippy::return_self_not_must_use)]
+    #[must_use]
     pub fn scroll_handle(mut self, scroll_handle: ScrollableHandle) -> Self {
         self.scroll_handle = Some(scroll_handle);
         self
@@ -168,6 +176,7 @@ impl Element for Scrollbar {
         hb
     }
 
+    #[allow(clippy::too_many_lines, clippy::unreadable_literal)]
     fn paint(
         &mut self,
         id: Option<&GlobalElementId>,
@@ -189,8 +198,7 @@ impl Element for Scrollbar {
             .style
             .text
             .color
-            .map(|v| v.into())
-            .unwrap_or(white().into());
+            .map_or(white().into(), Into::into);
 
         let mut corners = Corners::default();
         corners.refine(&self.style.corner_radii);
@@ -324,7 +332,7 @@ impl Element for Scrollbar {
                     if elapsed < hide_delay {
                         1.0
                     } else {
-                        let fade_elapsed = elapsed - hide_delay;
+                        let fade_elapsed = elapsed.checked_sub(hide_delay).unwrap();
                         let fade_progress =
                             fade_elapsed.as_secs_f32() / fade_duration.as_secs_f32();
                         (1.0 - fade_progress).max(0.0)
@@ -335,7 +343,7 @@ impl Element for Scrollbar {
 
                 // setup fade animation refresh
                 let needs_fade_refresh = opacity > 0.0 && opacity < 1.0;
-                let needs_hide_check = opacity == 1.0
+                let needs_hide_check = (opacity - 1.0).abs() < f32::EPSILON
                     && !is_dragging
                     && !currently_hovered
                     && last_interaction.is_some();
@@ -504,6 +512,7 @@ impl Element for Scrollbar {
     }
 }
 
+#[must_use] 
 pub fn scrollbar() -> Scrollbar {
     Scrollbar {
         id: None,

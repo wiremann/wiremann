@@ -5,10 +5,10 @@ use std::{
 };
 
 use crate::cacher::Cacher;
-use crate::worker_config::{WorkerConfig, calculate_worker_config};
+use crate::worker_config::{calculate_worker_config, WorkerConfig};
 use crate::{
-    audio::engine::Audio,
-    controller::{Controller, state::AppState},
+    audio::Audio,
+    controller::{state::AppState, Controller},
     errors::AppError,
     scanner::Scanner,
     ui::{
@@ -18,10 +18,11 @@ use crate::{
     },
 };
 use gpui::{
-    AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions, px, size,
+    px, size, AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions,
 };
 use gpui_component::Root;
 
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc, clippy::missing_errors_doc)]
 pub fn run() -> Result<(), AppError> {
     let assets = Assets {};
     let app = Application::new().with_assets(assets.clone());
@@ -32,9 +33,9 @@ pub fn run() -> Result<(), AppError> {
         assets.load_fonts(cx).expect("Could not load fonts");
 
         let WorkerConfig {
-            metadata_workers,
-            thumbnail_workers,
-            cacher_workers,
+            metadata,
+            thumbnail,
+            cacher: cacher_workers,
         } = calculate_worker_config();
 
         let (mut audio, audio_tx, audio_rx) = Audio::new();
@@ -58,7 +59,7 @@ pub fn run() -> Result<(), AppError> {
         });
 
         thread::spawn(move || {
-            if let Err(e) = scanner.run(metadata_workers, thumbnail_workers) {
+            if let Err(e) = scanner.run(metadata, thumbnail) {
                 eprintln!("Scanner thread crashed with error: {e:?}");
             }
         });
@@ -137,7 +138,7 @@ pub fn run() -> Result<(), AppError> {
                                     .await;
                             }
                         })
-                        .detach();
+                            .detach();
 
                         let view_clone = view.clone();
 
@@ -147,20 +148,20 @@ pub fn run() -> Result<(), AppError> {
                                     Event::Audio(event) => controller_resclone.handle_audio_event(
                                         cx,
                                         event,
-                                        view_clone.clone(),
+                                        &view_clone,
                                     ),
 
                                     Event::Scanner(event) => controller_resclone
-                                        .handle_scanner_event(cx, event, view_clone.clone()),
+                                        .handle_scanner_event(cx, event, &view_clone),
 
                                     Event::Cacher(event) => controller_resclone
-                                        .handle_cacher_event(cx, event, view_clone.clone()),
+                                        .handle_cacher_event(cx, event, &view_clone),
                                 }
                             {
                                 eprintln!("controller error: {e:?}");
                             }
                         })
-                        .detach();
+                            .detach();
 
                         Root::new(view, window, cx)
                     })
@@ -169,7 +170,7 @@ pub fn run() -> Result<(), AppError> {
 
             Ok::<_, AppError>(())
         })
-        .detach();
+            .detach();
     });
 
     Ok(())

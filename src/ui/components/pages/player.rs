@@ -1,17 +1,17 @@
 use crate::{
-    controller::Controller,
     controller::state::PlaybackStatus,
+    controller::Controller,
     ui::{
         components::controlbar::ControlBar,
         components::image_cache::ImageCache,
         components::queue::Queue,
-        components::scrollbar::{RightPad, floating_scrollbar},
+        components::scrollbar::{floating_scrollbar, RightPad},
         icons::Icons,
         theme::Theme,
     },
 };
 use gpui::prelude::FluentBuilder;
-use gpui::*;
+use gpui::{div, img, px, App, AppContext, Context, Entity, FontWeight, ImageFormat, InteractiveElement, IntoElement, ObjectFit, ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window};
 use gpui_component::Icon;
 
 #[derive(Clone)]
@@ -36,6 +36,7 @@ impl PlayerPage {
 }
 
 impl Render for PlayerPage {
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>();
 
@@ -67,7 +68,7 @@ impl Render for PlayerPage {
                     .px_16()
                     .pt_8()
                     .pb_2()
-                    .child(if let Some(track) = current.clone() {
+                    .child(if let Some(track) = current {
                         div()
                             .w_auto()
                             .h_auto()
@@ -177,10 +178,10 @@ impl Render for PlayerPage {
                                             .status
                                         {
                                             PlaybackStatus::Paused | PlaybackStatus::Stopped => {
-                                                cx.global::<Controller>().play()
+                                                cx.global::<Controller>().play();
                                             }
                                             PlaybackStatus::Playing => {
-                                                cx.global::<Controller>().pause()
+                                                cx.global::<Controller>().pause();
                                             }
                                         }
                                     })
@@ -295,8 +296,9 @@ impl Render for PlayerPage {
     }
 }
 
-pub fn get_img_format(format: String) -> ImageFormat {
-    match format.as_str() {
+#[must_use]
+pub fn get_img_format(format: &str) -> ImageFormat {
+    match format {
         "png" => ImageFormat::Png,
         "jpeg" | "jpg" => ImageFormat::Jpeg,
         _ => ImageFormat::Bmp,

@@ -1,4 +1,4 @@
-use gpui::*;
+use gpui::{IntoElement, RenderOnce, Window, App};
 use gpui_component::{Icon, IconNamed};
 
 #[allow(dead_code)]

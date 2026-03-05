@@ -2,7 +2,7 @@ pub mod playlists;
 use crate::errors::ScannerError;
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
 pub struct TrackId(pub [u8; 32]);
@@ -21,7 +21,8 @@ pub struct Track {
     pub modified: u64,
 }
 
-pub fn gen_track_id(path: &PathBuf) -> Result<TrackId, ScannerError> {
+#[allow(clippy::missing_errors_doc)]
+pub fn gen_track_id(path: &Path) -> Result<TrackId, ScannerError> {
     let mut hasher = Hasher::new();
 
     hasher.update(path.to_string_lossy().as_bytes());

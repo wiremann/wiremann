@@ -39,6 +39,7 @@ pub struct Controller {
 }
 
 impl Controller {
+    #[must_use]
     pub fn new(
         state: Entity<AppState>,
         audio_tx: Sender<AudioCommand>,
@@ -59,11 +60,12 @@ impl Controller {
         }
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn handle_audio_event(
         &mut self,
         cx: &mut App,
         event: &AudioEvent,
-        view: Entity<Wiremann>,
+        view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             AudioEvent::Position(pos) => {
@@ -83,7 +85,7 @@ impl Controller {
                                 } else {
                                     0
                                 };
-                                this.set_value(secs_to_slider(pos.clone(), duration), cx);
+                                this.set_value(secs_to_slider(*pos, duration), cx);
                             });
                         });
                     });
@@ -103,7 +105,7 @@ impl Controller {
                 if !self.state.read(cx).library.tracks.contains_key(&track_id) {
                     let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
                         path: path.clone(),
-                        track_id: track_id.clone(),
+                        track_id,
                     });
                 }
 
@@ -125,7 +127,7 @@ impl Controller {
             AudioEvent::PlaybackStatus(status) => {
                 self.state.update(cx, |this, cx| {
                     this.playback.status = *status;
-                    cx.notify()
+                    cx.notify();
                 });
                 let state = self.state.read(cx).playback.clone();
                 let _ = self
@@ -136,20 +138,21 @@ impl Controller {
                 let repeat = self.state.read(cx).playback.repeat;
 
                 if repeat {
-                    self.load_queue_current(cx)
+                    self.load_queue_current(cx);
                 } else {
-                    self.next(cx)
+                    self.next(cx);
                 }
             }
         }
         Ok(())
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn handle_scanner_event(
         &mut self,
         cx: &mut App,
         event: &ScannerEvent,
-        view: Entity<Wiremann>,
+        view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::Tracks(tracks) => {
@@ -158,7 +161,7 @@ impl Controller {
                     for track in tracks {
                         this.library
                             .tracks
-                            .insert(track.id.clone(), Arc::new(track.clone()));
+                            .insert(track.id, Arc::new(track.clone()));
                     }
                     cx.notify();
                 });
@@ -169,12 +172,12 @@ impl Controller {
                 self.state.update(cx, |this, cx| {
                     this.library
                         .playlists
-                        .insert(playlist.id.clone(), playlist.clone());
-                    this.playback.current_playlist = Some(playlist.id.clone());
-                    this.queue.tracks = playlist.tracks.clone();
+                        .insert(playlist.id, playlist.clone());
+                    this.playback.current_playlist = Some(playlist.id);
+                    this.queue.tracks.clone_from(&playlist.tracks);
                     this.queue.order = (0..playlist.tracks.len()).collect();
 
-                    let ids: HashSet<_> = this.queue.tracks.iter().map(|t| t.clone()).collect();
+                    let ids: HashSet<_> = this.queue.tracks.iter().copied().collect();
 
                     let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
 
@@ -189,20 +192,17 @@ impl Controller {
                 image_cache.current = Some(image.clone());
 
                 let image = image.clone();
-                let width = image.size(0).width.0 as u32;
-                let height = image.size(0).height.0 as u32;
-                match image.as_bytes(0) {
-                    Some(image) => {
-                        let image = image.to_vec();
-                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                            id: id.clone(),
-                            kind: ImageKind::AlbumArt,
-                            width,
-                            height,
-                            image,
-                        });
-                    }
-                    None => {}
+                let width = image.size(0).width.0.cast_unsigned();
+                let height = image.size(0).height.0.cast_unsigned();
+                if let Some(image) = image.as_bytes(0) {
+                    let image = image.to_vec();
+                    let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                        id: *id,
+                        kind: ImageKind::AlbumArt,
+                        width,
+                        height,
+                        image,
+                    });
                 }
 
                 cx.notify(view.entity_id());
@@ -216,20 +216,17 @@ impl Controller {
                 let thumbnails = cx.global::<ImageCache>().thumbs.clone();
 
                 for (id, image) in thumbnails {
-                    let width = image.size(0).width.0 as u32;
-                    let height = image.size(0).height.0 as u32;
-                    match image.as_bytes(0) {
-                        Some(image) => {
-                            let image = image.to_vec();
-                            let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                                id,
-                                kind: ImageKind::Thumbnail,
-                                width,
-                                height,
-                                image,
-                            });
-                        }
-                        None => {}
+                    let width = image.size(0).width.0.cast_unsigned();
+                    let height = image.size(0).height.0.cast_unsigned();
+                    if let Some(image) = image.as_bytes(0) {
+                        let image = image.to_vec();
+                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                            id,
+                            kind: ImageKind::Thumbnail,
+                            width,
+                            height,
+                            image,
+                        });
                     }
                 }
             }
@@ -237,11 +234,12 @@ impl Controller {
         Ok(())
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn handle_cacher_event(
         &mut self,
         cx: &mut App,
         event: &CacherEvent,
-        view: Entity<Wiremann>,
+        view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             CacherEvent::AppState(state) => {
@@ -249,7 +247,7 @@ impl Controller {
                 self.state.update(cx, |this, _| {
                     *this = state.clone();
 
-                    let ids: HashSet<_> = this.queue.tracks.iter().map(|t| t.clone()).collect();
+                    let ids: HashSet<_> = this.queue.tracks.iter().copied().collect();
                     let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
                 });
 
@@ -292,15 +290,12 @@ impl Controller {
             CacherEvent::MissingThumbnails(ids) => {
                 let tracks = self.state.read(cx).library.tracks.clone();
                 for id in ids {
-                    match tracks.get(id) {
-                        Some(track) => {
-                            let path = track.path.clone();
-                            let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                                path,
-                                track_id: id.clone(),
-                            });
-                        }
-                        None => {}
+                    if let Some(track) = tracks.get(id) {
+                        let path = track.path.clone();
+                        let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
+                            path,
+                            track_id: *id,
+                        });
                     }
                 }
             }
@@ -316,14 +311,14 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
-        if let Some(track_id) = state.queue.get_id(state.playback.current_index) {
-            if let Some(track) = state.library.tracks.get(&track_id) {
-                let path = track.path.clone();
-                let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
-                let _ = self
-                    .scanner_tx
-                    .send(ScannerCommand::GetCurrentAlbumArt(path));
-            }
+        if let Some(track_id) = state.queue.get_id(state.playback.current_index)
+            && let Some(track) = state.library.tracks.get(&track_id)
+        {
+            let path = track.path.clone();
+            let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
+            let _ = self
+                .scanner_tx
+                .send(ScannerCommand::GetCurrentAlbumArt(path));
         }
     }
 
@@ -331,7 +326,7 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
 
-    pub fn scan_folder(&self, tracks: HashSet<TrackId>, path: PathBuf) {
+    pub fn scan_folder(&self, tracks: &HashSet<TrackId>, path: PathBuf) {
         let _ = self.scanner_tx.send(ScannerCommand::ScanFolder {
             path,
             tracks: tracks.clone(),

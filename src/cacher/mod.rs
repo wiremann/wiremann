@@ -3,11 +3,12 @@ use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{Track, TrackId, gen_track_id};
+use crate::library::{gen_track_id, Track, TrackId};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{Receiver, Sender, select, tick};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::Frame;
+use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
@@ -242,8 +243,7 @@ impl From<CachedPlaybackState> for PlaybackState {
         Self {
             current: c.current.map(TrackId),
             current_playlist: c
-                .current_playlist
-                .and_then(|s| Some(PlaylistId(Uuid::from_str(&s).unwrap_or_default()))),
+                .current_playlist.map(|s| PlaylistId(Uuid::from_str(&s).unwrap_or_default())),
             current_index: c.current_index,
             status: c.status,
             position: c.position,
@@ -298,9 +298,9 @@ impl Cacher {
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
 
-        self.spawn_app_state_worker(app_state_rx)?;
-        self.spawn_thumbnail_workers(thumb_rx, workers)?;
-        self.spawn_album_art_worker(album_art_rx)?;
+        self.spawn_app_state_worker(app_state_rx);
+        self.spawn_thumbnail_workers(&thumb_rx, workers);
+        self.spawn_album_art_worker(album_art_rx);
 
         loop {
             match self.rx.recv()? {
@@ -369,11 +369,11 @@ impl Cacher {
 
         let payload = CachedPlaybackState::from(state);
 
-        let ron = ron::ser::to_string_pretty(&payload, Default::default())?;
+        let ron = ron::ser::to_string_pretty(&payload, PrettyConfig::default())?;
 
         {
             let mut file = fs::File::create(tmp_path.clone())?;
-            file.write_all(&ron.as_bytes())?;
+            file.write_all(ron.as_bytes())?;
             file.sync_all()?;
         }
 
@@ -393,7 +393,7 @@ impl Cacher {
         Ok(())
     }
 
-    fn cached_image_path(&self, id: TrackId, kind: ImageKind) -> PathBuf {
+    fn cached_image_path(&self, id: TrackId, kind: &ImageKind) -> PathBuf {
         let hex = hex::encode(id.0);
         let folder = &hex[0..2];
 
@@ -408,8 +408,8 @@ impl Cacher {
     fn write_cached_image(
         &self,
         id: TrackId,
-        kind: ImageKind,
-        cached_image: CachedImage,
+        kind: &ImageKind,
+        cached_image: &CachedImage,
     ) -> Result<(), CacherError> {
         let final_path = self.cached_image_path(id, kind);
         let tmp_path = final_path.with_extension("tmp");
@@ -420,7 +420,7 @@ impl Cacher {
 
         fs::create_dir_all(final_path.parent().unwrap())?;
 
-        let bytes = bitcode::encode(&cached_image);
+        let bytes = bitcode::encode(cached_image);
 
         let compressed = zstd::encode_all(Cursor::new(bytes), 4)?;
 
@@ -436,13 +436,13 @@ impl Cacher {
     }
 
     fn load_app_state(&self) -> Result<AppState, CacherError> {
-        let library = self.read_library_state()?;
         let playback = self.read_playback_state()?;
+        let library = self.read_library_state()?;
         let queue = self.read_queue_state()?;
 
         Ok(AppState {
-            library,
             playback,
+            library,
             queue,
         })
     }
@@ -489,9 +489,9 @@ impl Cacher {
     fn read_cached_image(
         &self,
         id: TrackId,
-        kind: ImageKind,
+        kind: &ImageKind,
     ) -> Result<Option<Arc<RenderImage>>, CacherError> {
-        let path = self.cached_image_path(id.clone(), kind);
+        let path = self.cached_image_path(id, kind);
 
         let bytes = fs::read(path)?;
 
@@ -513,7 +513,7 @@ impl Cacher {
         }
     }
 
-    fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>) -> Result<(), CacherError> {
+    fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>){
         let cacher = self.clone();
 
         std::thread::spawn(move || {
@@ -542,20 +542,20 @@ impl Cacher {
                     })();
 
                     if let Err(err) = result {
-                        eprintln!("Error occurred: {:#?}", err);
+                        eprintln!("Error occurred: {err:#?}");
                     }
                 }
             }
         });
 
-        Ok(())
+        
     }
 
     fn spawn_thumbnail_workers(
         &self,
-        rx: Receiver<CacheJob>,
+        rx: &Receiver<CacheJob>,
         workers: usize,
-    ) -> Result<(), CacherError> {
+    ) {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
@@ -577,14 +577,14 @@ impl Cacher {
                                         height,
                                         image
                                     };
-                                    match cacher.write_cached_image(id, kind, cached_image) {
-                                        Ok(_) => {}
-                                        Err(err) => {eprintln!("Error occurred: {:#?}", err);}
+                                    match cacher.write_cached_image(id, &kind, &cached_image) {
+                                        Ok(()) => {}
+                                        Err(err) => {eprintln!("Error occurred: {err:#?}");}
                                     }
                                 }
                                 Ok(CacheJob::LoadThumbnails(ids)) => {
                                     for id in ids {
-                                        match cacher.read_cached_image(id, ImageKind::Thumbnail) {
+                                        match cacher.read_cached_image(id, &ImageKind::Thumbnail) {
                                             Ok(Some(image)) => {batch.insert(id, image);},
                                             Ok(None) | Err(_) => {missing.push(id);},
                                         }
@@ -616,23 +616,23 @@ impl Cacher {
             });
         }
 
-        Ok(())
+        
     }
 
-    fn spawn_album_art_worker(&self, rx: Receiver<CacheJob>) -> Result<(), CacherError> {
-        let cacher = Arc::new(self.clone().to_owned());
+    fn spawn_album_art_worker(&self, rx: Receiver<CacheJob>) {
+        let cacher = Arc::new(self.clone());
 
         std::thread::spawn(move || {
             while let Ok(job) = rx.recv() {
                 match job {
                     CacheJob::LoadAlbumArt(path) => {
                         if let Ok(id) = gen_track_id(&path) {
-                            match cacher.read_cached_image(id, ImageKind::AlbumArt) {
+                            match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
                                 Ok(Some(image)) => {
                                     let _ = cacher.tx.send(CacherEvent::AlbumArt(image));
                                 }
                                 Err(e) => {
-                                    eprintln!("Error loading album art: {}", e);
+                                    eprintln!("Error loading album art: {e}");
                                     let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(path));
                                 }
                                 _ => {
@@ -655,10 +655,10 @@ impl Cacher {
                             height,
                             image,
                         };
-                        match cacher.write_cached_image(id, kind, cached_image) {
-                            Ok(_) => {}
+                        match cacher.write_cached_image(id, &kind, &cached_image) {
+                            Ok(()) => {}
                             Err(err) => {
-                                eprintln!("Error occurred: {:#?}", err);
+                                eprintln!("Error occurred: {err:#?}");
                             }
                         }
                     }
@@ -666,8 +666,6 @@ impl Cacher {
                 }
             }
         });
-
-        Ok(())
     }
 }
 

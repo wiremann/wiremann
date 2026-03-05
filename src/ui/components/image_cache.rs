@@ -3,27 +3,16 @@ use gpui::RenderImage;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[derive(Default)]
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
     pub thumbs: HashMap<TrackId, Arc<RenderImage>>,
 }
 
-impl Default for ImageCache {
-    fn default() -> Self {
-        Self {
-            current: None,
-            thumbs: HashMap::new(),
-        }
-    }
-}
-
 impl ImageCache {
+    #[must_use] 
     pub fn get(&self, id: &TrackId) -> Option<Arc<RenderImage>> {
-        if let Some(thumbnail) = self.thumbs.get(id) {
-            Some(thumbnail.clone())
-        } else {
-            None
-        }
+        self.thumbs.get(id).cloned()
     }
 
     pub fn clear(&mut self) {

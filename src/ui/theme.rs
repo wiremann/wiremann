@@ -28,6 +28,7 @@ pub struct Theme {
 }
 
 impl Default for Theme {
+    #[allow(clippy::unreadable_literal)]
     fn default() -> Self {
         Theme {
             bg_main: rgb(0x0A070F),

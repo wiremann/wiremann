@@ -3,8 +3,7 @@ use crate::ui::theme::Theme;
 
 use super::slider::{Slider, SliderState};
 use crate::ui::icons::Icons;
-// use crate::ui::icons::Icons;
-use gpui::*;
+use gpui::{Entity, Render, Window, Context, IntoElement, ParentElement, Styled, div, StatefulInteractiveElement, InteractiveElement};
 use gpui_component::Icon;
 
 #[derive(Clone)]
@@ -14,6 +13,7 @@ pub struct ControlBar {
 }
 
 impl ControlBar {
+    #[must_use] 
     pub fn new(
         playback_slider_state: Entity<SliderState>,
         vol_slider_state: Entity<SliderState>,
@@ -26,6 +26,7 @@ impl ControlBar {
 }
 
 impl Render for ControlBar {
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>();
         let controller = cx.global::<Controller>();
@@ -122,7 +123,7 @@ impl Render for ControlBar {
                                                     Icons::VolumeMute
                                                 } else {
                                                     match state.playback.volume.clamp(0.0, 1.0) {
-                                                        v if v == 0.0 => Icons::Volume0,
+                                                        0.0 => Icons::Volume0,
                                                         v if v < 0.4 => Icons::Volume0,
                                                         v if v < 0.8 => Icons::Volume1,
                                                         _ => Icons::Volume2,

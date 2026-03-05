@@ -4,7 +4,7 @@ use crate::ui::theme::Theme;
 use crate::{controller::Controller, library::Track};
 use ahash::AHashMap;
 use gpui::prelude::FluentBuilder;
-use gpui::*;
+use gpui::{div, img, px, uniform_list, App, AppContext, Context, Entity, InteractiveElement, IntoElement, ObjectFit, ParentElement, Render, ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -56,7 +56,7 @@ impl Render for Item {
             PathBuf::new()
         };
         div()
-            .id(format!("track_item_{}", path.to_string_lossy().to_string()))
+            .id(format!("track_item_{}", path.to_string_lossy()))
             .h(px(64.))
             .w_full()
             .flex()
@@ -131,7 +131,7 @@ impl Queue {
         track: Arc<Track>,
         cx: &mut App,
     ) -> Entity<Item> {
-        let key = track.id.clone();
+        let key = track.id;
         views.update(cx, |this, cx| {
             this.entry(key)
                 .or_insert_with(|| Item::new(cx, track, 0))
@@ -170,7 +170,7 @@ impl Render for Queue {
 
         let tracks = state.queue.tracks.clone();
         let order = state.queue.order.clone();
-        let current = state.playback.current.clone();
+        let current = state.playback.current;
 
         let queue_changed = self.last_tracks != tracks || self.last_order != order;
         let current_changed = self.last_current != current;
@@ -178,8 +178,8 @@ impl Render for Queue {
         if queue_changed {
             self.views.update(cx, |map, _| map.clear());
 
-            self.last_tracks = tracks.clone();
-            self.last_order = order.clone();
+            self.last_tracks.clone_from(&tracks);
+            self.last_order.clone_from(&order);
         }
 
         if (queue_changed || current_changed) && !self.stop_auto_scroll.read(cx) {
@@ -207,7 +207,7 @@ impl Render for Queue {
                         .map(|i| {
                             let real_index = &tracks[queue_order[i]];
                             if let Some(track) = state.library.tracks.get(real_index) {
-                                track.id.clone()
+                                track.id
                             } else {
                                 TrackId::default()
                             }
@@ -225,10 +225,10 @@ impl Render for Queue {
                                 let path = track.path.clone();
 
                                 div()
-                                    .id(format!("track_{}", path.to_string_lossy().to_string()))
+                                    .id(format!("track_{}", path.to_string_lossy()))
                                     .child(Queue::get_or_create_item(&views, track.clone(), cx))
                                     .on_click(move |_, _, cx| {
-                                        cx.global::<Controller>().load_audio(path.clone())
+                                        cx.global::<Controller>().load_audio(path.clone());
                                     })
                             } else {
                                 div()
@@ -241,11 +241,11 @@ impl Render for Queue {
                         })
                         .collect()
                 })
-                .w_full()
-                .h_full()
-                .flex()
-                .flex_col()
-                .track_scroll(&scroll_handle),
+                    .w_full()
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .track_scroll(&scroll_handle),
             )
     }
 }

@@ -1,12 +1,12 @@
 use std::ops::Range;
 
 use gpui::{
-    Along, App, AppContext as _, Axis, Bounds, Context, DefiniteLength, DragMoveEvent, Empty,
-    Entity, EntityId, EventEmitter, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
-    ParentElement as _, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement as _,
-    StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _, px, relative,
+    div, prelude::FluentBuilder as _, px, relative, Along, App, AppContext as _, Axis, Bounds,
+    Context, DefiniteLength, DragMoveEvent, Empty, Entity, EntityId, EventEmitter,
+    InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels,
+    Point, Render, RenderOnce, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
 };
-use gpui_component::{ActiveTheme, AxisExt, ElementExt, StyledExt, h_flex};
+use gpui_component::{h_flex, ActiveTheme, AxisExt, ElementExt, StyledExt};
 
 #[derive(Clone)]
 struct DragThumb((EntityId, bool));
@@ -46,8 +46,8 @@ pub enum SliderValue {
 impl std::fmt::Display for SliderValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SliderValue::Single(value) => write!(f, "{}", value),
-            SliderValue::Range(start, end) => write!(f, "{}..{}", start, end),
+            SliderValue::Single(value) => write!(f, "{value}"),
+            SliderValue::Range(start, end) => write!(f, "{start}..{end}"),
         }
     }
 }
@@ -78,6 +78,7 @@ impl Default for SliderValue {
 
 impl SliderValue {
     /// Clamp the value to the given range.
+    #[must_use]
     pub fn clamp(self, min: f32, max: f32) -> Self {
         match self {
             SliderValue::Single(value) => SliderValue::Single(value.clamp(min, max)),
@@ -89,17 +90,20 @@ impl SliderValue {
 
     /// Check if the value is a single value.
     #[inline]
+    #[must_use]
     pub fn is_single(&self) -> bool {
         matches!(self, SliderValue::Single(_))
     }
 
     /// Check if the value is a range of values.
     #[inline]
+    #[must_use]
     pub fn is_range(&self) -> bool {
         matches!(self, SliderValue::Range(_, _))
     }
 
     /// Get the start value.
+    #[must_use]
     pub fn start(&self) -> f32 {
         match self {
             SliderValue::Single(value) => *value,
@@ -108,6 +112,7 @@ impl SliderValue {
     }
 
     /// Get the end value.
+    #[must_use]
     pub fn end(&self) -> f32 {
         match self {
             SliderValue::Single(value) => *value,
@@ -168,11 +173,13 @@ pub enum SliderScale {
 
 impl SliderScale {
     #[inline]
+    #[must_use]
     pub fn is_linear(&self) -> bool {
         matches!(self, SliderScale::Linear)
     }
 
     #[inline]
+    #[must_use]
     pub fn is_logarithmic(&self) -> bool {
         matches!(self, SliderScale::Logarithmic)
     }
@@ -193,19 +200,23 @@ pub struct SliderState {
 
 impl SliderState {
     /// Create a new [`SliderState`].
+    #[must_use]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             min: 0.0,
             max: 100.0,
             step: 1.0,
             value: SliderValue::default(),
-            percentage: (0.0..0.0),
+            percentage: 0.0..0.0,
             bounds: Bounds::default(),
             scale: SliderScale::default(),
         }
     }
 
     /// Set the minimum value of the slider, default: 0.0
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
     pub fn min(mut self, min: f32) -> Self {
         if self.scale.is_logarithmic() {
             assert!(
@@ -223,6 +234,8 @@ impl SliderState {
     }
 
     /// Set the maximum value of the slider, default: 100.0
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use, clippy::missing_panics_doc)]
     pub fn max(mut self, max: f32) -> Self {
         if self.scale.is_logarithmic() {
             assert!(
@@ -236,12 +249,16 @@ impl SliderState {
     }
 
     /// Set the step value of the slider, default: 1.0
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use)]
     pub fn step(mut self, step: f32) -> Self {
         self.step = step;
         self
     }
 
     /// Set the scale of the slider, default: [`SliderScale::Linear`].
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use, clippy::missing_panics_doc)]
     pub fn scale(mut self, scale: SliderScale) -> Self {
         if scale.is_logarithmic() {
             assert!(
@@ -259,6 +276,8 @@ impl SliderState {
     }
 
     /// Set the default value of the slider, default: 0.0
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use)]
     pub fn default_value(mut self, value: impl Into<SliderValue>) -> Self {
         self.value = value.into();
         self.update_thumb_pos();
@@ -273,6 +292,7 @@ impl SliderState {
     }
 
     /// Get the value of the slider.
+    #[must_use]
     pub fn value(&self) -> SliderValue {
         self.value
     }
@@ -380,6 +400,7 @@ pub struct Slider {
 
 impl Slider {
     /// Create a new [`Slider`] element bind to the [`SliderState`].
+    #[must_use]
     pub fn new(state: &Entity<SliderState>) -> Self {
         Self {
             axis: Axis::Horizontal,
@@ -390,18 +411,24 @@ impl Slider {
     }
 
     /// As a horizontal slider.
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use)]
     pub fn horizontal(mut self) -> Self {
         self.axis = Axis::Horizontal;
         self
     }
 
     /// As a vertical slider.
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use)]
     pub fn vertical(mut self) -> Self {
         self.axis = Axis::Vertical;
         self
     }
 
     /// Set the disabled state of the slider, default: false
+    #[must_use]
+    #[allow(clippy::return_self_not_must_use)]
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
@@ -417,7 +444,7 @@ impl Slider {
     ) -> impl gpui::IntoElement {
         let entity_id = self.state.entity_id();
         let axis = self.axis;
-        let id = ("slider-thumb", is_start as u32);
+        let id = ("slider-thumb", u32::from(is_start));
 
         if self.disabled {
             return div().id(id);
@@ -436,7 +463,7 @@ impl Slider {
             .items_center()
             .justify_center()
             .flex_shrink_0()
-            .when(cx.theme().shadow, |this| this.shadow_md())
+            .when(cx.theme().shadow, Styled::shadow_md)
             .size_3()
             .child(div().flex_shrink_0().size_full())
             .on_mouse_down(MouseButton::Left, |_, _, cx| {
@@ -462,7 +489,7 @@ impl Slider {
                                 *is_start,
                                 window,
                                 cx,
-                            )
+                            );
                         }
                     }
                 },
@@ -477,7 +504,8 @@ impl Styled for Slider {
 }
 
 impl RenderOnce for Slider {
-    fn render(self, window: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
+    #[allow(clippy::too_many_lines)]
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let axis = self.axis;
         let entity_id = self.state.entity_id();
         let state = self.state.read(cx);
@@ -505,7 +533,7 @@ impl RenderOnce for Slider {
             .items_center()
             .justify_center()
             .when(axis.is_vertical(), |this| this.h(px(120.)))
-            .when(axis.is_horizontal(), |this| this.w_full())
+            .when(axis.is_horizontal(), Styled::w_full)
             .refine_style(&self.style)
             .bg(cx.theme().transparent)
             .text_color(cx.theme().foreground)
@@ -534,7 +562,7 @@ impl RenderOnce for Slider {
 
                                     state.update_value_by_position(
                                         axis, e.position, is_start, window, cx,
-                                    )
+                                    );
                                 },
                             ),
                         )
@@ -544,25 +572,25 @@ impl RenderOnce for Slider {
                             cx.stop_propagation();
                             cx.new(|_| drag.clone())
                         })
-                        .on_drag_move(window.listener_for(
-                            &self.state,
-                            move |view, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx)
-                            {
-                                DragSlider(id) => {
-                                    if *id != entity_id {
-                                        return;
-                                    }
+                            .on_drag_move(window.listener_for(
+                                &self.state,
+                                move |view, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx)
+                                {
+                                    DragSlider(id) => {
+                                        if *id != entity_id {
+                                            return;
+                                        }
 
-                                    view.update_value_by_position(
-                                        axis,
-                                        e.event.position,
-                                        false,
-                                        window,
-                                        cx,
-                                    )
-                                }
-                            },
-                        ))
+                                        view.update_value_by_position(
+                                            axis,
+                                            e.event.position,
+                                            false,
+                                            window,
+                                            cx,
+                                        );
+                                    }
+                                },
+                            ))
                     })
                     .when(axis.is_horizontal(), |this| {
                         this.items_center().h_6().w_full()

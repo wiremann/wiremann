@@ -2,13 +2,15 @@ use super::Page;
 use crate::ui::theme::Theme;
 
 use gpui::prelude::FluentBuilder;
-use gpui::*;
+use gpui::{Render, Window, Context, IntoElement, ParentElement, Styled, div, StatefulInteractiveElement, InteractiveElement, px};
 use gpui_component::StyledExt;
 
 #[derive(Clone)]
 pub struct NavBar;
 
 impl NavBar {
+    #[allow(clippy::new_without_default)]
+    #[must_use] 
     pub fn new() -> Self {
         NavBar {}
     }

@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use gpui::*;
+use gpui::{AssetSource, Result,  SharedString, App};
 use rust_embed::RustEmbed;
 use std::borrow::Cow;
 
@@ -28,7 +28,8 @@ impl AssetSource for Assets {
 }
 
 impl Assets {
-    pub fn load_fonts(&self, cx: &App) -> gpui::Result<()> {
+    #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+    pub fn load_fonts(&self, cx: &App) -> Result<()> {
         let font_paths = self.list("fonts")?;
         let mut embedded_fonts = Vec::new();
         for font_path in font_paths {

@@ -1,7 +1,7 @@
 use super::navbar::NavBar;
 use crate::ui::icons::Icons;
 use crate::ui::theme::Theme;
-use gpui::*;
+use gpui::{Entity, Render, Window, Context, IntoElement, ParentElement, Styled, InteractiveElement, div, WindowControlArea, rgb, App, AppContext};
 
 #[derive(Clone)]
 pub struct Titlebar {
@@ -9,6 +9,7 @@ pub struct Titlebar {
 }
 
 impl Render for Titlebar {
+    #[allow(clippy::unreadable_literal)]
     fn render(&mut self, win: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>();
         div()
