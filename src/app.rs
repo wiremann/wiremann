@@ -7,7 +7,7 @@ use std::{
 use crate::cacher::Cacher;
 use crate::worker_config::{WorkerConfig, calculate_worker_config};
 use crate::{
-    audio::engine::Audio,
+    audio::Audio,
     controller::{Controller, state::AppState},
     errors::AppError,
     scanner::Scanner,
