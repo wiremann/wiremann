@@ -5,10 +5,10 @@ use std::{
 };
 
 use crate::cacher::Cacher;
-use crate::worker_config::{WorkerConfig, calculate_worker_config};
+use crate::worker_config::{calculate_worker_config, WorkerConfig};
 use crate::{
     audio::Audio,
-    controller::{Controller, state::AppState},
+    controller::{state::AppState, Controller},
     errors::AppError,
     scanner::Scanner,
     ui::{
@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use gpui::{
-    AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions, px, size,
+    px, size, AppContext, Application, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions,
 };
 use gpui_component::Root;
 
@@ -137,7 +137,7 @@ pub fn run() -> Result<(), AppError> {
                                     .await;
                             }
                         })
-                        .detach();
+                            .detach();
 
                         let view_clone = view.clone();
 
@@ -147,20 +147,20 @@ pub fn run() -> Result<(), AppError> {
                                     Event::Audio(event) => controller_resclone.handle_audio_event(
                                         cx,
                                         event,
-                                        view_clone.clone(),
+                                        &view_clone,
                                     ),
 
                                     Event::Scanner(event) => controller_resclone
-                                        .handle_scanner_event(cx, event, view_clone.clone()),
+                                        .handle_scanner_event(cx, event, &view_clone),
 
                                     Event::Cacher(event) => controller_resclone
-                                        .handle_cacher_event(cx, event, view_clone.clone()),
+                                        .handle_cacher_event(cx, event, &view_clone),
                                 }
                             {
                                 eprintln!("controller error: {e:?}");
                             }
                         })
-                        .detach();
+                            .detach();
 
                         Root::new(view, window, cx)
                     })
@@ -169,7 +169,7 @@ pub fn run() -> Result<(), AppError> {
 
             Ok::<_, AppError>(())
         })
-        .detach();
+            .detach();
     });
 
     Ok(())
