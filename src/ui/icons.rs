@@ -1,5 +1,5 @@
 use gpui::{IntoElement, RenderOnce, Window, App};
-use gpui_component::{Icon, IconNamed};
+use crate::ui::components::icon::{Icon, IconNamed};
 
 #[allow(dead_code)]
 #[derive(IntoElement)]
