@@ -29,12 +29,6 @@ impl From<Icons> for AnyElement {
     }
 }
 
-impl RenderOnce for Icons {
-    fn render(self, _: &mut Window, _cx: &mut App) -> impl IntoElement {
-        Icon::build(self)
-    }
-}
-
 #[derive(IntoElement)]
 pub struct Icon {
     base: Svg,

@@ -3,7 +3,6 @@ use std::ops::Range;
 
 use crate::ui::components::element_ext::ElementExt;
 use gpui::{div, prelude::FluentBuilder as _, px, relative, transparent_black, white, Along, App, AppContext as _, Axis, Bounds, Context, DefiniteLength, Div, DragMoveEvent, Empty, Entity, EntityId, EventEmitter, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Refineable, Render, RenderOnce, StatefulInteractiveElement as _, StyleRefinement, Styled, Window};
-use gpui_component::StyledExt;
 
 #[derive(Clone)]
 struct DragThumb((EntityId, bool));
@@ -533,7 +532,7 @@ impl RenderOnce for Slider {
             .bg(transparent_black())
             .text_color(white());
         slider_div
-            .style().refine_style(&self.style);
+            .style().refine(&self.style);
         slider_div
             .child(
                 div()
@@ -638,7 +637,7 @@ impl RenderOnce for Slider {
     }
 }
 
-fn refine_style(element: &mut Div, style: &StyleRefinement) -> Div {
+fn refine_style(mut element: Div, style: &StyleRefinement) -> Div {
     element.style().refine(style);
-    *element
+    element
 }
