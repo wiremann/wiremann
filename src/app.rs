@@ -29,7 +29,7 @@ use std::{
 pub fn run() -> Result<(), AppError> {
     let assets = Assets {};
 
-    application().with_assets(assets.clone()).run(move |mut cx| {
+    application().with_assets(assets.clone()).run(move |cx| {
         let bounds = Bounds::centered(None, size(px(1280.0), px(760.0)), cx);
         assets.load_fonts(cx).expect("Could not load fonts");
 
@@ -87,7 +87,7 @@ pub fn run() -> Result<(), AppError> {
                 }),
                 ..Default::default()
             },
-            |window, cx| {
+            |_, cx| {
                 cx.set_global(controller.clone());
 
                 let view = cx.new(Wiremann::new);

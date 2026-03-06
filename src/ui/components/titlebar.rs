@@ -51,6 +51,7 @@ impl Render for Titlebar {
                             .flex()
                             .items_center()
                             .justify_center()
+                            .text_color(theme.text_primary)
                             .child(Icons::WinMin)
                             .hover(|this| this.bg(theme.white_08))
                             .window_control_area(WindowControlArea::Min),
@@ -64,6 +65,7 @@ impl Render for Titlebar {
                             .items_center()
                             .justify_center()
                             .hover(|this| this.bg(theme.white_08))
+                            .text_color(theme.text_primary)
                             .child(if win.is_maximized() {
                                 Icons::WinRes
                             } else {
@@ -79,6 +81,7 @@ impl Render for Titlebar {
                             .items_center()
                             .justify_center()
                             .hover(|this| this.bg(rgb(0xe81123)))
+                            .text_color(theme.text_primary)
                             .child(Icons::WinClose)
                             .window_control_area(WindowControlArea::Close),
                     ),

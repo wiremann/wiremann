@@ -3,10 +3,10 @@ use crate::{
     controller::Controller,
     ui::{
         components::controlbar::ControlBar,
+        components::icons::{Icon, Icons},
         components::image_cache::ImageCache,
         components::queue::Queue,
         components::scrollbar::{floating_scrollbar, RightPad},
-        components::icons::{Icon, Icons},
         theme::Theme,
     },
 };
@@ -144,6 +144,7 @@ impl Render for PlayerPage {
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_shuffle(cx)
                                     })
+                                    .text_color(theme.text_primary)
                                     .child(Icon::new(Icons::Shuffle).size_4()),
                             )
                             .child(
@@ -156,6 +157,7 @@ impl Render for PlayerPage {
                                     .justify_center()
                                     .hover(|this| this.bg(theme.white_05))
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
+                                    .text_color(theme.text_primary)
                                     .child(Icon::new(Icons::Prev).size_4()),
                             )
                             .child(
@@ -184,6 +186,7 @@ impl Render for PlayerPage {
                                             }
                                         }
                                     })
+                                    .text_color(theme.text_primary)
                                     .child(
                                         if cx.global::<Controller>().state.read(cx).playback.status
                                             == PlaybackStatus::Playing
@@ -204,6 +207,7 @@ impl Render for PlayerPage {
                                     .justify_center()
                                     .hover(|this| this.bg(theme.white_05))
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
+                                    .text_color(theme.text_primary)
                                     .child(Icon::new(Icons::Next).size_4()),
                             )
                             .child(
@@ -223,6 +227,7 @@ impl Render for PlayerPage {
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_repeat(cx)
                                     })
+                                    .text_color(theme.text_primary)
                                     .child(Icon::new(Icons::Repeat).size_4()),
                             ),
                     )
