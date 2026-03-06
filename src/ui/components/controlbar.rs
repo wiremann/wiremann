@@ -2,9 +2,8 @@ use crate::controller::Controller;
 use crate::ui::theme::Theme;
 
 use super::slider::{Slider, SliderState};
-use crate::ui::icons::Icons;
-use gpui::{Entity, Render, Window, Context, IntoElement, ParentElement, Styled, div, StatefulInteractiveElement, InteractiveElement};
-use gpui_component::Icon;
+use crate::ui::components::icons::{Icon, Icons};
+use gpui::{div, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window};
 
 #[derive(Clone)]
 pub struct ControlBar {
@@ -13,7 +12,7 @@ pub struct ControlBar {
 }
 
 impl ControlBar {
-    #[must_use] 
+    #[must_use]
     pub fn new(
         playback_slider_state: Entity<SliderState>,
         vol_slider_state: Entity<SliderState>,
@@ -118,6 +117,7 @@ impl Render for ControlBar {
                                                 let controller = controller.clone();
                                                 move |_, _, cx| controller.set_mute(cx)
                                             })
+                                            .text_color(theme.text_primary)
                                             .child(
                                                 Icon::new(if state.playback.mute {
                                                     Icons::VolumeMute
@@ -129,7 +129,7 @@ impl Render for ControlBar {
                                                         _ => Icons::Volume2,
                                                     }
                                                 })
-                                                .size_4(),
+                                                    .size_4(),
                                             ),
                                     )
                                     .child(

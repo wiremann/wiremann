@@ -46,9 +46,9 @@ impl ScrollableHandle {
     #[must_use]
     pub fn max_offset(&self) -> gpui::Size<Pixels> {
         match self {
-            ScrollableHandle::Regular(h) => h.max_offset(),
+            ScrollableHandle::Regular(h) => h.max_offset().into(),
             ScrollableHandle::UniformList { handle, .. } => {
-                handle.0.borrow().base_handle.max_offset()
+                handle.0.borrow().base_handle.max_offset().into()
             }
         }
     }
@@ -66,11 +66,11 @@ impl ScrollableHandle {
     #[must_use]
     pub fn total_content_height(&self) -> f32 {
         match self {
-            ScrollableHandle::Regular(h) => (h.bounds().size.height + h.max_offset().height).into(),
+            ScrollableHandle::Regular(h) => (h.bounds().size.height + h.max_offset().y).into(),
             ScrollableHandle::UniformList { handle, .. } => {
                 let handle = &handle.0.borrow().base_handle;
 
-                (handle.bounds().size.height + handle.max_offset().height).into()
+                (handle.bounds().size.height + handle.max_offset().y).into()
             }
         }
     }
@@ -225,7 +225,7 @@ impl Element for Scrollbar {
 
         let total_content_height = handle.total_content_height();
 
-        // dont show if there's nothing to scroll
+        // don't show if there's nothing to scroll
         if total_content_height <= viewport_height || max_offset <= px(0.0) {
             return;
         }
@@ -512,7 +512,7 @@ impl Element for Scrollbar {
     }
 }
 
-#[must_use] 
+#[must_use]
 pub fn scrollbar() -> Scrollbar {
     Scrollbar {
         id: None,

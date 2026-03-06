@@ -1,7 +1,7 @@
 use super::navbar::NavBar;
-use crate::ui::icons::Icons;
+use crate::ui::components::icons::Icons;
 use crate::ui::theme::Theme;
-use gpui::{Entity, Render, Window, Context, IntoElement, ParentElement, Styled, InteractiveElement, div, WindowControlArea, rgb, App, AppContext};
+use gpui::{div, rgb, App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, WindowControlArea};
 
 #[derive(Clone)]
 pub struct Titlebar {
@@ -51,6 +51,7 @@ impl Render for Titlebar {
                             .flex()
                             .items_center()
                             .justify_center()
+                            .text_color(theme.text_primary)
                             .child(Icons::WinMin)
                             .hover(|this| this.bg(theme.white_08))
                             .window_control_area(WindowControlArea::Min),
@@ -64,6 +65,7 @@ impl Render for Titlebar {
                             .items_center()
                             .justify_center()
                             .hover(|this| this.bg(theme.white_08))
+                            .text_color(theme.text_primary)
                             .child(if win.is_maximized() {
                                 Icons::WinRes
                             } else {
@@ -79,6 +81,7 @@ impl Render for Titlebar {
                             .items_center()
                             .justify_center()
                             .hover(|this| this.bg(rgb(0xe81123)))
+                            .text_color(theme.text_primary)
                             .child(Icons::WinClose)
                             .window_control_area(WindowControlArea::Close),
                     ),

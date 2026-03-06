@@ -2,15 +2,14 @@ use super::Page;
 use crate::ui::theme::Theme;
 
 use gpui::prelude::FluentBuilder;
-use gpui::{Render, Window, Context, IntoElement, ParentElement, Styled, div, StatefulInteractiveElement, InteractiveElement, px};
-use gpui_component::StyledExt;
+use gpui::{div, px, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window};
 
 #[derive(Clone)]
 pub struct NavBar;
 
 impl NavBar {
     #[allow(clippy::new_without_default)]
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         NavBar {}
     }
@@ -50,9 +49,9 @@ impl Render for NavBar {
                                 .left_0()
                                 .bg(theme.accent),
                         )
-                        .bg(theme.white_10)
-                        .font_black()
-                        .text_color(theme.text_primary)
+                            .bg(theme.white_10)
+                            .font_weight(FontWeight::BLACK)
+                            .text_color(theme.text_primary)
                     }),
             )
             .child(
@@ -78,9 +77,9 @@ impl Render for NavBar {
                                 .left_0()
                                 .bg(theme.accent),
                         )
-                        .bg(theme.white_10)
-                        .font_black()
-                        .text_color(theme.text_primary)
+                            .bg(theme.white_10)
+                            .font_weight(FontWeight::BLACK)
+                            .text_color(theme.text_primary)
                     }),
             )
             .child(
@@ -106,9 +105,9 @@ impl Render for NavBar {
                                 .left_0()
                                 .bg(theme.accent),
                         )
-                        .bg(theme.white_10)
-                        .font_black()
-                        .text_color(theme.text_primary)
+                            .bg(theme.white_10)
+                            .font_weight(FontWeight::BLACK)
+                            .text_color(theme.text_primary)
                     }),
             )
     }
