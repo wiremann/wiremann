@@ -8,7 +8,7 @@ use crate::{
 use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::imageops::thumbnail;
-use image::{Frame, ImageReader};
+use image::{imageops, DynamicImage, Frame, ImageReader};
 use lofty::{prelude::*, probe::Probe};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
@@ -32,7 +32,7 @@ enum ScanJob {
     Metadata(PathBuf, TrackId),
     Thumbnail(TrackId, Vec<u8>),
     AlbumArt(PathBuf),
-    PlaylistThumbnail(Uuid, Vec<TrackId>),
+    PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
 }
 
 impl Scanner {
@@ -60,10 +60,12 @@ impl Scanner {
         let (meta_tx, meta_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
+        let (playlist_thumb_tx, playlist_thumb_rx) = crossbeam_channel::unbounded();
 
         self.spawn_metadata_worker(&meta_rx, &thumb_tx, metadata_workers);
         self.spawn_thumbnail_workers(&thumb_rx, thumbnail_workers);
         self.spawn_album_art_worker(album_art_rx);
+        self.spawn_playlist_thumbnail_worker(playlist_thumb_rx);
 
         loop {
             match self.rx.recv()? {
@@ -76,7 +78,9 @@ impl Scanner {
                 ScannerCommand::GetCurrentAlbumArt(path) => {
                     let _ = album_art_tx.send(ScanJob::AlbumArt(path));
                 }
-                ScannerCommand::CheckScanEnded => {}
+                ScannerCommand::PlaylistThumbnail { id, tracks } => {
+                    let _ = playlist_thumb_tx.send(ScanJob::PlaylistThumbnail(id, tracks));
+                }
             }
         }
     }
@@ -211,19 +215,36 @@ impl Scanner {
         });
     }
 
-    fn spawn_playlist_thumbnail_worker(&self, album_art_rx: Receiver<ScanJob>) {
+    fn spawn_playlist_thumbnail_worker(&self, playlist_thumb_rx: Receiver<ScanJob>) {
         let events_tx = self.tx.clone();
 
         std::thread::spawn(move || {
-            while let Ok(ScanJob::AlbumArt(path)) = album_art_rx.recv() {
-                match get_album_art(&path) {
-                    Ok((id, Some(image))) => {
-                        if let Ok(album_art) = render_album_art(&image, false) {
-                            let _ = events_tx.send(ScannerEvent::AlbumArt(id, album_art));
-                        }
+            while let Ok(ScanJob::PlaylistThumbnail(id, tracks)) = playlist_thumb_rx.recv() {
+                let mut images = Vec::with_capacity(4);
+
+                for path in tracks {
+                    if images.len() == 4 {
+                        break;
                     }
-                    Err(err) => eprintln!("Failed album art: {err}"),
-                    _ => {}
+
+                    match get_album_art(&path) {
+                        Ok((_tid, Some(image))) => {
+                            images.push(DynamicImage::from(image));
+                        }
+                        Ok((_tid, None)) => {}
+                        Err(err) => eprintln!("Failed album art for {:?}: {err}", path),
+                    }
+                }
+
+                if images.is_empty() {
+                    continue;
+                }
+
+                match render_playlist_thumbnail(images) {
+                    Ok(thumbnail) => {
+                        let _ = events_tx.send(ScannerEvent::PlaylistThumbnail(id, thumbnail));
+                    }
+                    Err(err) => eprintln!("Failed playlist thumbnail: {err}"),
                 }
             }
         });
@@ -450,4 +471,54 @@ fn get_album_art(path: &Path) -> Result<(TrackId, Option<Vec<u8>>), ScannerError
     }
 
     Ok((id, thumbnail))
+}
+
+fn render_playlist_thumbnail(
+    mut images: Vec<DynamicImage>,
+) -> Option<Arc<RenderImage>> {
+    let mut canvas = DynamicImage::new_rgba8(128, 128);
+
+    match images.len() {
+        1 => {
+            let img = images.remove(0)
+                .resize_exact(128, 128, imageops::FilterType::Lanczos3);
+
+            imageops::overlay(&mut canvas, &img, 0, 0);
+        }
+
+        2 => {
+            for (i, img) in images.into_iter().enumerate() {
+                let resized = img.resize_exact(64, 128, imageops::FilterType::Lanczos3);
+                imageops::overlay(&mut canvas, &resized, (i * 64) as i64, 0);
+            }
+        }
+
+        3 => {
+            let a = images.remove(0).resize_exact(64, 64, imageops::FilterType::Lanczos3);
+            let b = images.remove(0).resize_exact(64, 64, imageops::FilterType::Lanczos3);
+            let c = images.remove(0).resize_exact(128, 64, imageops::FilterType::Lanczos3);
+
+            imageops::overlay(&mut canvas, &a, 0, 0);
+            imageops::overlay(&mut canvas, &b, 64, 0);
+            imageops::overlay(&mut canvas, &c, 0, 64);
+        }
+
+        _ => {
+            for (i, img) in images.into_iter().take(4).enumerate() {
+                let resized = img.resize_exact(64, 64, imageops::FilterType::Lanczos3);
+
+                let x = (i % 2) * 64;
+                let y = (i / 2) * 64;
+
+                imageops::overlay(&mut canvas, &resized, x as i64, y as i64);
+            }
+        }
+    }
+
+    let image = canvas.to_rgba8().to_vec();
+
+    match render_album_art(&image, false) {
+        Ok(image) => Some(image),
+        Err(_) => None,
+    }
 }

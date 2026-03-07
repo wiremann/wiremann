@@ -1,5 +1,5 @@
 use crate::controller::state::{AppState, PlaybackStatus};
-use crate::library::playlists::Playlist;
+use crate::library::playlists::{Playlist, PlaylistId};
 use crate::library::{Track, TrackId};
 use gpui::RenderImage;
 use std::collections::HashMap;
@@ -21,6 +21,7 @@ pub enum ScannerEvent {
     AlbumArt(TrackId, Arc<RenderImage>),
     Thumbnails(HashMap<TrackId, Arc<RenderImage>>),
     ScanFinished,
+    PlaylistThumbnail(PlaylistId, Arc<RenderImage>),
 }
 
 #[derive(Clone, PartialEq, Debug)]

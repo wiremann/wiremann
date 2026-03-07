@@ -30,7 +30,6 @@ pub enum ScannerCommand {
         id: PlaylistId,
         tracks: Vec<PathBuf>,
     },
-    CheckScanEnded,
 }
 
 pub enum CacherCommand {
