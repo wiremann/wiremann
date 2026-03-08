@@ -1,19 +1,33 @@
 use crate::library::playlists::PlaylistId;
 use crate::library::TrackId;
 use gpui::RenderImage;
-use std::collections::HashMap;
+use lru::LruCache;
+use std::collections::HashSet;
+use std::num::NonZero;
 use std::sync::Arc;
 
-#[derive(Default)]
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
-    pub track_thumbs: HashMap<TrackId, Arc<RenderImage>>,
-    pub playlist_thumbs: HashMap<PlaylistId, Arc<RenderImage>>,
+    pub track_thumbs: LruCache<TrackId, Arc<RenderImage>>,
+    pub playlist_thumbs: LruCache<PlaylistId, Arc<RenderImage>>,
+
+    pub inflight: HashSet<TrackId>,
+}
+
+impl Default for ImageCache {
+    fn default() -> Self {
+        ImageCache {
+            current: None,
+            track_thumbs: LruCache::new(NonZero(128)),
+            playlist_thumbs: LruCache::new(NonZero(64)),
+            inflight: HashSet::new(),
+        }
+    }
 }
 
 impl ImageCache {
     #[must_use]
-    pub fn get_track(&self, id: &TrackId) -> Option<Arc<RenderImage>> {
+    pub fn get_track(&mut self, id: &TrackId) -> Option<Arc<RenderImage>> {
         self.track_thumbs.get(id).cloned()
     }
 
@@ -22,7 +36,7 @@ impl ImageCache {
     }
 
     pub fn add_track(&mut self, id: TrackId, thumbnail: Arc<RenderImage>) {
-        self.track_thumbs.insert(id, thumbnail);
+        self.track_thumbs.put(id, thumbnail);
     }
 }
 
