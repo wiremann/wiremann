@@ -346,20 +346,37 @@ impl Controller {
 
                 cx.notify(view.entity_id());
             }
-            CacherEvent::MissingAlbumArt(path) => {
-                let _ = self
-                    .scanner_tx
-                    .send(ScannerCommand::GetCurrentAlbumArt(path.clone()));
+            CacherEvent::MissingAlbumArt(id) => {
+                let state = self.state.read(cx);
+                let lookup = state.library.image_lookup;
+                let tracks = state.library.tracks.clone();
+
+                let track_id = lookup.iter().find_map(|(track, image)| { if image == id { Some(track) } else { None } });
+
+                if let Some(track_id) = track_id {
+                    if let Some(track) = tracks.get(track_id) {
+                        let _ = self
+                            .scanner_tx
+                            .send(ScannerCommand::GetCurrentAlbumArt(track.path.clone()));
+                    }
+                }
             }
             CacherEvent::MissingThumbnails(ids) => {
-                let tracks = self.state.read(cx).library.tracks.clone();
+                let state = self.state.read(cx);
+                let lookup = state.library.image_lookup;
+                let tracks = state.library.tracks.clone();
+
                 for id in ids {
-                    if let Some(track) = tracks.get(id) {
-                        let path = track.path.clone();
-                        let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                            path,
-                            track_id: *id,
-                        });
+                    let track_id = lookup.iter().find_map(|(track, image)| { if image == id { Some(track) } else { None } });
+
+                    if let Some(track_id) = track_id {
+                        if let Some(track) = tracks.get(track_id) {
+                            let path = track.path.clone();
+                            let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
+                                path,
+                                track_id: *track_id,
+                            });
+                        }
                     }
                 }
             }
@@ -367,8 +384,11 @@ impl Controller {
         Ok(())
     }
 
-    pub fn load_audio(&self, path: PathBuf) {
+    pub fn load_audio(&self, path: PathBuf, cx: &App) {
         let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
+
+        let state = self.state.read(cx);
+
         let _ = self.cacher_tx.send(CacherCommand::GetAlbumArt(path));
     }
 

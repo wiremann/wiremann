@@ -28,6 +28,6 @@ pub enum CacherEvent {
     AppState(AppState),
     AlbumArt(Arc<RenderImage>),
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
-    MissingThumbnails(Vec<TrackId>),
-    MissingAlbumArt(PathBuf),
+    MissingThumbnails(Vec<ImageId>),
+    MissingAlbumArt(ImageId),
 }

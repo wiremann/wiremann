@@ -34,7 +34,7 @@ pub enum ScannerCommand {
 
 pub enum CacherCommand {
     GetAppState,
-    GetAlbumArt(PathBuf),
+    GetAlbumArt(ImageId),
     GetThumbnails(HashSet<ImageId>),
     WriteLibraryState(LibraryState),
     WritePlaybackState(PlaybackState),
