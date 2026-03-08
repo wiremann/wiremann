@@ -1,6 +1,6 @@
 use crate::controller::commands::CacherCommand;
 use crate::library::playlists::PlaylistId;
-use crate::library::TrackId;
+use crate::library::ImageId;
 use crossbeam_channel::Sender;
 use gpui::RenderImage;
 use lru::LruCache;
@@ -10,10 +10,10 @@ use std::sync::Arc;
 
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
-    pub track_thumbs: LruCache<TrackId, Arc<RenderImage>>,
+    pub track_thumbs: LruCache<ImageId, Arc<RenderImage>>,
     pub playlist_thumbs: LruCache<PlaylistId, Arc<RenderImage>>,
 
-    pub inflight: HashSet<TrackId>,
+    pub inflight: HashSet<ImageId>,
 }
 
 impl Default for ImageCache {
@@ -29,7 +29,7 @@ impl Default for ImageCache {
 
 impl ImageCache {
     #[must_use]
-    pub fn get_track(&mut self, id: &TrackId) -> Option<Arc<RenderImage>> {
+    pub fn get_track(&mut self, id: &ImageId) -> Option<Arc<RenderImage>> {
         self.track_thumbs.get(id).cloned()
     }
 
@@ -39,7 +39,7 @@ impl ImageCache {
 
     pub fn add_track(
         &mut self,
-        id: TrackId,
+        id: ImageId,
         thumbnail: Arc<RenderImage>,
     ) -> Option<Arc<RenderImage>> {
         let evicted = self.track_thumbs.put(id, thumbnail);
@@ -50,7 +50,7 @@ impl ImageCache {
 
     pub fn request_track(
         &mut self,
-        ids: HashSet<TrackId>,
+        ids: HashSet<ImageId>,
         tx: &Sender<CacherCommand>,
     ) {
         let mut to_request = HashSet::new();

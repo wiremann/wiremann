@@ -230,7 +230,7 @@ impl Controller {
                 let state = self.state.read(cx).queue.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
             }
-            ScannerEvent::AlbumArt(id, image) => {
+            ScannerEvent::AlbumArt(track_id, image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
 
                 image_cache.current = Some(image.clone());
@@ -241,7 +241,7 @@ impl Controller {
                 if let Some(image) = image.as_bytes(0) {
                     let image = image.to_vec();
                     let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                        id: *id,
+                        id: *image_id,
                         kind: ImageKind::AlbumArt,
                         width,
                         height,
@@ -249,9 +249,13 @@ impl Controller {
                     });
                 }
 
+                self.state.update(cx, |this, cx| {
+                    this.library.image_lookup.insert(*track_id, *image_id);
+                });
+
                 cx.notify(view.entity_id());
             }
-            ScannerEvent::Thumbnails(thumbnails) => {
+            ScannerEvent::Thumbnails(thumbnails, lookup) => {
                 for (id, image) in thumbnails {
                     let width = image.size(0).width.0.cast_unsigned();
                     let height = image.size(0).height.0.cast_unsigned();
@@ -265,6 +269,10 @@ impl Controller {
                             image,
                         });
                     }
+
+                    self.state.update(cx, |this, cx| {
+                        this.library.image_lookup.extend(lookup.clone());
+                    });
 
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
@@ -297,9 +305,6 @@ impl Controller {
                 let playback_state = state.playback.clone();
                 self.state.update(cx, |this, _| {
                     *this = state.clone();
-
-                    let ids: HashSet<_> = this.queue.tracks.iter().copied().collect();
-                    let _ = self.cacher_tx.send(CacherCommand::GetThumbnails(ids));
                 });
 
                 self.load_queue_current(cx);

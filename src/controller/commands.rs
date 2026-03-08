@@ -1,7 +1,7 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::{LibraryState, PlaybackState, QueueState};
 use crate::library::playlists::PlaylistId;
-use crate::library::TrackId;
+use crate::library::{ImageId, TrackId};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -35,12 +35,12 @@ pub enum ScannerCommand {
 pub enum CacherCommand {
     GetAppState,
     GetAlbumArt(PathBuf),
-    GetThumbnails(HashSet<TrackId>),
+    GetThumbnails(HashSet<ImageId>),
     WriteLibraryState(LibraryState),
     WritePlaybackState(PlaybackState),
     WriteQueueState(QueueState),
     WriteImage {
-        id: TrackId,
+        id: ImageId,
         kind: ImageKind,
         width: u32,
         height: u32,

@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
+use crate::library::ImageId;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AppState {
@@ -16,6 +17,7 @@ pub struct AppState {
 pub struct LibraryState {
     pub tracks: HashMap<TrackId, Arc<Track>>,
     pub playlists: HashMap<PlaylistId, Playlist>,
+    pub image_lookup: HashMap<TrackId, ImageId>
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]

@@ -1,5 +1,6 @@
+use crate::cacher::ImageKind;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{gen_track_id, Track};
+use crate::library::{gen_track_id, ImageId, Track};
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent},
     errors::ScannerError,
@@ -14,7 +15,6 @@ use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
@@ -28,7 +28,7 @@ pub struct Scanner {
 
 enum ScanJob {
     Metadata(PathBuf, TrackId),
-    Thumbnail(TrackId, Vec<u8>),
+    Thumbnail(TrackId, ImageId, Vec<u8>),
     AlbumArt(PathBuf),
     PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
 }
@@ -114,7 +114,13 @@ impl Scanner {
                                         }
 
                                         if let Some(bytes) = image {
-                                            let _ = thumb_tx.send(ScanJob::Thumbnail(id, bytes));
+                                            let hash = ImageId(<[u8; 32]>::from(blake3::hash(&bytes)));
+
+                                            let path = get_cached_image_path(hash, ImageKind::Thumbnail);
+
+                                            if !path.exists() {
+                                                let _ = thumb_tx.send(ScanJob::Thumbnail(id, hash, bytes));
+                                            }
                                         }
                                     }
                                     Err(err) => eprintln!("Failed to get track metadata: {err}" ),
@@ -148,18 +154,20 @@ impl Scanner {
             let thumb_rx = thumb_rx.clone();
 
             std::thread::spawn(move || {
-                let mut batch = HashMap::with_capacity(16);
+                let mut image_batch = HashMap::with_capacity(16);
+                let mut lookup_batch = HashMap::with_capacity(16);
 
                 loop {
                     select! {
                         recv(thumb_rx) -> job => {
-                            if let Ok(ScanJob::Thumbnail(id, bytes)) = job {
+                            if let Ok(ScanJob::Thumbnail(id, hash, bytes)) = job {
                                 if let Ok(image) = render_album_art(&bytes, true) {
-                                    batch.insert(id, image);
+                                    image_batch.insert(hash, image);
+                                    lookup_batch.insert(id, hash);
 
-                                    if batch.len() >= 16 {
+                                    if image_batch.len() >= 16 {
                                         let _ = events_tx.send(
-                                            ScannerEvent::Thumbnails(std::mem::take(&mut batch))
+                                            ScannerEvent::Thumbnails(std::mem::take(&mut image_batch), std::mem::take(&mut lookup_batch))
                                         );
                                     }
                                 }
@@ -167,9 +175,9 @@ impl Scanner {
                         }
 
                         recv(ticker) -> _ => {
-                            if !batch.is_empty() {
+                            if !image_batch.is_empty() || !lookup_batch.is_empty() {
                                 let _ = events_tx.send(
-                                    ScannerEvent::Thumbnails(std::mem::take(&mut batch))
+                                    ScannerEvent::Thumbnails(std::mem::take(&mut image_batch), std::mem::take(&mut lookup_batch))
                                 );
                             }
                         }
@@ -527,4 +535,21 @@ fn render_playlist_thumbnail(
         Ok(image) => Some(image),
         Err(_) => None,
     }
+}
+
+fn get_cached_image_path(id: ImageId, kind: ImageKind) -> PathBuf {
+    let base_dir = dirs::audio_dir()
+        .unwrap_or_default()
+        .join("wiremann")
+        .join("cache");
+
+    let hex = hex::encode(id.0);
+    let folder = &hex[0..2];
+
+    let name = match kind {
+        ImageKind::Thumbnail => format!("{hex}_thumb.bgra.zstd"),
+        ImageKind::AlbumArt => format!("{hex}_art.bgra.zstd"),
+    };
+
+    base_dir.join("images").join(folder).join(name)
 }

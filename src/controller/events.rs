@@ -1,6 +1,6 @@
 use crate::controller::state::{AppState, PlaybackStatus};
 use crate::library::playlists::{Playlist, PlaylistId};
-use crate::library::{Track, TrackId};
+use crate::library::{ImageId, Track, TrackId};
 use gpui::RenderImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -18,8 +18,8 @@ pub enum AudioEvent {
 pub enum ScannerEvent {
     Tracks(Vec<Track>),
     Playlist(Playlist),
-    AlbumArt(TrackId, Arc<RenderImage>),
-    Thumbnails(HashMap<TrackId, Arc<RenderImage>>),
+    AlbumArt(TrackId, ImageId, Arc<RenderImage>),
+    Thumbnails(HashMap<ImageId, Arc<RenderImage>>, HashMap<TrackId, ImageId>),
     PlaylistThumbnail(PlaylistId, Arc<RenderImage>),
 }
 
@@ -27,7 +27,7 @@ pub enum ScannerEvent {
 pub enum CacherEvent {
     AppState(AppState),
     AlbumArt(Arc<RenderImage>),
-    Thumbnails(HashMap<TrackId, Arc<RenderImage>>),
+    Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
     MissingThumbnails(Vec<TrackId>),
     MissingAlbumArt(PathBuf),
 }
