@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
 pub struct TrackId(pub [u8; 32]);
 
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
+pub struct ImageId(pub [u8; 32]);
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Track {
     pub id: TrackId,

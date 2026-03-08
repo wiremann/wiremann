@@ -14,7 +14,7 @@ use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
@@ -24,8 +24,6 @@ use walkdir::WalkDir;
 pub struct Scanner {
     pub tx: Sender<ScannerEvent>,
     pub rx: Receiver<ScannerCommand>,
-    metadata_jobs: Arc<AtomicUsize>,
-    thumbnail_jobs: Arc<AtomicUsize>,
 }
 
 enum ScanJob {
@@ -44,8 +42,6 @@ impl Scanner {
         let scanner = Scanner {
             tx: event_tx,
             rx: cmd_rx,
-            metadata_jobs: Arc::new(AtomicUsize::new(0)),
-            thumbnail_jobs: Arc::new(AtomicUsize::new(0)),
         };
 
         (scanner, cmd_tx, event_rx)
@@ -97,8 +93,6 @@ impl Scanner {
             let meta_rx = meta_rx.clone();
             let thumb_tx = thumb_tx.clone();
             let events_tx = self.tx.clone();
-            let metadata_jobs = self.metadata_jobs.clone();
-            let thumbnail_jobs = self.thumbnail_jobs.clone();
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
@@ -121,13 +115,9 @@ impl Scanner {
 
                                         if let Some(bytes) = image {
                                             let _ = thumb_tx.send(ScanJob::Thumbnail(id, bytes));
-                                            thumbnail_jobs.fetch_add(1, Ordering::AcqRel);
                                         }
                                     }
                                     Err(err) => eprintln!("Failed to get track metadata: {err}" ),
-                                }
-                                if metadata_jobs.fetch_sub(1, Ordering::AcqRel) == 1  && thumbnail_jobs.load(Ordering::Relaxed) == 0 {
-                                    let _ = events_tx.send(ScannerEvent::ScanFinished);
                                 }
                             }
                         }
@@ -156,8 +146,6 @@ impl Scanner {
             let events_tx = self.tx.clone();
             let ticker = ticker.clone();
             let thumb_rx = thumb_rx.clone();
-            let metadata_jobs = self.metadata_jobs.clone();
-            let thumbnail_jobs = self.thumbnail_jobs.clone();
 
             std::thread::spawn(move || {
                 let mut batch = HashMap::with_capacity(16);
@@ -175,7 +163,6 @@ impl Scanner {
                                         );
                                     }
                                 }
-                                thumbnail_jobs.fetch_sub(1, Ordering::AcqRel);
                             }
                         }
 
@@ -186,11 +173,6 @@ impl Scanner {
                                 );
                             }
                         }
-                    }
-                    if thumbnail_jobs.fetch_sub(1, Ordering::AcqRel) == 1
-                        && metadata_jobs.load(Ordering::Relaxed) == 0
-                    {
-                        let _ = events_tx.send(ScannerEvent::ScanFinished);
                     }
                 }
             });
@@ -261,7 +243,6 @@ impl Scanner {
         meta_tx: &Sender<ScanJob>,
     ) {
         let _ = meta_tx.send(ScanJob::Metadata(path, track_id));
-        self.metadata_jobs.fetch_add(1, Ordering::AcqRel);
     }
 
     fn enqueue_folder(
@@ -296,7 +277,6 @@ impl Scanner {
 
                 if !existing_tracks.contains(&id) {
                     let _ = meta_tx.send(ScanJob::Metadata(file, id));
-                    self.metadata_jobs.fetch_add(1, Ordering::AcqRel);
                 }
             }
         }

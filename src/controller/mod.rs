@@ -253,6 +253,19 @@ impl Controller {
             }
             ScannerEvent::Thumbnails(thumbnails) => {
                 for (id, image) in thumbnails {
+                    let width = image.size(0).width.0.cast_unsigned();
+                    let height = image.size(0).height.0.cast_unsigned();
+                    if let Some(image) = image.as_bytes(0) {
+                        let image = image.to_vec();
+                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                            id: *id,
+                            kind: ImageKind::Thumbnail,
+                            width,
+                            height,
+                            image,
+                        });
+                    }
+
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
                         thumbnail_cache.add_track(id.clone(), image.clone())
@@ -260,24 +273,6 @@ impl Controller {
 
                     if let Some(img) = evicted {
                         drop_image_from_app(cx, img);
-                    }
-                }
-            }
-            ScannerEvent::ScanFinished => {
-                let thumbnails = cx.global::<ImageCache>().track_thumbs.clone();
-
-                for (id, image) in thumbnails {
-                    let width = image.size(0).width.0.cast_unsigned();
-                    let height = image.size(0).height.0.cast_unsigned();
-                    if let Some(image) = image.as_bytes(0) {
-                        let image = image.to_vec();
-                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                            id,
-                            kind: ImageKind::Thumbnail,
-                            width,
-                            height,
-                            image,
-                        });
                     }
                 }
             }
