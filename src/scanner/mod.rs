@@ -229,7 +229,11 @@ impl Scanner {
 
                     match get_album_art(&path) {
                         Ok((_tid, Some(image))) => {
-                            images.push(DynamicImage::from(image));
+                            if let Ok(img) = image::load_from_memory(&image) {
+                                images.push(img);
+                            } else {
+                                eprintln!("Invalid album art in {:?}", path);
+                            }
                         }
                         Ok((_tid, None)) => {}
                         Err(err) => eprintln!("Failed album art for {:?}: {err}", path),
@@ -241,10 +245,10 @@ impl Scanner {
                 }
 
                 match render_playlist_thumbnail(images) {
-                    Ok(thumbnail) => {
+                    Some(thumbnail) => {
                         let _ = events_tx.send(ScannerEvent::PlaylistThumbnail(id, thumbnail));
                     }
-                    Err(err) => eprintln!("Failed playlist thumbnail: {err}"),
+                    None => eprintln!("Failed to generate playlist thumbnail"),
                 }
             }
         });

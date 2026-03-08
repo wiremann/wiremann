@@ -43,7 +43,7 @@ impl Render for Item {
 
         let is_current = Some(&self.data.id) == state.playback.current.as_ref();
 
-        let thumbnail = cx.global::<ImageCache>().get(&self.data.id);
+        let thumbnail = cx.global::<ImageCache>().get_track(&self.data.id);
         let current = if let Some(id) = state.playback.current {
             state.library.tracks.get(&id)
         } else {
