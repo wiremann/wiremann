@@ -120,6 +120,8 @@ impl Scanner {
 
                                             if !path.exists() {
                                                 let _ = thumb_tx.send(ScanJob::Thumbnail(id, hash, bytes));
+                                            } else {
+                                                let _ = events_tx.send(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
                                             }
                                         }
                                     }
@@ -167,8 +169,9 @@ impl Scanner {
 
                                     if image_batch.len() >= 16 {
                                         let _ = events_tx.send(
-                                            ScannerEvent::Thumbnails(std::mem::take(&mut image_batch), std::mem::take(&mut lookup_batch))
+                                            ScannerEvent::Thumbnails(std::mem::take(&mut image_batch))
                                         );
+                                        let _ = events_tx.send(ScannerEvent::ImageLookup(std::mem::take(&mut lookup_batch)));
                                     }
                                 }
                             }
@@ -177,8 +180,9 @@ impl Scanner {
                         recv(ticker) -> _ => {
                             if !image_batch.is_empty() || !lookup_batch.is_empty() {
                                 let _ = events_tx.send(
-                                    ScannerEvent::Thumbnails(std::mem::take(&mut image_batch), std::mem::take(&mut lookup_batch))
+                                    ScannerEvent::Thumbnails(std::mem::take(&mut image_batch))
                                 );
+                                let _ = events_tx.send(ScannerEvent::ImageLookup(std::mem::take(&mut lookup_batch)));
                             }
                         }
                     }
@@ -194,8 +198,15 @@ impl Scanner {
             while let Ok(ScanJob::AlbumArt(path)) = album_art_rx.recv() {
                 match get_album_art(&path) {
                     Ok((id, Some(image))) => {
-                        if let Ok(album_art) = render_album_art(&image, false) {
-                            let _ = events_tx.send(ScannerEvent::AlbumArt(id, album_art));
+                        let hash = ImageId(<[u8; 32]>::from(blake3::hash(&image)));
+
+                        let path = get_cached_image_path(hash, ImageKind::AlbumArt);
+
+                        if !path.exists() {
+                            if let Ok(album_art) = render_album_art(&image, false) {
+                                let _ = events_tx.send(ScannerEvent::AlbumArt(hash, album_art));
+                                let _ = events_tx.send(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
+                            }
                         }
                     }
                     Err(err) => eprintln!("Failed album art: {err}"),
@@ -334,7 +345,7 @@ fn render_album_art(bytes: &[u8], is_thumbnail: bool) -> Result<Arc<RenderImage>
                 .resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)),
         )?;
 
-        RgbaImage::from_raw(196, 196, dst.into_vec()).unwrap()
+        RgbaImage::from_raw(128, 128, dst.into_vec()).unwrap()
     } else {
         rgba
     };

@@ -102,11 +102,18 @@ impl Controller {
             }
             AudioEvent::TrackLoaded(path) => {
                 let track_id = gen_track_id(path)?;
-                if !self.state.read(cx).library.tracks.contains_key(&track_id) {
+                let state = self.state.read(cx);
+                if !state.library.tracks.contains_key(&track_id) {
                     let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
                         path: path.clone(),
                         track_id,
                     });
+                }
+
+                if let Some(image_id) = state.library.image_lookup.get(&track_id) {
+                    let _ = self.cacher_tx.send(CacherCommand::GetAlbumArt(image_id.clone()));
+                } else {
+                    let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(path.clone()));
                 }
 
                 self.state.update(cx, |this, cx| {
@@ -230,7 +237,7 @@ impl Controller {
                 let state = self.state.read(cx).queue.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
             }
-            ScannerEvent::AlbumArt(track_id, image_id, image) => {
+            ScannerEvent::AlbumArt(image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
 
                 image_cache.current = Some(image.clone());
@@ -249,13 +256,9 @@ impl Controller {
                     });
                 }
 
-                self.state.update(cx, |this, cx| {
-                    this.library.image_lookup.insert(*track_id, *image_id);
-                });
-
                 cx.notify(view.entity_id());
             }
-            ScannerEvent::Thumbnails(thumbnails, lookup) => {
+            ScannerEvent::Thumbnails(thumbnails) => {
                 for (id, image) in thumbnails {
                     let width = image.size(0).width.0.cast_unsigned();
                     let height = image.size(0).height.0.cast_unsigned();
@@ -270,10 +273,6 @@ impl Controller {
                         });
                     }
 
-                    self.state.update(cx, |this, cx| {
-                        this.library.image_lookup.extend(lookup.clone());
-                    });
-
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
                         thumbnail_cache.add_track(id.clone(), image.clone())
@@ -283,6 +282,11 @@ impl Controller {
                         drop_image_from_app(cx, img);
                     }
                 }
+            }
+            ScannerEvent::ImageLookup(lookup) => {
+                self.state.update(cx, |this, _| {
+                    this.library.image_lookup.extend(lookup.clone());
+                });
             }
             ScannerEvent::PlaylistThumbnail(id, thumbnail) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
@@ -348,7 +352,7 @@ impl Controller {
             }
             CacherEvent::MissingAlbumArt(id) => {
                 let state = self.state.read(cx);
-                let lookup = state.library.image_lookup;
+                let lookup = state.library.image_lookup.clone();
                 let tracks = state.library.tracks.clone();
 
                 let track_id = lookup.iter().find_map(|(track, image)| { if image == id { Some(track) } else { None } });
@@ -363,7 +367,7 @@ impl Controller {
             }
             CacherEvent::MissingThumbnails(ids) => {
                 let state = self.state.read(cx);
-                let lookup = state.library.image_lookup;
+                let lookup = state.library.image_lookup.clone();
                 let tracks = state.library.tracks.clone();
 
                 for id in ids {
@@ -384,12 +388,8 @@ impl Controller {
         Ok(())
     }
 
-    pub fn load_audio(&self, path: PathBuf, cx: &App) {
+    pub fn load_audio(&self, path: PathBuf) {
         let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
-
-        let state = self.state.read(cx);
-
-        let _ = self.cacher_tx.send(CacherCommand::GetAlbumArt(path));
     }
 
     pub fn load_queue_current(&self, cx: &App) {

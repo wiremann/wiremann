@@ -5,7 +5,7 @@ use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use components::{image_cache::ImageCache, pages::player::PlayerPage, titlebar::Titlebar, Page};
-use gpui::{Entity, Context, AppContext,  BorrowAppContext,  Render, Window, IntoElement, ParentElement, Styled, InteractiveElement, div};
+use gpui::{div, AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window};
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,

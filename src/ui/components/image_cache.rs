@@ -48,19 +48,18 @@ impl ImageCache {
         evicted
     }
 
-    pub fn request_track(
+    pub fn request_track<I>(
         &mut self,
-        ids: HashSet<ImageId>,
+        ids: I,
         tx: &Sender<CacherCommand>,
-    ) {
+    )
+    where
+        I: IntoIterator<Item=ImageId>,
+    {
         let mut to_request = HashSet::new();
 
         for id in ids {
-            if self.track_thumbs.contains(&id) {
-                continue;
-            }
-
-            if self.inflight.contains(&id) {
+            if self.track_thumbs.contains(&id) || self.inflight.contains(&id) {
                 continue;
             }
 
