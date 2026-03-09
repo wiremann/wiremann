@@ -1,4 +1,4 @@
-use async_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use std::time::Duration;
 use std::{fs::File, path::PathBuf};
 
@@ -23,8 +23,8 @@ impl Audio {
     #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn new() -> (Self, Sender<AudioCommand>, Receiver<AudioEvent>) {
-        let (cmd_tx, cmd_rx) = async_channel::unbounded();
-        let (event_tx, event_rx) = async_channel::unbounded();
+        let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+        let (event_tx, event_rx) = crossbeam_channel::unbounded();
         let stream_handle = DeviceSinkBuilder::open_default_sink().unwrap();
         let player = Player::connect_new(stream_handle.mixer());
 
@@ -42,7 +42,7 @@ impl Audio {
     #[allow(clippy::missing_errors_doc)]
     pub fn run(&mut self) -> Result<(), AudioError> {
         loop {
-            while let Ok(cmd) = self.rx.recv_blocking() {
+            while let Ok(cmd) = self.rx.try_recv() {
                 match cmd {
                     AudioCommand::Load(path) => self.load_path(path)?,
                     AudioCommand::GetPosition => self.emit_position(),
@@ -78,7 +78,7 @@ impl Audio {
 
         self.player.set_volume(prev_vol);
 
-        let _ = self.tx.send_blocking(AudioEvent::TrackLoaded(path));
+        let _ = self.tx.send(AudioEvent::TrackLoaded(path));
 
         self.play();
 
@@ -88,28 +88,28 @@ impl Audio {
     fn emit_position(&self) {
         let _ = self
             .tx
-            .send_blocking(AudioEvent::Position(self.player.get_pos().as_secs()));
+            .send(AudioEvent::Position(self.player.get_pos().as_secs()));
     }
 
     fn play(&self) {
         self.player.play();
         let _ = self
             .tx
-            .send_blocking(AudioEvent::PlaybackStatus(PlaybackStatus::Playing));
+            .send(AudioEvent::PlaybackStatus(PlaybackStatus::Playing));
     }
 
     fn pause(&self) {
         self.player.pause();
         let _ = self
             .tx
-            .send_blocking(AudioEvent::PlaybackStatus(PlaybackStatus::Paused));
+            .send(AudioEvent::PlaybackStatus(PlaybackStatus::Paused));
     }
 
     fn stop(&self) {
         self.player.stop();
         let _ = self
             .tx
-            .send_blocking(AudioEvent::PlaybackStatus(PlaybackStatus::Stopped));
+            .send(AudioEvent::PlaybackStatus(PlaybackStatus::Stopped));
     }
 
     fn set_volume(&self, volume: f32) {
@@ -127,7 +127,7 @@ impl Audio {
         if self.player.empty() && !self.track_ended {
             self.track_ended = true;
 
-            let _ = self.tx.send_blocking(AudioEvent::TrackEnded);
+            let _ = self.tx.send(AudioEvent::TrackEnded);
         }
     }
 }

@@ -12,8 +12,8 @@ use crate::{
     controller::state::AppState, errors::ControllerError, library::gen_track_id,
     ui::components::image_cache::ImageCache,
 };
-use async_channel::{Receiver, Sender};
 use commands::{AudioCommand, ScannerCommand};
+use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
 use gpui::{App, Entity, Global};
 use rand::rng;

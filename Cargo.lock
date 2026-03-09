@@ -1256,6 +1256,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7068,9 +7077,9 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "anyhow",
- "async-channel 2.5.0",
  "bitcode",
  "blake3",
+ "crossbeam-channel",
  "dirs 6.0.0",
  "fast_image_resize",
  "gpui",

@@ -4,8 +4,8 @@ use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackSt
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
 use crate::library::{ImageId, Track, TrackId};
-use async_channel::{Receiver, Sender};
 use bitcode::{Decode, Encode};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::Frame;
 use ron::ser::PrettyConfig;
@@ -280,8 +280,8 @@ impl From<CachedQueueState> for QueueState {
 
 impl Cacher {
     pub fn new() -> (Self, Sender<CacherCommand>, Receiver<CacherEvent>) {
-        let (cmd_tx, cmd_rx) = async_channel::unbounded();
-        let (event_tx, event_rx) = async_channel::unbounded();
+        let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+        let (event_tx, event_rx) = crossbeam_channel::unbounded();
 
         let base_dir = dirs::audio_dir()
             .unwrap_or_default()
@@ -299,24 +299,24 @@ impl Cacher {
     }
 
     pub fn run(&self, workers: usize) -> Result<(), CacherError> {
-        let (app_state_tx, app_state_rx) = async_channel::unbounded();
-        let (thumb_tx, thumb_rx) = async_channel::unbounded();
-        let (album_art_tx, album_art_rx) = async_channel::unbounded();
+        let (app_state_tx, app_state_rx) = crossbeam_channel::unbounded();
+        let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
+        let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
 
         self.spawn_app_state_worker(app_state_rx);
         self.spawn_thumbnail_workers(&thumb_rx, workers);
         self.spawn_album_art_worker(album_art_rx);
 
         loop {
-            match self.rx.recv_blocking()? {
+            match self.rx.recv()? {
                 CacherCommand::WriteLibraryState(state) => {
-                    let _ = app_state_tx.send_blocking(CacheJob::WriteLibraryState(state));
+                    let _ = app_state_tx.send(CacheJob::WriteLibraryState(state));
                 }
                 CacherCommand::WritePlaybackState(state) => {
-                    let _ = app_state_tx.send_blocking(CacheJob::WritePlaybackState(state));
+                    let _ = app_state_tx.send(CacheJob::WritePlaybackState(state));
                 }
                 CacherCommand::WriteQueueState(state) => {
-                    let _ = app_state_tx.send_blocking(CacheJob::WriteQueueState(state));
+                    let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
                 }
                 CacherCommand::WriteImage {
                     id,
@@ -326,7 +326,7 @@ impl Cacher {
                     image,
                 } => match kind {
                     ImageKind::AlbumArt => {
-                        let _ = album_art_tx.send_blocking(CacheJob::WriteImage {
+                        let _ = album_art_tx.send(CacheJob::WriteImage {
                             id,
                             kind: ImageKind::AlbumArt,
                             width,
@@ -335,7 +335,7 @@ impl Cacher {
                         });
                     }
                     ImageKind::Thumbnail => {
-                        let _ = thumb_tx.send_blocking(CacheJob::WriteImage {
+                        let _ = thumb_tx.send(CacheJob::WriteImage {
                             id,
                             kind: ImageKind::Thumbnail,
                             width,
@@ -345,13 +345,13 @@ impl Cacher {
                     }
                 },
                 CacherCommand::GetAppState => {
-                    let _ = app_state_tx.send_blocking(CacheJob::LoadAppState);
+                    let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
                 CacherCommand::GetThumbnails(ids) => {
-                    let _ = thumb_tx.send_blocking(CacheJob::LoadThumbnails(ids));
+                    let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
                 }
                 CacherCommand::GetAlbumArt(id) => {
-                    let _ = album_art_tx.send_blocking(CacheJob::LoadAlbumArt(id));
+                    let _ = album_art_tx.send(CacheJob::LoadAlbumArt(id));
                 }
             }
         }
@@ -537,7 +537,7 @@ impl Cacher {
                             }
                             CacheJob::LoadAppState => {
                                 let state = cacher.load_app_state()?;
-                                let _ = cacher.tx.send_blocking(CacherEvent::AppState(state));
+                                let _ = cacher.tx.send(CacherEvent::AppState(state));
                             }
 
                             _ => {}
@@ -593,11 +593,11 @@ impl Cacher {
                                         }
 
                                         if batch.len() >= 16 {
-                                            let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                                            let _ = cacher.tx.send(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
                                         }
 
                                         if missing.len() >= 16 {
-                                            let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                            let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
                                         }
                                     }
                                 }
@@ -607,11 +607,11 @@ impl Cacher {
 
                         recv(ticker) -> _ => {
                             if !batch.is_empty() {
-                                let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                                let _ = cacher.tx.send(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
                             }
 
                             if !missing.is_empty() {
-                                let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
                             }
                         }
                     }
@@ -629,14 +629,14 @@ impl Cacher {
                     CacheJob::LoadAlbumArt(id) => {
                         match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
                             Ok(Some(image)) => {
-                                let _ = cacher.tx.send_blocking(CacherEvent::AlbumArt(image));
+                                let _ = cacher.tx.send(CacherEvent::AlbumArt(image));
                             }
                             Err(e) => {
                                 eprintln!("Error loading album art: {e}");
-                                let _ = cacher.tx.send_blocking(CacherEvent::MissingAlbumArt(id));
+                                let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(id));
                             }
                             _ => {
-                                let _ = cacher.tx.send_blocking(CacherEvent::MissingAlbumArt(id));
+                                let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(id));
                             }
                         }
                     }
