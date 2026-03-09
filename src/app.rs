@@ -15,10 +15,11 @@ use gpui::{
     px, size, AppContext, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions,
 };
 use gpui_platform::application;
+use std::time::{Duration, Instant};
 use std::{
     sync::Arc,
-    thread,
-    time::{Duration, Instant},
+    thread
+    ,
 };
 
 #[allow(
@@ -96,47 +97,59 @@ pub fn run() -> Result<(), AppError> {
                 let arc_res = Arc::new(res_handler.clone());
                 let mut controller_clone = controller.clone();
 
+                let audio_rx = controller.audio_rx.clone();
+                let res = arc_res.clone();
+
+                cx.spawn(async move |cx| {
+                    while let Ok(event) = audio_rx.recv().await {
+                        res.update(cx, |handler, cx| {
+                            handler.handle(cx, Event::Audio(event));
+                        });
+                    }
+                }).detach();
+
+                let scanner_rx = controller.scanner_rx.clone();
+                let res = arc_res.clone();
+
+                cx.spawn(async move |cx| {
+                    while let Ok(event) = scanner_rx.recv().await {
+                        res.update(cx, |handler, cx| {
+                            handler.handle(cx, Event::Scanner(event));
+                        });
+                    }
+                }).detach();
+
+                let cacher_rx = controller.cacher_rx.clone();
+                let res = arc_res.clone();
+
+                cx.spawn(async move |cx| {
+                    while let Ok(event) = cacher_rx.recv().await {
+                        res.update(cx, |handler, cx| {
+                            handler.handle(cx, Event::Cacher(event));
+                        });
+                    }
+                }).detach();
+
                 cx.spawn(async move |cx| {
                     let mut last_pos_request = Instant::now();
                     let mut last_track_ended_request = Instant::now();
 
                     loop {
-                        while let Ok(e) = controller.audio_rx.try_recv() {
-                            arc_res.update(cx, |res_handler, cx| {
-                                res_handler.handle(cx, Event::Audio(e));
-                            });
-                        }
-
-                        while let Ok(e) = controller.scanner_rx.try_recv() {
-                            arc_res.update(cx, |res_handler, cx| {
-                                res_handler.handle(cx, Event::Scanner(e));
-                            });
-                        }
-
-                        while let Ok(e) = controller.cacher_rx.try_recv() {
-                            arc_res.update(cx, |res_handler, cx| {
-                                res_handler.handle(cx, Event::Cacher(e));
-                            });
-                        }
-
                         if last_pos_request.elapsed() >= Duration::from_millis(256) {
                             controller.get_pos();
-
                             last_pos_request = Instant::now();
                         }
 
                         if last_track_ended_request.elapsed() >= Duration::from_millis(512) {
                             controller.check_track_ended();
-
                             last_track_ended_request = Instant::now();
                         }
 
                         cx.background_executor()
-                            .timer(Duration::from_millis(16))
+                            .timer(Duration::from_millis(256))
                             .await;
                     }
-                })
-                    .detach();
+                }).detach();
 
                 let view_clone = view.clone();
 

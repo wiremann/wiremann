@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf, time::UNIX_EPOCH};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -87,56 +87,48 @@ impl Scanner {
         thumb_tx: &Sender<ScanJob>,
         workers: usize,
     ) {
-        let ticker = tick(Duration::from_millis(128));
-
         for _ in 0..workers {
             let meta_rx = meta_rx.clone();
             let thumb_tx = thumb_tx.clone();
             let events_tx = self.tx.clone();
-            let ticker = ticker.clone();
 
             std::thread::spawn(move || {
                 let mut batch: Vec<Track> = Vec::with_capacity(16);
+                let mut last_flush = Instant::now();
 
                 loop {
-                    select! {
-                        recv(meta_rx) -> job => {
-                            if let Ok(ScanJob::Metadata(path, track_id)) = job {
-                                match get_track_metadata(path, track_id) {
-                                    Ok((track, image)) => {
-                                        let id = track.id;
-                                        batch.push(track);
+                    if let Ok(ScanJob::Metadata(path, track_id)) = meta_rx.recv_blocking() {
+                        match get_track_metadata(path, track_id) {
+                            Ok((track, image)) => {
+                                let id = track.id;
+                                batch.push(track);
 
-                                        if batch.len() >= 16 {
-                                            let _ = events_tx.send_blocking(
-                                                ScannerEvent::Tracks(std::mem::take(&mut batch))
-                                            );
-                                        }
+                                if batch.len() >= 16 {
+                                    let _ = events_tx.send_blocking(
+                                        ScannerEvent::Tracks(std::mem::take(&mut batch))
+                                    );
+                                }
 
-                                        if let Some(bytes) = image {
-                                            let hash = ImageId(<[u8; 32]>::from(blake3::hash(&bytes)));
+                                if let Some(bytes) = image {
+                                    let hash = ImageId(<[u8; 32]>::from(blake3::hash(&bytes)));
 
-                                            let path = get_cached_image_path(hash, ImageKind::Thumbnail);
+                                    let path = get_cached_image_path(hash, ImageKind::Thumbnail);
 
-                                            if !path.exists() {
-                                                let _ = thumb_tx.send_blocking(ScanJob::Thumbnail(id, hash, bytes));
-                                            } else {
-                                                let _ = events_tx.send_blocking(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
-                                            }
-                                        }
+                                    if !path.exists() {
+                                        let _ = thumb_tx.send_blocking(ScanJob::Thumbnail(id, hash, bytes));
+                                    } else {
+                                        let _ = events_tx.send_blocking(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
                                     }
-                                    Err(err) => eprintln!("Failed to get track metadata: {err}" ),
                                 }
                             }
+                            Err(err) => eprintln!("Failed to get track metadata: {err}"),
                         }
-
-                         recv(ticker) -> _ => {
-                            if !batch.is_empty() {
-                                let _ = events_tx.send_blocking(
-                                    ScannerEvent::Tracks(std::mem::take(&mut batch))
-                                );
-                            }
-                        }
+                    }
+                    if last_flush.elapsed() >= Duration::from_millis(128) && !batch.is_empty() {
+                        let _ = events_tx.send_blocking(
+                            ScannerEvent::Tracks(std::mem::take(&mut batch))
+                        );
+                        last_flush = Instant::now();
                     }
                 }
             });
@@ -148,42 +140,36 @@ impl Scanner {
         thumb_rx: &Receiver<ScanJob>,
         workers: usize,
     ) {
-        let ticker = tick(Duration::from_millis(128));
-
         for _ in 0..workers {
             let events_tx = self.tx.clone();
-            let ticker = ticker.clone();
             let thumb_rx = thumb_rx.clone();
+            let mut last_flush = Instant::now();
 
             std::thread::spawn(move || {
                 let mut image_batch = HashMap::with_capacity(16);
                 let mut lookup_batch = HashMap::with_capacity(16);
 
                 loop {
-                    select! {
-                        recv(thumb_rx) -> job => {
-                            if let Ok(ScanJob::Thumbnail(id, hash, bytes)) = job {
-                                if let Ok(image) = render_album_art(&bytes, true) {
-                                    image_batch.insert(hash, image);
-                                    lookup_batch.insert(id, hash);
+                    if let Ok(ScanJob::Thumbnail(id, hash, bytes)) = thumb_rx.recv_blocking() {
+                        if let Ok(image) = render_album_art(&bytes, true) {
+                            image_batch.insert(hash, image);
+                            lookup_batch.insert(id, hash);
 
-                                    if image_batch.len() >= 16 {
-                                        let _ = events_tx.send_blocking(
-                                            ScannerEvent::Thumbnails(std::mem::take(&mut image_batch))
-                                        );
-                                        let _ = events_tx.send_blocking(ScannerEvent::ImageLookup(std::mem::take(&mut lookup_batch)));
-                                    }
-                                }
-                            }
-                        }
-
-                        recv(ticker) -> _ => {
-                            if !image_batch.is_empty() || !lookup_batch.is_empty() {
+                            if image_batch.len() >= 16 {
                                 let _ = events_tx.send_blocking(
                                     ScannerEvent::Thumbnails(std::mem::take(&mut image_batch))
                                 );
                                 let _ = events_tx.send_blocking(ScannerEvent::ImageLookup(std::mem::take(&mut lookup_batch)));
                             }
+                        }
+                    }
+                    if last_flush.elapsed() >= Duration::from_millis(128) {
+                        if !image_batch.is_empty() || !lookup_batch.is_empty() {
+                            let _ = events_tx.send_blocking(
+                                ScannerEvent::Thumbnails(std::mem::take(&mut image_batch))
+                            );
+                            let _ = events_tx.send_blocking(ScannerEvent::ImageLookup(std::mem::take(&mut lookup_batch)));
+                            last_flush = Instant::now();
                         }
                     }
                 }
@@ -195,7 +181,7 @@ impl Scanner {
         let events_tx = self.tx.clone();
 
         std::thread::spawn(move || {
-            while let Ok(ScanJob::AlbumArt(path)) = album_art_rx.recv() {
+            while let Ok(ScanJob::AlbumArt(path)) = album_art_rx.recv_blocking() {
                 match get_album_art(&path) {
                     Ok((id, Some(image))) => {
                         let hash = ImageId(<[u8; 32]>::from(blake3::hash(&image)));
@@ -220,7 +206,7 @@ impl Scanner {
         let events_tx = self.tx.clone();
 
         std::thread::spawn(move || {
-            while let Ok(ScanJob::PlaylistThumbnail(id, tracks)) = playlist_thumb_rx.recv() {
+            while let Ok(ScanJob::PlaylistThumbnail(id, tracks)) = playlist_thumb_rx.recv_blocking() {
                 let mut images = Vec::with_capacity(4);
 
                 for path in tracks {

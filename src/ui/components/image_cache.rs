@@ -1,7 +1,7 @@
 use crate::controller::commands::CacherCommand;
 use crate::library::playlists::PlaylistId;
 use crate::library::ImageId;
-use crossbeam_channel::Sender;
+use async_channel::Sender;
 use gpui::RenderImage;
 use lru::LruCache;
 use std::collections::HashSet;

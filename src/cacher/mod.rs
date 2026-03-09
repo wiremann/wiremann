@@ -17,7 +17,7 @@ use std::io::{Cursor, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -523,7 +523,7 @@ impl Cacher {
 
         std::thread::spawn(move || {
             loop {
-                while let Ok(job) = rx.recv() {
+                while let Ok(job) = rx.recv_blocking() {
                     let result: Result<(), CacherError> = (|| {
                         match job {
                             CacheJob::WriteLibraryState(state) => {
@@ -559,61 +559,54 @@ impl Cacher {
         rx: &Receiver<CacheJob>,
         workers: usize,
     ) {
-        let ticker = tick(Duration::from_millis(128));
-
         for _ in 0..workers {
             let cacher = self.clone();
-            let ticker = ticker.clone();
             let thumb_rx = rx.clone();
 
             std::thread::spawn(move || {
                 let mut batch = HashMap::with_capacity(16);
                 let mut missing = Vec::new();
+                let mut last_flush = std::time::Instant::now();
 
                 loop {
-                    select! {
-                        recv(thumb_rx) -> job => {
-                            match job {
-                                Ok(CacheJob::WriteImage {id, kind, width, height, image}) => {
-                                    let cached_image = CachedImage {
-                                        width,
-                                        height,
-                                        image
-                                    };
-                                    match cacher.write_cached_image(id, &kind, &cached_image) {
-                                        Ok(()) => {}
-                                        Err(err) => {eprintln!("Error occurred: {err:#?}");}
-                                    }
-                                }
-                                Ok(CacheJob::LoadThumbnails(ids)) => {
-                                    for id in ids {
-                                        match cacher.read_cached_image(id, &ImageKind::Thumbnail) {
-                                            Ok(Some(image)) => {batch.insert(id, image);},
-                                            Ok(None) | Err(_) => {missing.push(id);},
-                                        }
-
-                                        if batch.len() >= 16 {
-                                            let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
-                                        }
-
-                                        if missing.len() >= 16 {
-                                            let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
-                                        }
-                                    }
-                                }
-                                _ => {}
+                    match thumb_rx.recv_blocking() {
+                        Ok(CacheJob::WriteImage { id, kind, width, height, image }) => {
+                            let cached_image = CachedImage {
+                                width,
+                                height,
+                                image,
+                            };
+                            match cacher.write_cached_image(id, &kind, &cached_image) {
+                                Ok(()) => {}
+                                Err(err) => { eprintln!("Error occurred: {err:#?}"); }
                             }
                         }
+                        Ok(CacheJob::LoadThumbnails(ids)) => {
+                            for id in ids {
+                                match cacher.read_cached_image(id, &ImageKind::Thumbnail) {
+                                    Ok(Some(image)) => { batch.insert(id, image); }
+                                    Ok(None) | Err(_) => { missing.push(id); }
+                                }
 
-                        recv(ticker) -> _ => {
-                            if !batch.is_empty() {
-                                let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
-                            }
+                                if batch.len() >= 16 {
+                                    let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                                }
 
-                            if !missing.is_empty() {
-                                let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                if missing.len() >= 16 {
+                                    let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                }
                             }
                         }
+                        _ => {}
+                    }
+                    if last_flush.elapsed() >= Duration::from_millis(128) && !batch.is_empty() {
+                        let _ = cacher.tx.send_blocking(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                        last_flush = Instant::now();
+                    }
+
+                    if last_flush.elapsed() >= Duration::from_millis(128) && !missing.is_empty() {
+                        let _ = cacher.tx.send_blocking(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                        last_flush = Instant::now();
                     }
                 }
             });
@@ -624,7 +617,7 @@ impl Cacher {
         let cacher = Arc::new(self.clone());
 
         std::thread::spawn(move || {
-            while let Ok(job) = rx.recv() {
+            while let Ok(job) = rx.recv_blocking() {
                 match job {
                     CacheJob::LoadAlbumArt(id) => {
                         match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
