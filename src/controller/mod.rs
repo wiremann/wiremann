@@ -114,7 +114,7 @@ impl Controller {
                     });
                 }
 
-                if let Some(image_id) = state.library.image_lookup.get(&track_id) {
+                if let Some(track) = state.library.tracks.get(&track_id) && let Some(image_id) = track.image_id {
                     let _ = self.cacher_tx.send(CacherCommand::GetAlbumArt(image_id.clone()));
                 } else {
                     let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(path.clone()));
@@ -289,7 +289,11 @@ impl Controller {
             }
             ScannerEvent::ImageLookup(lookup) => {
                 self.state.update(cx, |this, _| {
-                    this.library.image_lookup.extend(lookup.clone());
+                    for (id, image_id) in lookup {
+                        if let Some(track) = this.library.tracks.get_mut(&id) {
+                            Arc::make_mut(track).image_id = Some(*image_id);
+                        }
+                    }
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
@@ -297,7 +301,7 @@ impl Controller {
             ScannerEvent::PlaylistThumbnail(id, hash, thumbnail) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
-                thumbnail_cache.playlist_thumbs.put(id.clone(), thumbnail.clone());
+                thumbnail_cache.images.put(hash.clone(), thumbnail.clone());
             }
         }
         Ok(())
@@ -356,12 +360,16 @@ impl Controller {
 
                 cx.notify(view.entity_id());
             }
+            CacherEvent::PlaylistThumbnail(id, thumbnail) => {
+                let image_cache = cx.global_mut::<ImageCache>();
+
+                image_cache.images.put(id.clone(), thumbnail.clone());
+            }
             CacherEvent::MissingAlbumArt(id) => {
                 let state = self.state.read(cx);
-                let lookup = state.library.image_lookup.clone();
                 let tracks = state.library.tracks.clone();
 
-                let track_id = lookup.iter().find_map(|(track, image)| { if image == id { Some(track) } else { None } });
+                let track_id = tracks.iter().find_map(|(tid, track)| { if track.image_id == Some(*id) { Some(tid) } else { None } });
 
                 if let Some(track_id) = track_id {
                     if let Some(track) = tracks.get(track_id) {
@@ -373,11 +381,10 @@ impl Controller {
             }
             CacherEvent::MissingThumbnails(ids) => {
                 let state = self.state.read(cx);
-                let lookup = state.library.image_lookup.clone();
                 let tracks = state.library.tracks.clone();
 
                 for id in ids {
-                    let track_id = lookup.iter().find_map(|(track, image)| { if image == id { Some(track) } else { None } });
+                    let track_id = tracks.iter().find_map(|(tid, track)| { if track.image_id == Some(*id) { Some(tid) } else { None } });
 
                     if let Some(track_id) = track_id {
                         if let Some(track) = tracks.get(track_id) {

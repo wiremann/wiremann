@@ -1,4 +1,4 @@
-use crate::library::TrackId;
+use crate::library::{ImageId, TrackId};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use crate::{controller::Controller, library::Track};
@@ -14,6 +14,7 @@ struct ItemData {
     id: TrackId,
     title: String,
     artist: String,
+    image_id: Option<ImageId>,
 }
 
 #[allow(unused)]
@@ -31,6 +32,7 @@ impl Item {
                 id: track.id,
                 title: track.title.clone(),
                 artist: track.artist.clone(),
+                image_id: track.image_id.clone(),
             };
 
             Self { data, idx }
@@ -40,12 +42,8 @@ impl Item {
 
 impl Render for Item {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let image_hash = {
-            let state = cx.global::<Controller>().state.read(cx);
-            state.library.image_lookup.get(&self.data.id).copied()
-        };
-        let thumbnail = image_hash.and_then(|hash| {
-            cx.global_mut::<ImageCache>().get_track(&hash)
+        let thumbnail = self.data.image_id.and_then(|id| {
+            cx.global_mut::<ImageCache>().get_track(&id)
         });
 
         let theme = cx.global::<Theme>();
@@ -232,7 +230,10 @@ impl Render for Queue {
                         (start..end)
                             .filter_map(|i| {
                                 let track_id = tracks[queue_order[i]];
-                                state.library.image_lookup.get(&track_id).copied()
+                                state.library
+                                    .tracks
+                                    .get(&track_id)
+                                    .and_then(|track| track.image_id)
                             })
                             .collect::<Vec<_>>()
                     };

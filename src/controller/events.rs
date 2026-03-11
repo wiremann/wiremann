@@ -29,7 +29,7 @@ pub enum CacherEvent {
     AppState(AppState),
     AlbumArt(Arc<RenderImage>),
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
-    PlaylistThumbnail(),
+    PlaylistThumbnail(ImageId, Arc<RenderImage>),
     MissingThumbnails(Vec<ImageId>),
     MissingAlbumArt(ImageId),
 }

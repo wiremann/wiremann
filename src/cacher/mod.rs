@@ -102,7 +102,6 @@ struct CachedPlaylist {
 struct CachedLibraryState {
     pub tracks: HashMap<[u8; 32], CachedTrack>,
     pub playlists: HashMap<String, CachedPlaylist>,
-    pub image_lookup: HashMap<[u8; 32], [u8; 32]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -206,9 +205,7 @@ impl From<&LibraryState> for CachedLibraryState {
             .map(|(id, playlist)| (id.0.to_string(), CachedPlaylist::from(playlist)))
             .collect();
 
-        let image_lookup = state.image_lookup.iter().map(|(track, image)| (track.0, image.0)).collect();
-
-        Self { tracks, playlists, image_lookup }
+        Self { tracks, playlists }
     }
 }
 
@@ -235,9 +232,7 @@ impl From<CachedLibraryState> for LibraryState {
             })
             .collect();
 
-        let image_lookup = cache.image_lookup.iter().map(|(track, image)| { (TrackId(*track), ImageId(*image)) }).collect();
-
-        Self { tracks, playlists, image_lookup }
+        Self { tracks, playlists }
     }
 }
 
@@ -316,10 +311,12 @@ impl Cacher {
         let (app_state_tx, app_state_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
+        let (playlist_thumbnail_tx, playlist_thumbnail_rx) = crossbeam_channel::unbounded();
 
         self.spawn_app_state_worker(app_state_rx);
         self.spawn_thumbnail_workers(&thumb_rx, workers);
         self.spawn_album_art_worker(album_art_rx);
+        self.spawn_playlist_thumbnail_worker(playlist_thumbnail_rx);
 
         loop {
             match self.rx.recv()? {
@@ -352,6 +349,15 @@ impl Cacher {
                         let _ = thumb_tx.send(CacheJob::WriteImage {
                             id,
                             kind: ImageKind::Thumbnail,
+                            width,
+                            height,
+                            image,
+                        });
+                    }
+                    ImageKind::Playlist => {
+                        let _ = playlist_thumbnail_tx.send(CacheJob::WriteImage {
+                            id,
+                            kind: ImageKind::Playlist,
                             width,
                             height,
                             image,
