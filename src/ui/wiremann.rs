@@ -104,6 +104,7 @@ impl Render for Wiremann {
             .child(self.titlebar.clone())
             .child(match cx.global::<Page>() {
                 Page::Player => div().w_full().h_full().child(self.player_page.clone()),
+                Page::Library => div().w_full().h_full().child(self.library_page.clone()),
                 _ => div(),
             })
     }
