@@ -273,7 +273,7 @@ impl Controller {
 
                 self.state.update(cx, |this, _| {
                     if let Some(playlist) = this.library.playlists.get_mut(&id) {
-                        Arc::make_mut(playlist).image_id = Some(*image_id);
+                        playlist.image_id = Some(*image_id);
                     }
                 });
                 let state = self.state.read(cx).library.clone();
@@ -391,8 +391,8 @@ impl Controller {
                                 4,
                             )
                         };
-                        
-                        let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {id: playlist_id.clone(), tracks: thumb_tracks});
+
+                        let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail { id: playlist_id.clone(), tracks: thumb_tracks });
                     }
                 }
             }

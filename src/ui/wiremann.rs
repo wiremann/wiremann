@@ -77,14 +77,14 @@ impl Wiremann {
         let titlebar = cx.new(|cx| Titlebar::new(cx));
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
-        let library = cx.new(|cx| LibraryPage::new(cx));
+        let library_page = cx.new(|cx| LibraryPage::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
 
         Self {
             titlebar,
             player_page,
-            library_page
+            library_page,
         }
     }
 }
