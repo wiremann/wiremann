@@ -270,7 +270,7 @@ impl Render for PlayerPage {
                             .child(floating_scrollbar(
                                 "queue_scrollbar",
                                 scroll_handle,
-                                RightPad::None,
+                                RightPad::Pad,
                             )),
                     )
             } else {

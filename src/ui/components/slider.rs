@@ -161,28 +161,9 @@ impl RenderOnce for Slider {
                 .relative()
                 .cursor_pointer()
                 .w_full()
-                .h(px(4.))
-                .bg(bar_color)
-                .rounded_full()
-                .child(
-                    div()
-                        .absolute()
-                        .left(px(0.))
-                        .right(relative(1.0 - percentage))
-                        .h_full()
-                        .bg(fill_color)
-                        .rounded_full(),
-                )
-                .child(
-                    div()
-                        .absolute()
-                        .left(relative(percentage))
-                        .ml(-px(6.))
-                        .size(px(12.))
-                        .rounded_full()
-                )
-                .hover(|this| this.bg(bar_color))
-                .active(|this| this.bg(bar_color))
+                .h(px(24.))
+                .flex()
+                .items_center()
                 .on_mouse_down(
                     MouseButton::Left,
                     window.listener_for(&self.state, move |state, e: &MouseDownEvent, window, cx| {
@@ -209,10 +190,38 @@ impl RenderOnce for Slider {
                         }
                     },
                 ))
-                .on_prepaint({
-                    let state = self.state.clone();
-                    move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
-                }),
+                .child(
+                    div()
+                        .id("inner_visual_bar")
+                        .relative()
+                        .w_full()
+                        .h(px(4.))
+                        .bg(bar_color)
+                        .rounded_full()
+                        .child(
+                            div()
+                                .absolute()
+                                .left(px(0.))
+                                .right(relative(1.0 - percentage))
+                                .h_full()
+                                .bg(fill_color)
+                                .rounded_full(),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .left(relative(percentage))
+                                .ml(-px(6.))
+                                .size(px(12.))
+                                .rounded_full(),
+                        )
+                        .hover(|this| this.bg(bar_color))
+                        .active(|this| this.bg(bar_color))
+                        .on_prepaint({
+                            let state = self.state.clone();
+                            move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
+                        }),
+                ),
         )
     }
 }

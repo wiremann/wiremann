@@ -103,7 +103,7 @@ impl Render for LibraryPage {
             .child(floating_scrollbar(
                 "queue_scrollbar",
                 self.scroll_handle.clone(),
-                RightPad::None,
+                RightPad::Pad,
             ))
     }
 }
