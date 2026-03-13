@@ -61,7 +61,7 @@ impl Render for ControlBar {
                     .items_center()
                     .justify_center()
                     .child(
-                        Slider::new(&self.playback_slider_state.clone()).text_color(theme.accent).bg(theme.white_08),
+                        Slider::new(&self.playback_slider_state.clone(), "playback_slider").text_color(theme.accent).bg(theme.white_08),
                     )
                     .child(
                         div()
@@ -134,7 +134,7 @@ impl Render for ControlBar {
                                     )
                                     .child(
                                         div().w_40().flex().flex_shrink_0().child(
-                                            Slider::new(&self.vol_slider_state)
+                                            Slider::new(&self.vol_slider_state, "volume_slider")
                                                 .bg(theme.white_08)
                                                 .text_color(theme.accent),
                                         ),

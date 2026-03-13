@@ -56,7 +56,7 @@ where
         offsets,
         content_height: sum,
         render: Box::new(render),
-        overscan: 2,
+        overscan: 16,
     }
 }
 

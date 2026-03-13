@@ -37,7 +37,7 @@ impl Wiremann {
                 SliderEvent::Change(value) => {
                     let controller = cx.global::<Controller>().clone();
 
-                    controller.set_volume(value.start() / 100.0, cx);
+                    controller.set_volume(*value / 100.0, cx);
                     cx.notify();
                 }
             },
@@ -62,7 +62,7 @@ impl Wiremann {
                         0
                     };
 
-                    controller.seek(slider_to_secs(value.start(), duration));
+                    controller.seek(slider_to_secs(*value, duration));
 
                     cx.notify();
                 }

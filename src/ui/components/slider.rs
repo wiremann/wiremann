@@ -1,16 +1,17 @@
-// Ref: https://github.com/longbridge/gpui-component/blob/main/crates/ui/src/slider.rs
-use std::ops::Range;
-
 use crate::ui::components::element_ext::ElementExt;
-use gpui::{div, prelude::FluentBuilder as _, px, relative, transparent_black, white, Along, App, AppContext as _, Axis, Bounds, Context, DefiniteLength, DragMoveEvent, Empty, Entity, EntityId, EventEmitter, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Refineable, Render, RenderOnce, StatefulInteractiveElement as _, StyleRefinement, Styled, Window};
+use gpui::{div, px, relative, transparent_black, white, App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Refineable, Render, RenderOnce, SharedString, StatefulInteractiveElement, StyleRefinement, Styled, Window};
 
-#[derive(Clone)]
-struct DragThumb((EntityId, bool));
+pub enum SliderEvent {
+    Change(f32),
+}
 
-impl Render for DragThumb {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        Empty
-    }
+pub struct SliderState {
+    min: f32,
+    max: f32,
+    step: f32,
+    value: f32,
+    percentage: f32,
+    bounds: Bounds<Pixels>,
 }
 
 #[derive(Clone)]
@@ -18,477 +19,105 @@ struct DragSlider(EntityId);
 
 impl Render for DragSlider {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        Empty
+        gpui::Empty
     }
-}
-
-/// Events emitted by the [`SliderState`].
-pub enum SliderEvent {
-    Change(SliderValue),
-}
-
-/// The value of the slider, can be a single value or a range of values.
-///
-/// - Can from a f32 value, which will be treated as a single value.
-/// - Or from a (f32, f32) tuple, which will be treated as a range of values.
-///
-/// The default value is `SliderValue::Single(0.0)`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum SliderValue {
-    Single(f32),
-    Range(f32, f32),
-}
-
-impl std::fmt::Display for SliderValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SliderValue::Single(value) => write!(f, "{value}"),
-            SliderValue::Range(start, end) => write!(f, "{start}..{end}"),
-        }
-    }
-}
-
-impl From<f32> for SliderValue {
-    fn from(value: f32) -> Self {
-        SliderValue::Single(value)
-    }
-}
-
-impl From<(f32, f32)> for SliderValue {
-    fn from(value: (f32, f32)) -> Self {
-        SliderValue::Range(value.0, value.1)
-    }
-}
-
-impl From<Range<f32>> for SliderValue {
-    fn from(value: Range<f32>) -> Self {
-        SliderValue::Range(value.start, value.end)
-    }
-}
-
-impl Default for SliderValue {
-    fn default() -> Self {
-        SliderValue::Single(0.)
-    }
-}
-
-impl SliderValue {
-    /// Clamp the value to the given range.
-    #[must_use]
-    pub fn clamp(self, min: f32, max: f32) -> Self {
-        match self {
-            SliderValue::Single(value) => SliderValue::Single(value.clamp(min, max)),
-            SliderValue::Range(start, end) => {
-                SliderValue::Range(start.clamp(min, max), end.clamp(min, max))
-            }
-        }
-    }
-
-    /// Check if the value is a single value.
-    #[inline]
-    #[must_use]
-    pub fn is_single(&self) -> bool {
-        matches!(self, SliderValue::Single(_))
-    }
-
-    /// Check if the value is a range of values.
-    #[inline]
-    #[must_use]
-    pub fn is_range(&self) -> bool {
-        matches!(self, SliderValue::Range(_, _))
-    }
-
-    /// Get the start value.
-    #[must_use]
-    pub fn start(&self) -> f32 {
-        match self {
-            SliderValue::Single(value) => *value,
-            SliderValue::Range(start, _) => *start,
-        }
-    }
-
-    /// Get the end value.
-    #[must_use]
-    pub fn end(&self) -> f32 {
-        match self {
-            SliderValue::Single(value) => *value,
-            SliderValue::Range(_, end) => *end,
-        }
-    }
-
-    fn set_start(&mut self, value: f32) {
-        if let SliderValue::Range(_, end) = self {
-            *self = SliderValue::Range(value.min(*end), *end);
-        } else {
-            *self = SliderValue::Single(value);
-        }
-    }
-
-    fn set_end(&mut self, value: f32) {
-        if let SliderValue::Range(start, _) = self {
-            *self = SliderValue::Range(*start, value.max(*start));
-        } else {
-            *self = SliderValue::Single(value);
-        }
-    }
-}
-
-/// The scale mode of the slider.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SliderScale {
-    /// Linear scale where values change uniformly across the slider range.
-    /// This is the default mode.
-    #[default]
-    Linear,
-    /// Logarithmic scale where the distance between values increases exponentially.
-    ///
-    /// This is useful for parameters that have a large range of values where smaller
-    /// changes are more significant at lower values. Common examples include:
-    ///
-    /// - Volume controls (human hearing perception is logarithmic)
-    /// - Frequency controls (musical notes follow a logarithmic scale)
-    /// - Zoom levels
-    /// - Any parameter where you want finer control at lower values
-    ///
-    /// # For example
-    ///
-    /// ```
-    /// use gpui_component::slider::{SliderState, SliderScale};
-    ///
-    /// let slider = SliderState::new()
-    ///     .min(1.0)    // Must be > 0 for logarithmic scale
-    ///     .max(1000.0)
-    ///     .scale(SliderScale::Logarithmic);
-    /// ```
-    ///
-    /// - Moving the slider 1/3 of the way will yield ~10
-    /// - Moving it 2/3 of the way will yield ~100
-    /// - The full range covers 3 orders of magnitude evenly
-    Logarithmic,
-}
-
-impl SliderScale {
-    #[inline]
-    #[must_use]
-    pub fn is_linear(&self) -> bool {
-        matches!(self, SliderScale::Linear)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_logarithmic(&self) -> bool {
-        matches!(self, SliderScale::Logarithmic)
-    }
-}
-
-/// State of the [`Slider`].
-pub struct SliderState {
-    min: f32,
-    max: f32,
-    step: f32,
-    value: SliderValue,
-    /// When is single value mode, only `end` is used, the start is always 0.0.
-    percentage: Range<f32>,
-    /// The bounds of the slider after rendered.
-    bounds: Bounds<Pixels>,
-    scale: SliderScale,
 }
 
 impl SliderState {
-    /// Create a new [`SliderState`].
-    #[must_use]
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             min: 0.0,
-            max: 100.0,
-            step: 1.0,
-            value: SliderValue::default(),
-            percentage: 0.0..0.0,
+            max: 1.0,
+            step: 0.01,
+            value: 0.0,
+            percentage: 0.0,
             bounds: Bounds::default(),
-            scale: SliderScale::default(),
         }
     }
 
-    /// Set the minimum value of the slider, default: 0.0
-    #[must_use]
-    #[allow(clippy::missing_panics_doc)]
-    pub fn min(mut self, min: f32) -> Self {
-        if self.scale.is_logarithmic() {
-            assert!(
-                min > 0.0,
-                "`min` must be greater than 0 for SliderScale::Logarithmic"
-            );
-            assert!(
-                min < self.max,
-                "`min` must be less than `max` for Logarithmic scale"
-            );
-        }
-        self.min = min;
-        self.update_thumb_pos();
+    pub fn min(mut self, v: f32) -> Self {
+        self.min = v;
         self
     }
 
-    /// Set the maximum value of the slider, default: 100.0
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use, clippy::missing_panics_doc)]
-    pub fn max(mut self, max: f32) -> Self {
-        if self.scale.is_logarithmic() {
-            assert!(
-                max > self.min,
-                "`max` must be greater than `min` for Logarithmic scale"
-            );
-        }
-        self.max = max;
-        self.update_thumb_pos();
+    pub fn max(mut self, v: f32) -> Self {
+        self.max = v;
         self
     }
 
-    /// Set the step value of the slider, default: 1.0
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn step(mut self, step: f32) -> Self {
-        self.step = step;
+    pub fn step(mut self, v: f32) -> Self {
+        self.step = v;
         self
     }
 
-    /// Set the scale of the slider, default: [`SliderScale::Linear`].
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use, clippy::missing_panics_doc)]
-    pub fn scale(mut self, scale: SliderScale) -> Self {
-        if scale.is_logarithmic() {
-            assert!(
-                self.min > 0.0,
-                "`min` must be greater than 0 for Logarithmic scale"
-            );
-            assert!(
-                self.max > self.min,
-                "`max` must be greater than `min` for Logarithmic scale"
-            );
-        }
-        self.scale = scale;
-        self.update_thumb_pos();
+    pub fn default_value(mut self, v: f32) -> Self {
+        self.value = v;
+        self.percentage = self.value_to_percentage(v);
         self
     }
 
-    /// Set the default value of the slider, default: 0.0
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn default_value(mut self, value: impl Into<SliderValue>) -> Self {
-        self.value = value.into();
-        self.update_thumb_pos();
-        self
-    }
-
-    /// Set the value of the slider.
-    pub fn set_value(&mut self, value: impl Into<SliderValue>, cx: &mut Context<Self>) {
-        self.value = value.into();
-        self.update_thumb_pos();
-        cx.notify();
-    }
-
-    /// Get the value of the slider.
-    #[must_use]
-    pub fn value(&self) -> SliderValue {
+    pub fn value(&self) -> f32 {
         self.value
     }
 
-    /// Converts a value between 0.0 and 1.0 to a value between the minimum and maximum value,
-    /// depending on the chosen scale.
-    fn percentage_to_value(&self, percentage: f32) -> f32 {
-        match self.scale {
-            SliderScale::Linear => self.min + (self.max - self.min) * percentage,
-            SliderScale::Logarithmic => {
-                // when percentage is 0, this simplifies to (max/min)^0 * min = 1 * min = min
-                // when percentage is 1, this simplifies to (max/min)^1 * min = (max*min)/min = max
-                // we clamp just to make sure we don't have issue with floating point precision
-                let base = self.max / self.min;
-                (base.powf(percentage) * self.min).clamp(self.min, self.max)
-            }
+    pub fn set_value(&mut self, v: f32, cx: &mut Context<Self>) {
+        self.value = v.clamp(self.min, self.max);
+        self.percentage = self.value_to_percentage(self.value);
+        cx.emit(SliderEvent::Change(self.value));
+        cx.notify();
+    }
+
+    fn value_to_percentage(&self, v: f32) -> f32 {
+        let range = self.max - self.min;
+        if range == 0.0 {
+            0.0
+        } else {
+            (v - self.min) / range
         }
     }
 
-    /// Converts a value between the minimum and maximum value to a value between 0.0 and 1.0,
-    /// depending on the chosen scale.
-    fn value_to_percentage(&self, value: f32) -> f32 {
-        match self.scale {
-            SliderScale::Linear => {
-                let range = self.max - self.min;
-                if range <= 0.0 {
-                    0.0
-                } else {
-                    (value - self.min) / range
-                }
-            }
-            SliderScale::Logarithmic => {
-                let base = self.max / self.min;
-                (value / self.min).log(base).clamp(0.0, 1.0)
-            }
-        }
+    fn percentage_to_value(&self, p: f32) -> f32 {
+        self.min + (self.max - self.min) * p
     }
 
-    fn update_thumb_pos(&mut self) {
-        match self.value {
-            SliderValue::Single(value) => {
-                let percentage = self.value_to_percentage(value.clamp(self.min, self.max));
-                self.percentage = 0.0..percentage;
-            }
-            SliderValue::Range(start, end) => {
-                let clamped_start = start.clamp(self.min, self.max);
-                let clamped_end = end.clamp(self.min, self.max);
-                self.percentage =
-                    self.value_to_percentage(clamped_start)..self.value_to_percentage(clamped_end);
-            }
-        }
-    }
-
-    /// Update value by mouse position
-    fn update_value_by_position(
+    fn update_from_position(
         &mut self,
-        axis: Axis,
         position: Point<Pixels>,
-        is_start: bool,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let bounds = self.bounds;
-        let step = self.step;
+        let inner = position.x - self.bounds.left();
+        let total = self.bounds.size.width;
 
-        let inner_pos = if axis == Axis::Horizontal {
-            position.x - bounds.left()
-        } else {
-            bounds.bottom() - position.y
-        };
-        let total_size = bounds.size.along(axis);
-        let percentage = inner_pos.clamp(px(0.), total_size) / total_size;
+        let p = (inner / total).clamp(0.0, 1.0);
 
-        let percentage = if is_start {
-            percentage.clamp(0.0, self.percentage.end)
-        } else {
-            percentage.clamp(self.percentage.start, 1.0)
-        };
+        let mut value = self.percentage_to_value(p);
+        value = (value / self.step).round() * self.step;
 
-        let value = self.percentage_to_value(percentage);
-        let value = (value / step).round() * step;
+        self.value = value;
+        self.percentage = p;
 
-        if is_start {
-            self.percentage.start = percentage;
-            self.value.set_start(value);
-        } else {
-            self.percentage.end = percentage;
-            self.value.set_end(value);
-        }
-        cx.emit(SliderEvent::Change(self.value));
+        cx.emit(SliderEvent::Change(value));
         cx.notify();
     }
 }
 
 impl EventEmitter<SliderEvent> for SliderState {}
 
-/// A Slider element.
 #[derive(IntoElement)]
 pub struct Slider {
     state: Entity<SliderState>,
-    axis: Axis,
     style: StyleRefinement,
-    disabled: bool,
+    id: SharedString,
 }
 
 impl Slider {
-    /// Create a new [`Slider`] element bind to the [`SliderState`].
-    #[must_use]
-    pub fn new(state: &Entity<SliderState>) -> Self {
+    pub fn new<T: Into<SharedString>>(state: &Entity<SliderState>, id: T) -> Self {
         Self {
-            axis: Axis::Horizontal,
             state: state.clone(),
             style: StyleRefinement::default(),
-            disabled: false,
+            id: id.into(),
         }
-    }
-
-    /// As a horizontal slider.
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn horizontal(mut self) -> Self {
-        self.axis = Axis::Horizontal;
-        self
-    }
-
-    /// As a vertical slider.
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn vertical(mut self) -> Self {
-        self.axis = Axis::Vertical;
-        self
-    }
-
-    /// Set the disabled state of the slider, default: false
-    #[must_use]
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
-        self
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn render_thumb(
-        &self,
-        start: DefiniteLength,
-        is_start: bool,
-        window: &mut Window,
-        _: &mut App,
-    ) -> impl gpui::IntoElement {
-        let entity_id = self.state.entity_id();
-        let axis = self.axis;
-        let id = ("slider-thumb", u32::from(is_start));
-
-        if self.disabled {
-            return div().id(id);
-        }
-
-        div()
-            .id(id)
-            .absolute()
-            .when(axis == Axis::Horizontal, |this| {
-                this.top(px(-5.)).left(start).ml(-px(12.))
-            })
-            .when(axis == Axis::Vertical, |this| {
-                this.bottom(start).left(px(-5.)).mb(-px(8.))
-            })
-            .flex()
-            .items_center()
-            .justify_center()
-            .flex_shrink_0()
-            .size_3()
-            .child(div().flex_shrink_0().size_full())
-            .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                cx.stop_propagation();
-            })
-            .on_drag(DragThumb((entity_id, is_start)), |drag, _, _, cx| {
-                cx.stop_propagation();
-                cx.new(|_| drag.clone())
-            })
-            .on_drag_move(window.listener_for(
-                &self.state,
-                move |view, e: &DragMoveEvent<DragThumb>, window, cx| {
-                    match e.drag(cx) {
-                        DragThumb((id, is_start)) => {
-                            if *id != entity_id {
-                                return;
-                            }
-
-                            // set value by mouse position
-                            view.update_value_by_position(
-                                axis,
-                                e.event.position,
-                                *is_start,
-                                window,
-                                cx,
-                            );
-                        }
-                    }
-                },
-            ))
     }
 }
 
@@ -499,15 +128,8 @@ impl Styled for Slider {
 }
 
 impl RenderOnce for Slider {
-    #[allow(clippy::too_many_lines)]
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let axis = self.axis;
-        let entity_id = self.state.entity_id();
-        let state = self.state.read(cx);
-        let is_range = state.value().is_range();
-        let percentage = state.percentage.clone();
-        let bar_start = relative(percentage.start);
-        let bar_end = relative(1. - percentage.end);
+        let percentage = self.state.read(cx).percentage;
 
         let bar_color = self
             .style
@@ -515,126 +137,82 @@ impl RenderOnce for Slider {
             .clone()
             .and_then(|bg| bg.color())
             .unwrap_or(white().into());
-        let thumb_color = self
+
+        let fill_color = self
             .style
             .text
             .color
             .unwrap_or_else(|| white().into());
 
-        let mut slider_div = div()
+        let mut root = div()
             .id(("slider", self.state.entity_id()))
+            .h(px(24.))
+            .w_full()
             .flex()
-            .flex_1()
-            .items_center()
-            .justify_center()
-            .when(axis == Axis::Vertical, |this| this.h(px(120.)))
-            .when(axis == Axis::Horizontal, Styled::w_full)
-            .text_color(white());
+            .items_center();
 
-        slider_div
-            .style().refine(&self.style);
+        let entity_id = self.state.entity_id();
 
-        slider_div
-            .bg(transparent_black())
-            .child(
-                div()
-                    .flex()
-                    .id("slider-bar-container")
-                    .when(!self.disabled, |this| {
-                        this.on_mouse_down(
-                            MouseButton::Left,
-                            window.listener_for(
-                                &self.state,
-                                move |state, e: &MouseDownEvent, window, cx| {
-                                    let mut is_start = false;
-                                    if is_range {
-                                        let bar_size = state.bounds.size.along(axis);
-                                        let inner_pos = if axis == Axis::Horizontal {
-                                            e.position.x - state.bounds.left()
-                                        } else {
-                                            state.bounds.bottom() - e.position.y
-                                        };
-                                        let center = ((percentage.end - percentage.start) / 2.0
-                                            + percentage.start)
-                                            * bar_size;
-                                        is_start = inner_pos < center;
-                                    }
+        root.style().refine(&self.style);
 
-                                    state.update_value_by_position(
-                                        axis, e.position, is_start, window, cx,
-                                    );
-                                },
-                            ),
-                        )
-                    })
-                    .when(!self.disabled && !is_range, |this| {
-                        this.on_drag(DragSlider(entity_id), |drag, _, _, cx| {
-                            cx.stop_propagation();
-                            cx.new(|_| drag.clone())
-                        })
-                            .on_drag_move(window.listener_for(
-                                &self.state,
-                                move |view, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx)
-                                {
-                                    DragSlider(id) => {
-                                        if *id != entity_id {
-                                            return;
-                                        }
+        root.bg(transparent_black()).child(
+            div()
+                .id(self.id)
+                .relative()
+                .cursor_pointer()
+                .w_full()
+                .h(px(4.))
+                .bg(bar_color)
+                .rounded_full()
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(0.))
+                        .right(relative(1.0 - percentage))
+                        .h_full()
+                        .bg(fill_color)
+                        .rounded_full(),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(relative(percentage))
+                        .ml(-px(6.))
+                        .size(px(12.))
+                        .rounded_full()
+                )
+                .hover(|this| this.bg(bar_color))
+                .active(|this| this.bg(bar_color))
+                .on_mouse_down(
+                    MouseButton::Left,
+                    window.listener_for(&self.state, move |state, e: &MouseDownEvent, window, cx| {
+                        state.update_from_position(e.position, window, cx);
+                    }),
+                )
+                .on_drag(
+                    DragSlider(entity_id),
+                    |drag, _, _, cx| {
+                        cx.new(|_| drag.clone())
+                    },
+                )
+                .on_drag_move(window.listener_for(
+                    &self.state,
+                    move |state, e: &DragMoveEvent<DragSlider>, window, cx| {
+                        match e.drag(cx) {
+                            DragSlider(id) => {
+                                if *id != entity_id {
+                                    return;
+                                }
 
-                                        view.update_value_by_position(
-                                            axis,
-                                            e.event.position,
-                                            false,
-                                            window,
-                                            cx,
-                                        );
-                                    }
-                                },
-                            ))
-                    })
-                    .when(axis == Axis::Horizontal, |this| {
-                        this.items_center().h_6().w_full()
-                    })
-                    .when(axis == Axis::Vertical, |this| {
-                        this.justify_center().w_6().h_full()
-                    })
-                    .flex_shrink_0()
-                    .child(
-                        div()
-                            .id("slider-bar")
-                            .relative()
-                            .when(axis == Axis::Horizontal, |this| this.w_full().h_1())
-                            .when(axis == Axis::Vertical, |this| this.h_full().w_2())
-                            .bg(bar_color)
-                            .hover(|this| this.bg(bar_color).h_1())
-                            .active(|this| this.bg(bar_color).h_1())
-                            .rounded_full()
-                            .child(
-                                div()
-                                    .absolute()
-                                    .when(axis == Axis::Horizontal, |this| {
-                                        this.h_full().left(bar_start).right(bar_end)
-                                    })
-                                    .when(axis == Axis::Vertical, |this| {
-                                        this.w_full().bottom(bar_start).top(bar_end)
-                                    })
-                                    .bg(thumb_color)
-                                    .rounded_full(),
-                            )
-                            .when(is_range, |this| {
-                                this.child(self.render_thumb(
-                                    relative(percentage.start),
-                                    true,
-                                    window,
-                                    cx,
-                                ))
-                            })
-                            .child(self.render_thumb(relative(percentage.end), false, window, cx))
-                            .on_prepaint({
-                                let state = self.state.clone();
-                                move |bounds, _, cx| state.update(cx, |r, _| r.bounds = bounds)
-                            }),
-                    ),
-            )
+                                state.update_from_position(e.event.position, window, cx);
+                            }
+                        }
+                    },
+                ))
+                .on_prepaint({
+                    let state = self.state.clone();
+                    move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
+                }),
+        )
     }
 }
