@@ -10,7 +10,7 @@ use crate::library::playlists::PlaylistId;
 use crate::library::TrackId;
 use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
-use gpui::{div, px, rgb, App, AppContext, Context, Entity, IntoElement, ParentElement, Pixels, Render, ScrollHandle, Styled, Window};
+use gpui::{div, px, rgb, App, AppContext, Context, Div, Entity, FontWeight, IntoElement, ParentElement, Pixels, Render, ScrollHandle, Styled, Window};
 
 #[derive(Clone)]
 pub struct LibraryPage {
@@ -95,26 +95,13 @@ impl Render for LibraryPage {
             .size_full()
             .bg(theme.bg_main)
             .text_color(theme.text_primary)
+            .p_4()
             .child(
                 vlist(cx.entity(), "library", heights.clone(), scroll_handle, move |_this, range, _, cx| {
                     range
                         .map(|i| {
                             match &rows[i] {
-                                LibraryRow::Header(kind) => {
-                                    let text = match kind {
-                                        HeaderKind::Playlists => "Playlists",
-                                        HeaderKind::Tracks => "Tracks",
-                                        HeaderKind::Albums => "Albums",
-                                    };
-
-                                    div()
-                                        .h(heights[i])
-                                        .flex()
-                                        .items_center()
-                                        .pl(px(12.0))
-                                        .text_lg()
-                                        .child(text)
-                                }
+                                LibraryRow::Header(kind) => render_header(kind, heights[i], cx),
 
                                 LibraryRow::PlaylistGridRow(ids) => {
                                     let controller = cx.global::<Controller>().clone();
@@ -214,4 +201,26 @@ fn build_rows(
     }
 
     (rows, heights)
+}
+
+fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
+    let text = match kind {
+        HeaderKind::Playlists => "Playlists",
+        HeaderKind::Tracks => "Tracks",
+        HeaderKind::Albums => "Albums",
+    };
+
+    let theme = cx.global::<Theme>();
+
+    div()
+        .h(height)
+        .w_full()
+        .flex()
+        .items_center()
+        .py_4()
+        .px_6()
+        .text_lg()
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(theme.text_primary)
+        .child(text)
 }
