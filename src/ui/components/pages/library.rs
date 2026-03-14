@@ -76,6 +76,38 @@ impl LibraryPage {
             .text_color(theme.text_primary)
             .child(text)
     }
+
+    fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
+        let controller = cx.global::<Controller>().clone();
+
+        div()
+            .h(height)
+            .flex()
+            .gap_10()
+            .px_6()
+            .items_center()
+            .children(
+                // let image_cache = cx.global_mut::<ImageCache>();
+                //
+                // image_cache.request(&ids, cx, ImageKind::Playlist);
+                ids.iter().map(|pid| {
+                    let playlist = controller.state.read(cx)
+                        .library
+                        .playlists
+                        .get(pid)
+                        .unwrap();
+
+                    div()
+                        .size_32()
+                        .bg(rgb(0x202020))
+                        .rounded(px(6.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(playlist.name.clone())
+                })
+            )
+    }
 }
 
 impl Render for LibraryPage {
@@ -125,34 +157,7 @@ impl Render for LibraryPage {
                             match &rows[i] {
                                 LibraryRow::Header(kind) => Self::render_header(kind, heights[i], cx),
 
-                                LibraryRow::PlaylistGridRow(ids) => {
-                                    let controller = cx.global::<Controller>().clone();
-
-                                    div()
-                                        .h(heights[i])
-                                        .flex()
-                                        .gap_5()
-                                        .px_4()
-                                        .items_center()
-                                        .children(
-                                            ids.iter().map(|pid| {
-                                                let playlist = controller.state.read(cx)
-                                                    .library
-                                                    .playlists
-                                                    .get(pid)
-                                                    .unwrap();
-
-                                                div()
-                                                    .size_32()
-                                                    .bg(rgb(0x202020))
-                                                    .rounded(px(6.0))
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_center()
-                                                    .child(playlist.name.clone())
-                                            })
-                                        )
-                                }
+                                LibraryRow::PlaylistGridRow(ids) => Self::render_playlist_grid(ids, heights[i], cx),
 
                                 LibraryRow::TrackRow(id) => {
                                     let controller = cx.global::<Controller>().clone();

@@ -247,7 +247,7 @@ impl Controller {
 
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
-                        thumbnail_cache.add_track(id.clone(), image.clone())
+                        thumbnail_cache.add(id.clone(), image.clone())
                     };
 
                     if let Some(img) = evicted {
@@ -321,7 +321,7 @@ impl Controller {
                 for (id, image) in thumbnails {
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
-                        thumbnail_cache.add_track(id.clone(), image.clone())
+                        thumbnail_cache.add(id.clone(), image.clone())
                     };
 
                     if let Some(img) = evicted {

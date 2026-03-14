@@ -6,6 +6,7 @@ use lru::LruCache;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use crate::cacher::ImageKind;
 
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
@@ -26,29 +27,30 @@ impl Default for ImageCache {
 
 impl ImageCache {
     #[must_use]
-    pub fn get_track(&mut self, id: &ImageId) -> Option<Arc<RenderImage>> {
+    pub fn get(&mut self, id: &ImageId) -> Option<Arc<RenderImage>> {
         self.images.get(id).cloned()
     }
 
-    pub fn clear_tracks(&mut self) {
+    pub fn clear(&mut self) {
         self.images.clear();
     }
 
-    pub fn add_track(
+    pub fn add(
         &mut self,
         id: ImageId,
-        thumbnail: Arc<RenderImage>,
+        image: Arc<RenderImage>,
     ) -> Option<Arc<RenderImage>> {
-        let evicted = self.images.put(id, thumbnail);
+        let evicted = self.images.put(id, image);
         self.inflight.remove(&id);
 
         evicted
     }
 
-    pub fn request_track<I>(
+    pub fn request<I>(
         &mut self,
         ids: I,
         tx: &Sender<CacherCommand>,
+        kind: ImageKind
     )
     where
         I: IntoIterator<Item=ImageId>,
@@ -65,7 +67,7 @@ impl ImageCache {
         }
 
         if !to_request.is_empty() {
-            let _ = tx.send(CacherCommand::GetThumbnails(to_request));
+            let _ = tx.send(CacherCommand::GetImage(to_request, kind));
         }
     }
 }

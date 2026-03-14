@@ -34,8 +34,6 @@ pub enum ScannerCommand {
 
 pub enum CacherCommand {
     GetAppState,
-    GetAlbumArt(ImageId),
-    GetThumbnails(HashSet<ImageId>),
     WriteLibraryState(LibraryState),
     WritePlaybackState(PlaybackState),
     WriteQueueState(QueueState),
@@ -46,4 +44,5 @@ pub enum CacherCommand {
         height: u32,
         image: Vec<u8>,
     },
+    GetImage(HashSet<ImageId>, ImageKind),
 }

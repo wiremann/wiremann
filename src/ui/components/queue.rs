@@ -1,3 +1,4 @@
+use crate::cacher::ImageKind;
 use crate::library::{ImageId, TrackId};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
@@ -43,7 +44,7 @@ impl Item {
 impl Render for Item {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let thumbnail = self.data.image_id.and_then(|id| {
-            cx.global_mut::<ImageCache>().get_track(&id)
+            cx.global_mut::<ImageCache>().get(&id)
         });
 
         let theme = cx.global::<Theme>();
@@ -239,7 +240,7 @@ impl Render for Queue {
                     };
 
                     let tx = cx.global::<Controller>().cacher_tx.clone();
-                    cx.global_mut::<ImageCache>().request_track(ids, &tx);
+                    cx.global_mut::<ImageCache>().request(ids, &tx, ImageKind::Thumbnail);
 
                     views.update(cx, |map, _| {
                         map.retain(|id, _| visible_tracks.contains(id));

@@ -367,11 +367,22 @@ impl Cacher {
                 CacherCommand::GetAppState => {
                     let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
-                CacherCommand::GetThumbnails(ids) => {
-                    let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
-                }
-                CacherCommand::GetAlbumArt(id) => {
-                    let _ = album_art_tx.send(CacheJob::LoadAlbumArt(id));
+                CacherCommand::GetImage(ids, kind) => {
+                    match kind {
+                        ImageKind::Thumbnail => {
+                            let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
+                        }
+                        ImageKind::AlbumArt => {
+                            for id in ids {
+                                let _ = album_art_tx.send(CacheJob::LoadAlbumArt(id));
+                            }
+                        }
+                        ImageKind::Playlist => {
+                            for id in ids {
+                                let _ = playlist_thumbnail_tx.send(CacheJob::LoadPlaylistThumbnail(id));
+                            }
+                        }
+                    }
                 }
             }
         }
