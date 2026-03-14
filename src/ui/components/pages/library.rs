@@ -54,6 +54,28 @@ impl LibraryPage {
             grid_cols: cols,
         }
     }
+
+    fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
+        let text = match kind {
+            HeaderKind::Playlists => "Playlists",
+            HeaderKind::Tracks => "Tracks",
+            HeaderKind::Albums => "Albums",
+        };
+
+        let theme = cx.global::<Theme>();
+
+        div()
+            .h(height)
+            .w_full()
+            .flex()
+            .items_center()
+            .py_4()
+            .px_6()
+            .text_lg()
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text_primary)
+            .child(text)
+    }
 }
 
 impl Render for LibraryPage {
@@ -101,7 +123,7 @@ impl Render for LibraryPage {
                     range
                         .map(|i| {
                             match &rows[i] {
-                                LibraryRow::Header(kind) => render_header(kind, heights[i], cx),
+                                LibraryRow::Header(kind) => Self::render_header(kind, heights[i], cx),
 
                                 LibraryRow::PlaylistGridRow(ids) => {
                                     let controller = cx.global::<Controller>().clone();
@@ -203,24 +225,3 @@ fn build_rows(
     (rows, heights)
 }
 
-fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
-    let text = match kind {
-        HeaderKind::Playlists => "Playlists",
-        HeaderKind::Tracks => "Tracks",
-        HeaderKind::Albums => "Albums",
-    };
-
-    let theme = cx.global::<Theme>();
-
-    div()
-        .h(height)
-        .w_full()
-        .flex()
-        .items_center()
-        .py_4()
-        .px_6()
-        .text_lg()
-        .font_weight(FontWeight::MEDIUM)
-        .text_color(theme.text_primary)
-        .child(text)
-}

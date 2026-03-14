@@ -2,6 +2,7 @@ use crate::controller::Controller;
 use crate::ui::components;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::slider::{SliderEvent, SliderState};
+use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use components::{image_cache::ImageCache, pages::{library::LibraryPage, player::PlayerPage}, titlebar::Titlebar, Page};
 use gpui::{div, AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window};
@@ -61,7 +62,7 @@ impl Wiremann {
                         0
                     };
 
-                    // controller.seek(slider_to_secs(*value, duration));
+                    controller.seek(slider_to_secs(*value, duration));
 
                     cx.notify();
                 }
@@ -79,7 +80,7 @@ impl Wiremann {
         let library_page = cx.new(|cx| LibraryPage::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
-        // 
+        //
         // let controller = cx.global::<Controller>().clone();
         //
         // controller.load_audio("E:\\music\\$UMH4RD$H1T\\002 - Push Ups.mp3".into());
