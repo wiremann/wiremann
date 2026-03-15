@@ -207,6 +207,8 @@ impl Scanner {
                                 let _ = events_tx.send(ScannerEvent::AlbumArt(hash, album_art));
                                 let _ = events_tx.send(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
                             }
+                        } else {
+                            let _ = events_tx.send(ScannerEvent::ImageLookup(HashMap::from([(id, hash)])));
                         }
                     }
                     Err(err) => eprintln!("Failed album art: {err}"),

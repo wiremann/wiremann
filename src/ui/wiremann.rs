@@ -79,22 +79,22 @@ impl Wiremann {
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
 
-        cx.global::<Controller>().load_cached_app_state();
-        //
-        // let controller = cx.global::<Controller>().clone();
-        //
-        // controller.load_audio("E:\\music\\$UMH4RD$H1T\\002 - Push Ups.mp3".into());
-        //
-        // let tracks = controller
-        //     .state
-        //     .read(cx)
-        //     .library
-        //     .tracks
-        //     .keys()
-        //     .copied()
-        //     .collect();
-        // cx.global::<Controller>()
-        //     .scan_folder(&tracks, "E:\\music\\$UMH4RD$H1T".into());
+        // cx.global::<Controller>().load_cached_app_state();
+
+        let controller = cx.global::<Controller>().clone();
+
+        controller.load_audio("E:\\music\\$UMH4RD$H1T\\002 - Push Ups.mp3".into());
+
+        let tracks = controller
+            .state
+            .read(cx)
+            .library
+            .tracks
+            .keys()
+            .copied()
+            .collect();
+        cx.global::<Controller>()
+            .scan_folder(&tracks, "E:\\music\\$UMH4RD$H1T".into());
 
         Self {
             titlebar,

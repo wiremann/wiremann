@@ -98,12 +98,15 @@ impl LibraryPage {
                     .iter()
                     .filter_map(|pid| state.library.playlists.get(pid)?.image_id);
 
+
                 cache.request(image_ids, &tx, ImageKind::Playlist);
 
                 let mut elements = Vec::new();
 
                 for pid in ids {
                     if let Some(playlist) = state.library.playlists.get(pid) {
+                        println!("{:#?}", playlist.image_id);
+
                         let thumbnail =
                             playlist.image_id.and_then(|id| cache.get(&id));
 

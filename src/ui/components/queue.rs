@@ -1,5 +1,5 @@
 use crate::cacher::ImageKind;
-use crate::library::{ImageId, TrackId};
+use crate::library::TrackId;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use crate::{controller::Controller, library::Track};
@@ -15,7 +15,6 @@ struct ItemData {
     id: TrackId,
     title: String,
     artist: String,
-    image_id: Option<ImageId>,
 }
 
 #[allow(unused)]
@@ -33,7 +32,6 @@ impl Item {
                 id: track.id,
                 title: track.title.clone(),
                 artist: track.artist.clone(),
-                image_id: track.image_id.clone(),
             };
 
             Self { data, idx }
@@ -43,7 +41,12 @@ impl Item {
 
 impl Render for Item {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let thumbnail = self.data.image_id.and_then(|id| {
+        let image_id = {
+            let state = cx.global::<Controller>().state.read(cx);
+            state.library.tracks.get(&self.data.id).and_then(|t| t.image_id)
+        };
+
+        let thumbnail = image_id.and_then(|id| {
             cx.global_mut::<ImageCache>().get(&id)
         });
 

@@ -256,12 +256,14 @@ impl Controller {
                 }
             }
             ScannerEvent::ImageLookup(lookup) => {
-                self.state.update(cx, |this, _| {
+                self.state.update(cx, |this, cx| {
                     for (id, image_id) in lookup {
                         if let Some(track) = this.library.tracks.get_mut(&id) {
                             Arc::make_mut(track).image_id = Some(*image_id);
                         }
                     }
+
+                    cx.notify();
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
@@ -270,6 +272,8 @@ impl Controller {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
                 thumbnail_cache.images.put(image_id.clone(), thumbnail.clone());
+
+                println!("got image_id:{:#?}; playlist_id: {:#?}", image_id, id);
 
                 self.state.update(cx, |this, _| {
                     if let Some(playlist) = this.library.playlists.get_mut(&id) {
