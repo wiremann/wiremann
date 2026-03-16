@@ -511,46 +511,46 @@ fn get_album_art(path: &Path) -> Result<(TrackId, Option<Vec<u8>>), ScannerError
 fn render_playlist_thumbnail(
     mut images: Vec<DynamicImage>,
 ) -> (Option<Arc<RenderImage>>, Option<ImageId>) {
-    let mut canvas = DynamicImage::new_rgba8(128, 128);
+    let mut canvas = DynamicImage::new_rgba8(256, 256);
 
     match images.len() {
         1 => {
             let img = images
                 .remove(0)
-                .resize_exact(128, 128, imageops::FilterType::Lanczos3);
+                .resize_exact(256, 256, imageops::FilterType::Lanczos3);
 
             imageops::overlay(&mut canvas, &img, 0, 0);
         }
 
         2 => {
             for (i, img) in images.into_iter().enumerate() {
-                let resized = img.resize_exact(64, 128, imageops::FilterType::Lanczos3);
-                imageops::overlay(&mut canvas, &resized, (i * 64) as i64, 0);
+                let resized = img.resize_exact(128, 256, imageops::FilterType::Lanczos3);
+                imageops::overlay(&mut canvas, &resized, (i * 128) as i64, 0);
             }
         }
 
         3 => {
             let a = images
                 .remove(0)
-                .resize_exact(64, 64, imageops::FilterType::Lanczos3);
+                .resize_exact(128, 128, imageops::FilterType::Lanczos3);
             let b = images
                 .remove(0)
-                .resize_exact(64, 64, imageops::FilterType::Lanczos3);
+                .resize_exact(128, 128, imageops::FilterType::Lanczos3);
             let c = images
                 .remove(0)
-                .resize_exact(128, 64, imageops::FilterType::Lanczos3);
+                .resize_exact(256, 128, imageops::FilterType::Lanczos3);
 
             imageops::overlay(&mut canvas, &a, 0, 0);
-            imageops::overlay(&mut canvas, &b, 64, 0);
-            imageops::overlay(&mut canvas, &c, 0, 64);
+            imageops::overlay(&mut canvas, &b, 128, 0);
+            imageops::overlay(&mut canvas, &c, 0, 128);
         }
 
         _ => {
             for (i, img) in images.into_iter().take(4).enumerate() {
-                let resized = img.resize_exact(64, 64, imageops::FilterType::Lanczos3);
+                let resized = img.resize_exact(128, 128, imageops::FilterType::Lanczos3);
 
-                let x = (i % 2) * 64;
-                let y = (i / 2) * 64;
+                let x = (i % 2) * 128;
+                let y = (i / 2) * 128;
 
                 imageops::overlay(&mut canvas, &resized, x as i64, y as i64);
             }
@@ -559,7 +559,7 @@ fn render_playlist_thumbnail(
 
     let mut image = canvas.to_rgba8();
 
-    let hash = ImageId(<[u8; 32]>::from(blake3::hash(&image.to_vec())));
+    let hash = ImageId(<[u8; 32]>::from(blake3::hash(image.as_raw())));
 
     for px in <[u8] as AsMut<[u8]>>::as_mut(&mut image).chunks_exact_mut(4) {
         px.swap(0, 2);

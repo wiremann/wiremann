@@ -157,8 +157,8 @@ impl LibraryPage {
                                 ),
                                 None => div().size_48().flex_shrink_0(),
                             })
-                            .child(div().text_base().text_color(theme.text_primary).font_weight(FontWeight::SEMIBOLD).child(playlist.name.clone()))
-                            .child(div().text_sm().text_color(theme.text_muted).font_weight(FontWeight::SEMIBOLD).child(format!("{} tracks", playlist.tracks.len())));
+                            .child(div().text_base().text_color(theme.text_primary).font_weight(FontWeight::MEDIUM).child(playlist.name.clone()))
+                            .child(div().text_sm().text_color(theme.text_muted).font_weight(FontWeight::MEDIUM).child(format!("{} tracks", playlist.tracks.len())));
 
                         elements.push(el);
                     }
