@@ -279,8 +279,6 @@ impl Controller {
                 self.state.update(cx, |this, _| {
                     if let Some(playlist) = this.library.playlists.get_mut(id) {
                         playlist.image_id = Some(*image_id);
-
-                        println!("set playlist image id to: {:#?}", playlist.image_id);
                     }
                 });
                 let state = self.state.read(cx).library.clone();
@@ -627,7 +625,6 @@ impl Controller {
                 if let Some(image_id) = playlist.image_id {
                     cache_ids.push(image_id);
                 } else {
-                    println!("{:#?}", playlist.name);
                     let playlist_tracks = playlist.tracks.clone();
                     let thumb_tracks = {
                         let state = self.state.read(cx);

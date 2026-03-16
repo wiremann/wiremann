@@ -11,7 +11,7 @@ use crate::library::TrackId;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
-use gpui::{div, img, px, white, App, AppContext, Context, Div, Entity, FontWeight, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, Styled, StyledImage, Window};
+use gpui::{div, img, px, white, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, Styled, StyledImage, Window};
 
 #[derive(Clone)]
 pub struct LibraryPage {
@@ -22,7 +22,7 @@ pub struct LibraryPage {
     grid_cols: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum HeaderKind {
     Playlists,
     Tracks,
@@ -57,7 +57,7 @@ impl LibraryPage {
     }
 
     fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
-        let text = match kind {
+        let heading = match kind {
             HeaderKind::Playlists => "Playlists",
             HeaderKind::Tracks => "Tracks",
             HeaderKind::Albums => "Albums",
@@ -70,16 +70,53 @@ impl LibraryPage {
             .w_full()
             .flex()
             .items_center()
-            .py_4()
-            .px_6()
+            .justify_between()
             .text_lg()
             .font_weight(FontWeight::MEDIUM)
             .text_color(theme.text_primary)
-            .child(text)
+            .child(heading)
+            .child(
+                if *kind == HeaderKind::Playlists {
+                    div()
+                        .id("create_playlist")
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .gap_2()
+                        .px_4()
+                        .py_1()
+                        .rounded_lg()
+                        .border_1()
+                        .border_color(theme.accent)
+                        .text_color(theme.accent)
+                        .text_base()
+                        .hover(|this| this.bg(theme.accent_15))
+                        .child("Create Playlist")
+                } else if *kind == HeaderKind::Tracks {
+                    div()
+                        .id("add_track")
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .gap_2()
+                        .px_4()
+                        .py_1()
+                        .rounded_lg()
+                        .border_1()
+                        .border_color(theme.accent)
+                        .text_base()
+                        .text_color(theme.accent)
+                        .hover(|this| this.bg(theme.accent_15))
+                        .child("Add Track")
+                } else {
+                    div().id("")
+                }
+            )
     }
 
     fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
         let controller = cx.global::<Controller>().clone();
+        let theme = cx.global::<Theme>().clone();
 
         div()
             .h(height)
@@ -102,22 +139,26 @@ impl LibraryPage {
                             playlist.image_id.and_then(|id| cache.get(&id));
 
                         let el = div()
-                            .h_auto()
-                            .w_auto()
+                            .id(format!("playlist_{}", playlist.id.0.to_string()))
+                            .size_64()
+                            .bg(theme.bg_main)
                             .flex()
                             .flex_col()
                             .items_center()
                             .justify_center()
-                            .gap_y_4()
+                            .gap_y_3()
                             .text_color(white())
+                            .p_4()
+                            .rounded_lg()
+                            .hover(|this| this.bg(theme.white_08))
                             .child(match thumbnail {
-                                Some(image) => div().size_64().flex_shrink_0().child(
+                                Some(image) => div().size_48().child(
                                     img(image.clone())
                                         .object_fit(ObjectFit::Contain)
                                         .size_full()
                                         .rounded_lg(),
                                 ),
-                                None => div().size_64().flex_shrink_0(),
+                                None => div().size_56().flex_shrink_0(),
                             })
                             .child(playlist.name.clone());
 
@@ -169,7 +210,8 @@ impl Render for LibraryPage {
             .size_full()
             .bg(theme.bg_main)
             .text_color(theme.text_primary)
-            .p_4()
+            .px_12()
+            .py_10()
             .child(
                 vlist(cx.entity(), "library", heights.clone(), scroll_handle, move |_this, range, _, cx| {
                     range
@@ -226,14 +268,14 @@ fn build_rows(
 
             if chunk.len() == cols {
                 rows.push(LibraryRow::PlaylistGridRow(chunk));
-                heights.push(px(160.0));
+                heights.push(px(280.0));
                 chunk = Vec::with_capacity(cols);
             }
         }
 
         if !chunk.is_empty() {
             rows.push(LibraryRow::PlaylistGridRow(chunk));
-            heights.push(px(160.0));
+            heights.push(px(280.0));
         }
     }
 
