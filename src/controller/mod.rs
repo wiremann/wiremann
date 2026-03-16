@@ -193,8 +193,9 @@ impl Controller {
                     cx.notify();
                 });
 
-                let state = self.state.read(cx).queue.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+                let state = self.state.read(cx);
+                let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state.queue.clone()));
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state.library.clone()));
             }
             ScannerEvent::AlbumArt(image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
@@ -268,18 +269,18 @@ impl Controller {
                     let image = image.to_vec();
                     let _ = self.cacher_tx.send(CacherCommand::WriteImage {
                         id: *image_id,
-                        kind: ImageKind::Thumbnail,
+                        kind: ImageKind::Playlist,
                         width,
                         height,
                         image,
                     });
                 }
 
-                println!("got image_id:{:#?}; playlist_id: {:#?}", image_id, id);
-
                 self.state.update(cx, |this, _| {
-                    if let Some(playlist) = this.library.playlists.get_mut(&id) {
+                    if let Some(playlist) = this.library.playlists.get_mut(id) {
                         playlist.image_id = Some(*image_id);
+
+                        println!("set playlist image id to: {:#?}", playlist.image_id);
                     }
                 });
                 let state = self.state.read(cx).library.clone();
@@ -626,6 +627,7 @@ impl Controller {
                 if let Some(image_id) = playlist.image_id {
                     cache_ids.push(image_id);
                 } else {
+                    println!("{:#?}", playlist.name);
                     let playlist_tracks = playlist.tracks.clone();
                     let thumb_tracks = {
                         let state = self.state.read(cx);

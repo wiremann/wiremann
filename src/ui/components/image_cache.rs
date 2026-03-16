@@ -57,7 +57,6 @@ impl ImageCache {
     {
         let mut to_request = HashSet::new();
 
-
         for id in ids {
             if self.images.contains(&id) {
                 continue;
