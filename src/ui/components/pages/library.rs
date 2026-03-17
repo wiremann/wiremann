@@ -33,6 +33,7 @@ enum HeaderKind {
 enum LibraryRow {
     Header(HeaderKind),
     PlaylistGridRow(Vec<PlaylistId>),
+    TrackTableHeader,
     TrackRow(TrackId),
 }
 
@@ -122,6 +123,7 @@ impl LibraryPage {
             .h(height)
             .flex()
             .gap_8()
+            .py_2()
             .items_center()
             .children({
                 let state = controller.state.read(cx).clone();
@@ -140,6 +142,7 @@ impl LibraryPage {
                         let el = div()
                             .id(format!("playlist_{}", playlist.id.0.to_string()))
                             .bg(theme.bg_main)
+                            .size_full()
                             .flex()
                             .flex_col()
                             .items_start()
@@ -149,7 +152,7 @@ impl LibraryPage {
                             .rounded_lg()
                             .hover(|this| this.bg(theme.accent_10))
                             .child(match thumbnail {
-                                Some(image) => div().size_48().mb_3().child(
+                                Some(image) => div().size_full().mb_3().child(
                                     img(image.clone())
                                         .object_fit(ObjectFit::Contain)
                                         .size_full()
@@ -166,6 +169,30 @@ impl LibraryPage {
 
                 elements
             })
+    }
+
+    fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
+        div()
+    }
+
+    fn render_track(id: &TrackId, height: Pixels, cx: &mut App) -> Div {
+        let controller = cx.global::<Controller>().clone();
+        let theme = cx.global::<Theme>().clone();
+        let state = controller.state.read(cx).clone();
+
+        if let Some(track) = state.library.tracks.get(id) {
+            div()
+                .h(height)
+                .py_2()
+                .child(
+                    div()
+                        .size_full()
+                )
+        } else {
+            div()
+                .h(height)
+                .py_2()
+        }
     }
 }
 
@@ -219,22 +246,9 @@ impl Render for LibraryPage {
 
                                 LibraryRow::PlaylistGridRow(ids) => Self::render_playlist_grid(ids, heights[i], cx),
 
-                                LibraryRow::TrackRow(id) => {
-                                    let controller = cx.global::<Controller>().clone();
-                                    let track = controller.state.read(cx)
-                                        .library
-                                        .tracks
-                                        .get(id)
-                                        .unwrap();
+                                LibraryRow::TrackTableHeader => Self::render_track_table_header(heights[i], cx),
 
-                                    div()
-                                        .h(heights[i])
-                                        .flex()
-                                        .items_center()
-                                        .gap(px(10.0))
-                                        .pl(px(12.0))
-                                        .child(track.title.clone())
-                                }
+                                LibraryRow::TrackRow(id) => Self::render_track(id, heights[i], cx),
                             }
                         })
                         .collect::<Vec<_>>()
@@ -281,9 +295,12 @@ fn build_rows(
         rows.push(LibraryRow::Header(HeaderKind::Tracks));
         heights.push(px(60.0));
 
+        rows.push(LibraryRow::TrackTableHeader);
+        heights.push(px(40.0));
+
         for id in library.tracks.keys() {
             rows.push(LibraryRow::TrackRow(*id));
-            heights.push(px(32.0));
+            heights.push(px(60.0));
         }
     }
 
