@@ -12,7 +12,7 @@ use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
 use gpui::prelude::FluentBuilder;
-use gpui::{div, img, px, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, Styled, StyledImage, Window};
+use gpui::{div, img, px, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window};
 
 const THUMBNAIL_MARGIN: usize = 16;
 
@@ -96,6 +96,7 @@ impl LibraryPage {
                         .border_color(theme.accent)
                         .text_color(theme.accent)
                         .text_base()
+                        .cursor_pointer()
                         .hover(|this| this.bg(theme.accent_15))
                         .child("Create Playlist")
                 } else if *kind == HeaderKind::Tracks {
@@ -112,6 +113,7 @@ impl LibraryPage {
                         .border_color(theme.accent)
                         .text_base()
                         .text_color(theme.accent)
+                        .cursor_pointer()
                         .hover(|this| this.bg(theme.accent_15))
                         .child("Add Track")
                 } else {
@@ -156,6 +158,7 @@ impl LibraryPage {
                             .p_3()
                             .rounded_lg()
                             .hover(|this| this.bg(theme.accent_10))
+                            .cursor_pointer()
                             .child(match thumbnail {
                                 Some(image) => div().size_full().mb_3().child(
                                     img(image.clone())
@@ -263,9 +266,14 @@ impl LibraryPage {
                         .size_full()
                         .flex()
                         .items_center()
+                        .rounded_md()
+                        .cursor_pointer()
                         .hover(|this| this.bg(theme.accent_10))
                         .when(is_current, |this| this.bg(theme.accent_15))
-                        .rounded_md()
+                        .on_click({
+                            let id = *id;
+                            move |_, _, cx| cx.global::<Controller>().load_audio_at_id(&id, cx)
+                        })
                         .child(
                             div()
                                 .w_20()
@@ -274,7 +282,7 @@ impl LibraryPage {
                                 .px_6()
                                 .items_center()
                                 .justify_start()
-                                .child(i.to_string())
+                                .child(format! {"{:02}", i})
                         )
                         .child(
                             div()
@@ -339,6 +347,7 @@ impl LibraryPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
+                                .text_sm()
                                 .font_family("JetBrains Mono")
                                 .child(format!("{:02}:{:02}", track.duration / 60, track.duration % 60))
                                 .overflow_hidden()

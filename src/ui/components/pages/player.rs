@@ -145,6 +145,7 @@ impl Render for PlayerPage {
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_shuffle(cx)
                                     })
+                                    .cursor_pointer()
                                     .child(Icon::new(Icons::Shuffle).size_4()),
                             )
                             .child(
@@ -158,6 +159,7 @@ impl Render for PlayerPage {
                                     .hover(|this| this.bg(theme.white_05))
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
                                     .text_color(theme.text_primary)
+                                    .cursor_pointer()
                                     .child(Icon::new(Icons::Prev).size_4()),
                             )
                             .child(
@@ -187,6 +189,7 @@ impl Render for PlayerPage {
                                         }
                                     })
                                     .text_color(theme.text_primary)
+                                    .cursor_pointer()
                                     .child(
                                         if cx.global::<Controller>().state.read(cx).playback.status
                                             == PlaybackStatus::Playing
@@ -207,6 +210,7 @@ impl Render for PlayerPage {
                                     .justify_center()
                                     .hover(|this| this.bg(theme.white_05))
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
+                                    .cursor_pointer()
                                     .text_color(theme.text_primary)
                                     .child(Icon::new(Icons::Next).size_4()),
                             )
@@ -289,6 +293,7 @@ impl Render for PlayerPage {
                     .text_sm()
                     .font_weight(FontWeight(400.0))
                     .text_color(theme.text_muted)
+                    .cursor_pointer()
                     .hover(|this| this.bg(theme.white_05).text_color(theme.text_primary))
                     .on_click(move |_, _, cx| show_queue.update(cx, |this, _| *this = !*this))
                     .child(if *self.show_queue.read(cx) {

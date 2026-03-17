@@ -77,6 +77,7 @@ impl Render for Item {
             .rounded_lg()
             .hover(|d| d.bg(theme.white_05))
             .when(is_current, |d| d.bg(theme.accent_15))
+            .cursor_pointer()
             .child(match thumbnail {
                 Some(image) => div().size_12().flex_shrink_0().child(
                     img(image.clone())

@@ -38,6 +38,7 @@ impl Render for NavBar {
                     .px_6()
                     .child("Library")
                     .text_color(theme.text_muted)
+                    .cursor_pointer()
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Library)
                     .when(page == &Page::Library, |this| {
                         this.child(
@@ -66,6 +67,7 @@ impl Render for NavBar {
                     .px_6()
                     .child("Player")
                     .text_color(theme.text_muted)
+                    .cursor_pointer()
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Player)
                     .when(page == &Page::Player, |this| {
                         this.child(
@@ -94,6 +96,7 @@ impl Render for NavBar {
                     .px_6()
                     .child("Playlists")
                     .text_color(theme.text_muted)
+                    .cursor_pointer()
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Playlists)
                     .when(page == &Page::Playlists, |this| {
                         this.child(
