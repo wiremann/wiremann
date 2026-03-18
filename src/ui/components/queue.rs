@@ -8,6 +8,8 @@ use gpui::{div, img, px, uniform_list, App, AppContext, Context, Entity, Interac
 use std::path::PathBuf;
 use std::sync::Arc;
 
+const THUMBNAIL_MARGIN: usize = 16;
+
 struct ItemData {
     id: TrackId,
     title: String,
@@ -38,12 +40,20 @@ impl Item {
 
 impl Render for Item {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let image_id = {
+            let state = cx.global::<Controller>().state.read(cx);
+            state.library.tracks.get(&self.data.id).and_then(|t| t.image_id)
+        };
+
+        let thumbnail = image_id.and_then(|id| {
+            cx.global_mut::<ImageCache>().get(&id)
+        });
+
         let theme = cx.global::<Theme>();
         let state = cx.global::<Controller>().state.read(cx);
 
         let is_current = Some(&self.data.id) == state.playback.current.as_ref();
 
-        let thumbnail = cx.global::<ImageCache>().get(&self.data.id);
         let current = if let Some(id) = state.playback.current {
             state.library.tracks.get(&id)
         } else {
@@ -67,6 +77,7 @@ impl Render for Item {
             .rounded_lg()
             .hover(|d| d.bg(theme.white_05))
             .when(is_current, |d| d.bg(theme.accent_15))
+            .cursor_pointer()
             .child(match thumbnail {
                 Some(image) => div().size_12().flex_shrink_0().child(
                     img(image.clone())
@@ -166,7 +177,9 @@ impl Render for Queue {
         let views = self.views.clone();
         let stop_auto_scroll = self.stop_auto_scroll.clone();
 
-        let state = cx.global::<Controller>().state.read(cx).clone();
+        let controller = cx.global::<Controller>().clone();
+
+        let state = controller.state.read(cx).clone();
 
         let tracks = state.queue.tracks.clone();
         let order = state.queue.order.clone();
@@ -202,25 +215,28 @@ impl Render for Queue {
             .size_full()
             .child(
                 uniform_list("queue", len, move |range, _, cx| {
-                    let visible_paths: Vec<TrackId> = range
-                        .clone()
-                        .map(|i| {
-                            let real_index = &tracks[queue_order[i]];
-                            if let Some(track) = state.library.tracks.get(real_index) {
-                                track.id
-                            } else {
-                                TrackId::default()
-                            }
-                        })
-                        .collect();
+                    let visible_tracks: Vec<TrackId> =
+                        range.clone().map(|i| tracks[queue_order[i]]).collect();
+
+                    let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                    let end = (range.end + THUMBNAIL_MARGIN).min(len);
+
+                    let thumb_tracks: Vec<TrackId> =
+                        (start..end).map(|i| tracks[queue_order[i]]).collect();
+
+                    controller
+                        .request_track_thumbnails(&thumb_tracks, cx);
 
                     views.update(cx, |map, _| {
-                        map.retain(|id, _| visible_paths.contains(id));
+                        map.retain(|id, _| visible_tracks.contains(id));
                     });
 
                     range
                         .map(|i| {
+                            let state = cx.global::<Controller>().state.read(cx);
+
                             let real_index = &tracks[queue_order[i]];
+
                             if let Some(track) = state.library.tracks.get(real_index) {
                                 let path = track.path.clone();
 

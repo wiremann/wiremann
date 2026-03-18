@@ -3,7 +3,7 @@ use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
 use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
-use crate::library::{gen_track_id, Track, TrackId};
+use crate::library::{ImageId, Track, TrackId};
 use bitcode::{Decode, Encode};
 use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
@@ -32,15 +32,16 @@ enum CacheJob {
     WritePlaybackState(PlaybackState),
     WriteQueueState(QueueState),
     WriteImage {
-        id: TrackId,
+        id: ImageId,
         kind: ImageKind,
         width: u32,
         height: u32,
         image: Vec<u8>,
     },
     LoadAppState,
-    LoadThumbnails(HashSet<TrackId>),
-    LoadAlbumArt(PathBuf),
+    LoadThumbnails(HashSet<ImageId>),
+    LoadAlbumArt(ImageId),
+    LoadPlaylistThumbnail(ImageId),
 }
 
 #[derive(Encode, Decode)]
@@ -52,6 +53,7 @@ struct CacheFile<T> {
 pub enum ImageKind {
     Thumbnail,
     AlbumArt,
+    Playlist,
 }
 #[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
 struct CachedTrack {
@@ -65,6 +67,8 @@ struct CachedTrack {
     pub duration: u64,
     pub size: u64,
     pub modified: u64,
+
+    pub image_id: Option<[u8; 32]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
@@ -88,6 +92,10 @@ struct CachedPlaylist {
     pub name: String,
     pub source: CachedPlaylistSource,
     pub tracks: Vec<[u8; 32]>,
+
+    pub duration: u64,
+
+    pub image_id: Option<[u8; 32]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
@@ -128,6 +136,7 @@ impl From<&Track> for CachedTrack {
             duration: track.duration,
             size: track.size,
             modified: track.modified,
+            image_id: track.image_id.map(|id| id.0),
         }
     }
 }
@@ -143,6 +152,7 @@ impl From<CachedTrack> for Track {
             duration: c.duration,
             size: c.size,
             modified: c.modified,
+            image_id: c.image_id.map(|id| ImageId(id)),
         }
     }
 }
@@ -158,6 +168,8 @@ impl From<&Playlist> for CachedPlaylist {
                 PlaylistSource::User => CachedPlaylistSource::User,
             },
             tracks: playlist.tracks.iter().map(|t| t.0).collect(),
+            duration: playlist.duration.as_secs(),
+            image_id: playlist.image_id.map(|id| id.0),
         }
     }
 }
@@ -173,6 +185,8 @@ impl From<CachedPlaylist> for Playlist {
                 CachedPlaylistSource::User => PlaylistSource::User,
             },
             tracks: cached_playlist.tracks.iter().map(|t| TrackId(*t)).collect(),
+            duration: Duration::from_secs(cached_playlist.duration),
+            image_id: cached_playlist.image_id.map(|id| ImageId(id)),
         }
     }
 }
@@ -297,10 +311,12 @@ impl Cacher {
         let (app_state_tx, app_state_rx) = crossbeam_channel::unbounded();
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
+        let (playlist_thumbnail_tx, playlist_thumbnail_rx) = crossbeam_channel::unbounded();
 
         self.spawn_app_state_worker(app_state_rx);
         self.spawn_thumbnail_workers(&thumb_rx, workers);
         self.spawn_album_art_worker(album_art_rx);
+        self.spawn_playlist_thumbnail_worker(playlist_thumbnail_rx);
 
         loop {
             match self.rx.recv()? {
@@ -338,15 +354,35 @@ impl Cacher {
                             image,
                         });
                     }
+                    ImageKind::Playlist => {
+                        let _ = playlist_thumbnail_tx.send(CacheJob::WriteImage {
+                            id,
+                            kind: ImageKind::Playlist,
+                            width,
+                            height,
+                            image,
+                        });
+                    }
                 },
                 CacherCommand::GetAppState => {
                     let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
-                CacherCommand::GetThumbnails(ids) => {
-                    let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
-                }
-                CacherCommand::GetAlbumArt(path) => {
-                    let _ = album_art_tx.send(CacheJob::LoadAlbumArt(path));
+                CacherCommand::GetImage(ids, kind) => {
+                    match kind {
+                        ImageKind::Thumbnail => {
+                            let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
+                        }
+                        ImageKind::AlbumArt => {
+                            for id in ids {
+                                let _ = album_art_tx.send(CacheJob::LoadAlbumArt(id));
+                            }
+                        }
+                        ImageKind::Playlist => {
+                            for id in ids {
+                                let _ = playlist_thumbnail_tx.send(CacheJob::LoadPlaylistThumbnail(id));
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -393,13 +429,14 @@ impl Cacher {
         Ok(())
     }
 
-    fn cached_image_path(&self, id: TrackId, kind: &ImageKind) -> PathBuf {
+    fn cached_image_path(&self, id: ImageId, kind: &ImageKind) -> PathBuf {
         let hex = hex::encode(id.0);
         let folder = &hex[0..2];
 
         let name = match kind {
             ImageKind::Thumbnail => format!("{hex}_thumb.bgra.zstd"),
             ImageKind::AlbumArt => format!("{hex}_art.bgra.zstd"),
+            ImageKind::Playlist => format!("{hex}_playlist.bgra.zstd"),
         };
 
         self.base_dir.join("images").join(folder).join(name)
@@ -407,7 +444,7 @@ impl Cacher {
 
     fn write_cached_image(
         &self,
-        id: TrackId,
+        id: ImageId,
         kind: &ImageKind,
         cached_image: &CachedImage,
     ) -> Result<(), CacherError> {
@@ -488,7 +525,7 @@ impl Cacher {
 
     fn read_cached_image(
         &self,
-        id: TrackId,
+        id: ImageId,
         kind: &ImageKind,
     ) -> Result<Option<Arc<RenderImage>>, CacherError> {
         let path = self.cached_image_path(id, kind);
@@ -513,7 +550,7 @@ impl Cacher {
         }
     }
 
-    fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>){
+    fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>) {
         let cacher = self.clone();
 
         std::thread::spawn(move || {
@@ -547,8 +584,6 @@ impl Cacher {
                 }
             }
         });
-
-        
     }
 
     fn spawn_thumbnail_workers(
@@ -615,8 +650,6 @@ impl Cacher {
                 }
             });
         }
-
-        
     }
 
     fn spawn_album_art_worker(&self, rx: Receiver<CacheJob>) {
@@ -625,22 +658,63 @@ impl Cacher {
         std::thread::spawn(move || {
             while let Ok(job) = rx.recv() {
                 match job {
-                    CacheJob::LoadAlbumArt(path) => {
-                        if let Ok(id) = gen_track_id(&path) {
-                            match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
-                                Ok(Some(image)) => {
-                                    let _ = cacher.tx.send(CacherEvent::AlbumArt(image));
-                                }
-                                Err(e) => {
-                                    eprintln!("Error loading album art: {e}");
-                                    let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(path));
-                                }
-                                _ => {
-                                    let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(path));
-                                }
+                    CacheJob::LoadAlbumArt(id) => {
+                        match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
+                            Ok(Some(image)) => {
+                                let _ = cacher.tx.send(CacherEvent::AlbumArt(image));
                             }
-                        } else {
-                            let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(path));
+                            Err(e) => {
+                                eprintln!("Error loading album art: {e}");
+                                let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(id));
+                            }
+                            _ => {
+                                let _ = cacher.tx.send(CacherEvent::MissingAlbumArt(id));
+                            }
+                        }
+                    }
+                    CacheJob::WriteImage {
+                        id,
+                        kind,
+                        width,
+                        height,
+                        image,
+                    } => {
+                        let cached_image = CachedImage {
+                            width,
+                            height,
+                            image,
+                        };
+                        match cacher.write_cached_image(id, &kind, &cached_image) {
+                            Ok(()) => {}
+                            Err(err) => {
+                                eprintln!("Error occurred: {err:#?}");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    fn spawn_playlist_thumbnail_worker(&self, rx: Receiver<CacheJob>) {
+        let cacher = Arc::new(self.clone());
+
+        std::thread::spawn(move || {
+            while let Ok(job) = rx.recv() {
+                match job {
+                    CacheJob::LoadPlaylistThumbnail(id) => {
+                        match cacher.read_cached_image(id, &ImageKind::Playlist) {
+                            Ok(Some(image)) => {
+                                let _ = cacher.tx.send(CacherEvent::PlaylistThumbnail(id, image));
+                            }
+                            Err(e) => {
+                                eprintln!("Error loading playlist thumbnail art: {e}");
+                                let _ = cacher.tx.send(CacherEvent::MissingPlaylistThumbnail(id));
+                            }
+                            _ => {
+                                let _ = cacher.tx.send(CacherEvent::MissingPlaylistThumbnail(id));
+                            }
                         }
                     }
                     CacheJob::WriteImage {

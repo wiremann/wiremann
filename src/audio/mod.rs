@@ -42,8 +42,7 @@ impl Audio {
     #[allow(clippy::missing_errors_doc)]
     pub fn run(&mut self) -> Result<(), AudioError> {
         loop {
-            while let Ok(cmd) = self.rx.try_recv() {
-                match cmd {
+                match self.rx.recv()? {
                     AudioCommand::Load(path) => self.load_path(path)?,
                     AudioCommand::GetPosition => self.emit_position(),
                     AudioCommand::CheckTrackEnded => self.check_track_ended(),
@@ -53,7 +52,6 @@ impl Audio {
                     AudioCommand::SetVolume(v) => self.set_volume(v),
                     AudioCommand::Seek(u64) => self.seek(u64)?,
                 }
-            }
         }
     }
 

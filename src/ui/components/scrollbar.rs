@@ -1,5 +1,6 @@
 // Ref: https://github.com/hummingbird-player/hummingbird/blob/master/src/ui/components/scrollbar.rs
 // Original implementation by 143mailliw (https://github.com/143mailliw)
+// Originally licensed under the Apache License v2.0
 
 use std::{
     cell::RefCell,
@@ -356,7 +357,7 @@ impl Element for Scrollbar {
                     let bg_color = background.opacity(opacity);
                     let thumb_color = foreground.opacity(opacity);
 
-                    window.set_cursor_style(CursorStyle::Arrow, hitbox_for_events);
+                    window.set_cursor_style(CursorStyle::PointingHand, hitbox_for_events);
 
                     // background
                     window.paint_quad(quad(
@@ -555,11 +556,11 @@ impl RenderOnce for FloatingScrollbar {
                 scrollbar()
                     .id(self.id)
                     .scroll_handle(self.handle)
-                    .w(px(6.0))
+                    .w(px(8.0))
                     .h_full()
                     .bg(gpui::transparent_black())
                     .text_color(theme.accent)
-                    .rounded(px(0.0)),
+                    .rounded(px(0.0))
             )
     }
 }

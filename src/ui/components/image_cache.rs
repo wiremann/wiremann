@@ -1,26 +1,77 @@
-use crate::library::TrackId;
+use crate::cacher::ImageKind;
+use crate::controller::commands::CacherCommand;
+use crate::library::ImageId;
+use crossbeam_channel::Sender;
 use gpui::RenderImage;
-use std::collections::HashMap;
+use lru::LruCache;
+use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-#[derive(Default)]
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
-    pub thumbs: HashMap<TrackId, Arc<RenderImage>>,
+    pub images: LruCache<ImageId, Arc<RenderImage>>,
+
+    pub inflight: HashSet<ImageId>,
+}
+
+impl Default for ImageCache {
+    fn default() -> Self {
+        ImageCache {
+            current: None,
+            images: LruCache::new(NonZeroUsize::new(128).unwrap()),
+            inflight: HashSet::new(),
+        }
+    }
 }
 
 impl ImageCache {
-    #[must_use] 
-    pub fn get(&self, id: &TrackId) -> Option<Arc<RenderImage>> {
-        self.thumbs.get(id).cloned()
+    #[must_use]
+    pub fn get(&mut self, id: &ImageId) -> Option<Arc<RenderImage>> {
+        self.images.get(id).cloned()
     }
 
     pub fn clear(&mut self) {
-        self.thumbs.clear();
+        self.images.clear();
     }
 
-    pub fn add(&mut self, id: TrackId, thumbnail: Arc<RenderImage>) {
-        self.thumbs.insert(id, thumbnail);
+    pub fn add(
+        &mut self,
+        id: ImageId,
+        image: Arc<RenderImage>,
+    ) -> Option<Arc<RenderImage>> {
+        let evicted = self.images.put(id, image);
+        self.inflight.remove(&id);
+
+        evicted
+    }
+
+    pub fn request<I>(
+        &mut self,
+        ids: I,
+        tx: &Sender<CacherCommand>,
+        kind: ImageKind,
+    )
+    where
+        I: IntoIterator<Item=ImageId>,
+    {
+        let mut to_request = HashSet::new();
+
+        for id in ids {
+            if self.images.contains(&id) {
+                continue;
+            }
+
+            if !self.inflight.insert(id) {
+                continue;
+            }
+
+            to_request.insert(id);
+        }
+
+        if !to_request.is_empty() {
+            let _ = tx.send(CacherCommand::GetImage(to_request, kind));
+        }
     }
 }
 

@@ -8,6 +8,7 @@ pub mod slider;
 pub mod titlebar;
 pub mod icons;
 mod element_ext;
+pub mod virtual_list;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Page {

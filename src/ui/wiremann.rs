@@ -4,12 +4,13 @@ use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
-use components::{image_cache::ImageCache, pages::player::PlayerPage, titlebar::Titlebar, Page};
-use gpui::{Entity, Context, AppContext,  BorrowAppContext,  Render, Window, IntoElement, ParentElement, Styled, InteractiveElement, div};
+use components::{image_cache::ImageCache, pages::{library::LibraryPage, player::PlayerPage}, titlebar::Titlebar, Page};
+use gpui::{div, AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window};
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
     pub player_page: Entity<PlayerPage>,
+    pub library_page: Entity<LibraryPage>,
 }
 
 impl Wiremann {
@@ -36,7 +37,7 @@ impl Wiremann {
                 SliderEvent::Change(value) => {
                     let controller = cx.global::<Controller>().clone();
 
-                    controller.set_volume(value.start() / 100.0, cx);
+                    controller.set_volume(*value / 100.0, cx);
                     cx.notify();
                 }
             },
@@ -61,7 +62,7 @@ impl Wiremann {
                         0
                     };
 
-                    controller.seek(slider_to_secs(value.start(), duration));
+                    controller.seek(slider_to_secs(*value, duration));
 
                     cx.notify();
                 }
@@ -76,12 +77,14 @@ impl Wiremann {
         let titlebar = cx.new(|cx| Titlebar::new(cx));
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
+        let library_page = cx.new(|cx| LibraryPage::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
 
         Self {
             titlebar,
             player_page,
+            library_page,
         }
     }
 }
@@ -101,6 +104,7 @@ impl Render for Wiremann {
             .child(self.titlebar.clone())
             .child(match cx.global::<Page>() {
                 Page::Player => div().w_full().h_full().child(self.player_page.clone()),
+                Page::Library => div().w_full().h_full().child(self.library_page.clone()),
                 _ => div(),
             })
     }
