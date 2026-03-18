@@ -98,7 +98,23 @@ impl LibraryPage {
                         .text_base()
                         .cursor_pointer()
                         .hover(|this| this.bg(theme.accent_15))
-                        .child("Create Playlist")
+                        .on_click(move |_, _, cx| {
+                            let controller = cx.global::<Controller>().clone();
+                            let tracks = controller
+                                .state
+                                .read(cx)
+                                .library
+                                .tracks
+                                .keys()
+                                .copied()
+                                .collect();
+                            cx.spawn(async move |cx| {
+                                if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
+                                    controller.scan_folder(&tracks, folder.path().into());
+                                }
+                            }).detach()
+                        })
+                        .child("Open Folder")
                 } else if *kind == HeaderKind::Tracks {
                     div()
                         .id("add_track")
@@ -115,6 +131,16 @@ impl LibraryPage {
                         .text_color(theme.accent)
                         .cursor_pointer()
                         .hover(|this| this.bg(theme.accent_15))
+                        .on_click(move |_, _, cx| {
+                            let controller = cx.global::<Controller>().clone();
+                            cx.spawn(async move |cx| {
+                                if let Some(files) = rfd::AsyncFileDialog::new().pick_files().await {
+                                    for file in files {
+                                        controller.load_audio(file.path().into());
+                                    }
+                                }
+                            }).detach()
+                        })
                         .child("Add Track")
                 } else {
                     div().id("")
@@ -463,7 +489,7 @@ fn build_rows(
 
             if chunk.len() == cols {
                 rows.push(LibraryRow::PlaylistGridRow(chunk));
-                heights.push(px(260.0));
+                heights.push(px(280.0));
                 chunk = Vec::with_capacity(cols);
             }
         }

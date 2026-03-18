@@ -423,7 +423,7 @@ impl Controller {
     pub fn load_audio(&self, path: PathBuf) {
         let _ = self.audio_tx.send(AudioCommand::Load(path.clone()));
     }
-    
+
     pub fn load_audio_at_id(&self, id: &TrackId, cx: &App) {
         let state = self.state.read(cx);
         if let Some(track) = state.library.tracks.get(id) {

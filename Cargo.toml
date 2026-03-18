@@ -28,6 +28,7 @@ hex = "0.4.3"
 zstd = "0.13.3"
 lru = "0.16.3"
 fast_image_resize = "6.0.0"
+rfd = "0.17.2"
 
 [profile.dev]
 opt-level = 0
