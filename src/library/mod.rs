@@ -3,11 +3,13 @@ pub mod playlists;
 use crate::errors::ScannerError;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use twox_hash::XxHash3_128;
 
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
 const IMAGE_HASH_SEED: u64 = 0x2718_2818_2845_9045;
-const CHUNK_SIZE: u64 = 65536;
+const CHUNK_SIZE: usize = 65536;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
 pub struct TrackId(pub [u8; 16]);
@@ -40,15 +42,30 @@ pub struct TrackSource {
 impl TrackId {
     #[allow(clippy::missing_errors_doc)]
     pub fn generate(path: &Path) -> Result<Self, ScannerError> {
-        let file = File::open(path)?;
+        let mut hasher = XxHash3_128::with_seed(AUDIO_HASH_SEED);
+
+        let mut file = File::open(path)?;
 
         let length = file.metadata()?.len();
 
-        if length > CHUNK_SIZE * 3 {
-            let length = length as f64;
-            let first_chunk = (length * 0.25) as u64;
-            let second_chunk = (length * 0.5) as u64;
-            let third_chunk = (length * 0.75) as u64;
+        if length > (CHUNK_SIZE * 3) as u64 {
+            let offsets = [
+                length / 4,
+                length / 2,
+                (length * 3) / 4,
+            ];
+
+            for &offset in &offsets {
+                file.seek(SeekFrom::Start(offset))?;
+                let mut buf: [u8; CHUNK_SIZE];
+                file.read_exact(buf.as_mut())?;
+
+                hasher.write(&buf);
+            }
+
+            Ok(TrackId(hasher.finish_128().to_le_bytes()))
+        } else {
+            // hasher.write();
         }
     }
 }
