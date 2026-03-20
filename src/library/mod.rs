@@ -10,20 +10,25 @@ pub struct TrackId(pub [u8; 32]);
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
 pub struct ImageId(pub [u8; 32]);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Track {
     pub id: TrackId,
-    pub path: PathBuf,
+    pub sources: Vec<TrackSource>,
 
     pub title: String,
     pub artist: String,
     pub album: String,
 
     pub duration: u64,
-    pub size: u64,
-    pub modified: u64,
 
     pub image_id: Option<ImageId>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrackSource {
+    pub path: PathBuf,
+    pub size: u64,
+    pub modified: u64,
 }
 
 #[allow(clippy::missing_errors_doc)]
