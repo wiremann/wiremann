@@ -49,15 +49,17 @@ impl TrackId {
         let length = file.metadata()?.len();
 
         if length > (CHUNK_SIZE * 3) as u64 {
+            let max_offset = length - CHUNK_SIZE as u64;
+
             let offsets = [
                 length / 4,
                 length / 2,
-                (length * 3) / 4,
-            ];
+                length - (length / 4),
+            ].map(|o| o.min(max_offset));
+            let mut buf = [0u8; CHUNK_SIZE];
 
             for &offset in &offsets {
                 file.seek(SeekFrom::Start(offset))?;
-                let mut buf: [u8; CHUNK_SIZE];
                 file.read_exact(buf.as_mut())?;
 
                 hasher.write(&buf);
@@ -65,7 +67,12 @@ impl TrackId {
 
             Ok(TrackId(hasher.finish_128().to_le_bytes()))
         } else {
-            // hasher.write();
+            let mut buf = vec![];
+            file.read_to_end(buf.as_mut())?;
+
+            hasher.write(&buf);
+
+            Ok(TrackId(hasher.finish_128().to_le_bytes()))
         }
     }
 }
