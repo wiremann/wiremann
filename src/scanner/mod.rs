@@ -278,9 +278,14 @@ impl Scanner {
         path: &PathBuf,
         meta_tx: &Sender<ScanJob>,
     ) -> Result<(), ScannerError> {
-        let supported = ["mp3", "flac", "wav", "ogg", "m4a"];
-
         let mut track_ids = Vec::new();
+        let mut quick_lookup = HashMap::new();
+
+        for (&id, track) in existing_tracks {
+            for source in &track.sources {
+                quick_lookup.insert(source.path, (id, source.size, source.modified));
+            }
+        }
 
         if path.is_dir() {
             for entry in WalkDir::new(path)
@@ -289,21 +294,33 @@ impl Scanner {
                 .filter(|e| e.file_type().is_file())
             {
                 let file = entry.path().to_path_buf();
+                let meta = file.metadata()?;
 
                 let ext_ok = file
                     .extension()
                     .and_then(|e| e.to_str())
-                    .is_some_and(|e| supported.contains(&e.to_lowercase().as_str()));
+                    .is_some_and(|e| matches!(e, "mp3" | "flac" | "wav" | "ogg" | "m4a"));
 
                 if !ext_ok {
                     continue;
                 }
 
-                let id = TrackId::generate(&file)?;
-                track_ids.push(id);
+                if quick_lookup.contains_key(&file) {
+                    if let Some((id, size, modified)) = quick_lookup.get(&file) && (*size, *modified) == (meta.len(), meta.modified()?.duration_since(UNIX_EPOCH)?.as_secs()) {
+                        track_ids.push(*id);
+                    } else {
+                        if let Some((id, _, _)) = quick_lookup.get(&file) {
+                            let _ = meta_tx.send(ScanJob::Metadata(file, *id));
+                        }
+                    }
+                } else {
+                    let id = TrackId::generate(&file)?;
 
-                if !existing_tracks.contains(&id) {
-                    let _ = meta_tx.send(ScanJob::Metadata(file, id));
+                    if existing_tracks.contains_key(&id) {
+                        track_ids.push(id);
+                    } else {
+                        let _ = meta_tx.send(ScanJob::Metadata(file, id));
+                    }
                 }
             }
         }
@@ -392,7 +409,7 @@ fn get_track_metadata(
                 .and_then(|s| s.to_str())
                 .unwrap_or("Unknown")
                 .to_string();
-            
+
             let sources = vec![TrackSource {
                 path,
                 size,
@@ -473,7 +490,7 @@ fn get_track_metadata(
         size,
         modified
     }];
-    
+
     Ok((
         Track {
             sources,

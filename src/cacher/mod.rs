@@ -168,10 +168,10 @@ impl From<&TrackSource> for CachedTrackSource {
     }
 }
 
-impl From<CachedTrackSource> for TrackSource {
-    fn from(c: CachedTrackSource) -> Self {
+impl From<&CachedTrackSource> for TrackSource {
+    fn from(c: &CachedTrackSource) -> Self {
         TrackSource {
-            path: PathBuf::from(c.path),
+            path: PathBuf::from(c.path.clone()),
             size: c.size,
             modified: c.modified,
         }
