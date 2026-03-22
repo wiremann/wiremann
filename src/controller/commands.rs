@@ -22,6 +22,7 @@ pub enum ScannerCommand {
         path: PathBuf,
         track_id: TrackId,
     },
+    ScanTrack(PathBuf),
     ScanFolder {
         path: PathBuf,
         tracks: HashMap<TrackId, Arc<Track>>,

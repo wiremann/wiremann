@@ -76,6 +76,9 @@ impl Scanner {
                 ScannerCommand::ScanFolder { path, tracks } => {
                     self.enqueue_folder(&tracks, &path, &meta_tx)?;
                 }
+                ScannerCommand::ScanTrack(path) => {
+                    self.enqueue_track(path, &meta_tx);
+                }
                 ScannerCommand::GetCurrentAlbumArt(id, path) => {
                     let _ = album_art_tx.send(ScanJob::AlbumArt(id, path));
                 }

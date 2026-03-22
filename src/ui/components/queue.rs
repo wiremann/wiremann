@@ -234,7 +234,7 @@ impl Render for Queue {
 
                     range
                         .map(|i| {
-                            let state = cx.global::<Controller>().state.read(cx);
+                            let state = cx.global::<Controller>().state.read(cx).clone();
 
                             let real_index = &tracks[queue_order[i]];
 
@@ -244,8 +244,11 @@ impl Render for Queue {
                                 div()
                                     .id(format!("track_{}", path.to_string_lossy()))
                                     .child(Queue::get_or_create_item(&views, track.clone(), cx))
-                                    .on_click(move |_, _, cx| {
-                                        cx.global::<Controller>().load_audio(path.clone());
+                                    .on_click({
+                                        let id = track.id;
+                                        move |_, _, cx| {
+                                            cx.global::<Controller>().load_audio(&id, cx);
+                                        }
                                     })
                             } else {
                                 div()

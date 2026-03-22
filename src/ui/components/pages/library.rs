@@ -135,7 +135,7 @@ impl LibraryPage {
                             cx.spawn(async move |_| {
                                 if let Some(files) = rfd::AsyncFileDialog::new().pick_files().await {
                                     for file in files {
-                                        controller.load_audio(file.path().into());
+                                        controller.scan_track(file.path().into());
                                     }
                                 }
                             }).detach()
@@ -297,7 +297,7 @@ impl LibraryPage {
                         .when(is_current, |this| this.bg(theme.accent_15))
                         .on_click({
                             let id = *id;
-                            move |_, _, cx| cx.global::<Controller>().load_audio_at_id(&id, cx)
+                            move |_, _, cx| cx.global::<Controller>().load_audio(&id, cx)
                         })
                         .child(
                             div()
@@ -520,7 +520,7 @@ fn build_rows(
     heights.push(px(60.0));
 
     if !library.tracks.is_empty() {
-        let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
+        let sorted_tracks: Vec<_> = library.tracks.values().collect();
 
         // sorted_tracks.sort_by(|a, b| a.sources[0].cmp(&b.sources[0]));
 
