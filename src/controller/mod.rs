@@ -169,16 +169,54 @@ impl Controller {
             ScannerEvent::UpsertTracks(tracks) => {
                 self.state.update(cx, |this, cx| {
                     this.library.tracks.reserve(tracks.len());
-                    for track in tracks {
-                        this.library
-                            .tracks
-                            .insert(track.id, Arc::new(track.clone()));
-                        let _ = self.scanner_tx.send(ScannerCommand::MetaJobFinished(track.id));
+                    for (track, playlist_id) in tracks {
+                        let id = track.id;
+
+                        if let Some(existing) = this.library.tracks.get_mut(&id) {
+                            let existing = Arc::make_mut(existing);
+
+                            for src in track.sources {
+                                if !existing.sources.iter().any(|s| s.path == src.path) {
+                                    existing.sources.push(src);
+                                }
+                            }
+
+                            if existing.title.is_empty() && !track.title.is_empty() {
+                                existing.title = track.title.clone();
+                            }
+
+                            if existing.artist.is_empty() && !track.artist.is_empty() {
+                                existing.artist = track.artist.clone();
+                            }
+
+                            if existing.album.is_empty() && !track.album.is_empty() {
+                                existing.album = track.album.clone();
+                            }
+                        } else {
+                            this.library.tracks.insert(id, Arc::new(track.clone()));
+                        }
+
+                        let _ = self.scanner_tx.send(ScannerCommand::MetaJobFinished(id));
+
+                        if let Some(pid) = playlist_id {
+                            if let Some(playlist) = this.library.playlists.get_mut(pid) {
+                                if !playlist.tracks.contains(&id) {
+                                    playlist.tracks.push(id);
+                                }
+                            }
+                        }
                     }
                     cx.notify();
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::InsertTrackIntoPlaylist(pid, tid) => {
+                self.state.update(cx, |this, cx| {
+                    if let Some(playlist) = this.library.playlists.get_mut(pid) {
+                        playlist.tracks.push(*tid);
+                    }
+                });
             }
             ScannerEvent::AddTrackSource(id, source) => {
                 self.state.update(cx, |this, cx| {
