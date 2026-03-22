@@ -1,10 +1,9 @@
 pub mod playlists;
 
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 use std::io;
-use std::io::{Read, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::io::{Read, Seek};
+use std::path::PathBuf;
 use twox_hash::XxHash3_128;
 
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
@@ -41,39 +40,20 @@ pub struct TrackSource {
 
 impl TrackId {
     #[allow(clippy::missing_errors_doc)]
-    pub fn generate(path: &Path) -> Result<Self, io::Error> {
+    pub fn generate(name: &str, artists: &str, album: &str) -> Result<Self, io::Error> {
         let mut hasher = XxHash3_128::with_seed(AUDIO_HASH_SEED);
 
-        let mut file = File::open(path)?;
+        let name = name.trim().to_lowercase();
+        let artists = artists.trim().to_lowercase();
+        let album = album.trim().to_lowercase();
 
-        let length = file.metadata()?.len();
+        hasher.write(name.as_bytes());
+        hasher.write(b"#");
+        hasher.write(artists.as_bytes());
+        hasher.write(b"#");
+        hasher.write(album.as_bytes());
 
-        if length > (CHUNK_SIZE as u64 * 3) {
-            let max_offset = length - CHUNK_SIZE as u64;
-
-            let offsets = [
-                length / 4,
-                length / 2,
-                length - (length / 4),
-            ].map(|o| o.min(max_offset));
-            let mut buf = [0u8; CHUNK_SIZE];
-
-            for &offset in &offsets {
-                file.seek(SeekFrom::Start(offset))?;
-                file.read_exact(&mut buf)?;
-
-                hasher.write(&buf);
-            }
-
-            Ok(TrackId(hasher.finish_128().to_le_bytes()))
-        } else {
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf)?;
-
-            hasher.write(&buf);
-
-            Ok(TrackId(hasher.finish_128().to_le_bytes()))
-        }
+        Ok(TrackId(hasher.finish_128().to_le_bytes()))
     }
 }
 
