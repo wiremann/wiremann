@@ -218,6 +218,8 @@ impl Controller {
                     }
                     cx.notify()
                 });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::AddTrackSource(id, source) => {
                 self.state.update(cx, |this, cx| {
@@ -248,16 +250,12 @@ impl Controller {
                     this.library
                         .playlists
                         .insert(playlist.id, playlist.clone());
-                    this.playback.current_playlist = Some(playlist.id);
-                    this.queue.tracks.clone_from(&playlist.tracks);
-                    this.queue.order = (0..playlist.tracks.len()).collect();
 
                     cx.notify();
                 });
 
-                let state = self.state.read(cx);
-                let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state.queue.clone()));
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state.library.clone()));
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::InsertAlbumArt(image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
