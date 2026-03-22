@@ -19,6 +19,7 @@ pub enum ScannerEvent {
     InsertTracks(Vec<Track>),
     AddTrackSource(TrackId, TrackSource),
     RemoveTrackSource(TrackId, PathBuf),
+    InsertTrackIntoPlaylist(TrackId),
     Playlist(Playlist),
     AlbumArt(ImageId, Arc<RenderImage>),
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),

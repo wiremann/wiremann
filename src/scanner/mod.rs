@@ -27,7 +27,7 @@ pub struct Scanner {
 }
 
 enum ScanJob {
-    Metadata(PathBuf, TrackId),
+    Metadata(TrackSource, Option<PlaylistId>),
     Thumbnail(TrackId, ImageId, Vec<u8>),
     AlbumArt(PathBuf),
     PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
@@ -278,7 +278,6 @@ impl Scanner {
         scan_path: &PathBuf,
         meta_tx: &Sender<ScanJob>,
     ) -> Result<(), ScannerError> {
-        let mut track_ids = Vec::new();
         let mut quick_lookup = HashMap::new();
 
         for (&id, track) in existing_tracks {
@@ -287,7 +286,25 @@ impl Scanner {
             }
         }
 
+        let id = PlaylistId(Uuid::new_v4());
+
         if scan_path.is_dir() {
+            let playlist = Playlist {
+                id,
+                name: scan_path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unnamed Playlist")
+                    .to_string(),
+                source: PlaylistSource::Folder,
+                folder_path: Some(scan_path.clone()),
+                tracks: Vec::new(),
+                duration: Duration::from_secs(0),
+                image_id: None,
+            };
+
+            let _ = self.tx.send(ScannerEvent::Playlist(playlist));
+
             for entry in WalkDir::new(scan_path)
                 .into_iter()
                 .filter_map(Result::ok)
@@ -313,46 +330,17 @@ impl Scanner {
 
                 if let Some((existing_id, size, modified)) = quick_lookup.get(file) {
                     if (*size, *modified) == (track_source.size, track_source.modified) {
-                        track_ids.push(*existing_id);
+                        let _ = self.tx.send(ScannerEvent::InsertTrackIntoPlaylist(*existing_id));
                     } else {
                         let _ = self.tx.send(ScannerEvent::RemoveTrackSource(*existing_id, file.to_path_buf()));
-                        let id = TrackId::generate(&file)?;
 
-                        if existing_tracks.contains_key(&id) {
-                            let _ = self.tx.send(ScannerEvent::AddTrackSource(id, track_source));
-                        } else {
-                            let _ = meta_tx.send(ScanJob::Metadata(file.to_path_buf(), id));
-                        }
-                        track_ids.push(id);
+                        let _ = meta_tx.send(ScanJob::Metadata(track_source, Some(id)));
                     }
                 } else {
-                    let id = TrackId::generate(&file)?;
-
-                    if existing_tracks.contains_key(&id) {
-                        let _ = self.tx.send(ScannerEvent::AddTrackSource(id, track_source));
-                    } else {
-                        let _ = meta_tx.send(ScanJob::Metadata(file.to_path_buf(), id));
-                    }
-                    track_ids.push(id);
+                    let _ = meta_tx.send(ScanJob::Metadata(track_source, Some(id)));
                 }
             }
         }
-
-        let playlist = Playlist {
-            id: PlaylistId(Uuid::new_v4()),
-            name: scan_path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unnamed Playlist")
-                .to_string(),
-            source: PlaylistSource::Folder,
-            folder_path: Some(scan_path.clone()),
-            tracks: track_ids,
-            duration: Duration::from_secs(0),
-            image_id: None,
-        };
-
-        let _ = self.tx.send(ScannerEvent::Playlist(playlist));
 
         Ok(())
     }
