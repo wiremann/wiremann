@@ -16,15 +16,18 @@ pub enum AudioEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ScannerEvent {
-    InsertTracks(Vec<Track>),
+    UpsertTracks(Vec<Track>, Option<PlaylistId>),
+    InsertTrackIntoPlaylist(PlaylistId, TrackId),
+
     AddTrackSource(TrackId, TrackSource),
     RemoveTrackSource(TrackId, PathBuf),
-    InsertTrackIntoPlaylist(TrackId),
-    Playlist(Playlist),
-    AlbumArt(ImageId, Arc<RenderImage>),
-    Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
-    ImageLookup(HashMap<TrackId, ImageId>),
-    PlaylistThumbnail(PlaylistId, ImageId, Arc<RenderImage>),
+
+    InsertPlaylist(Playlist),
+
+    InsertAlbumArt(ImageId, Arc<RenderImage>),
+    InsertThumbnails(HashMap<ImageId, Arc<RenderImage>>),
+    InsertPlaylistThumbnail(PlaylistId, ImageId, Arc<RenderImage>),
+    UpdateImageLookup(HashMap<TrackId, ImageId>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
