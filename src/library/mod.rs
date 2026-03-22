@@ -7,7 +7,6 @@ use twox_hash::XxHash3_128;
 
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
 const IMAGE_HASH_SEED: u64 = 0x2718_2818_2845_9045;
-const CHUNK_SIZE: usize = 65536;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
 pub struct TrackId(pub [u8; 16]);

@@ -175,9 +175,9 @@ impl Controller {
                         if let Some(existing) = this.library.tracks.get_mut(&id) {
                             let existing = Arc::make_mut(existing);
 
-                            for src in track.sources {
+                            for src in &track.sources {
                                 if !existing.sources.iter().any(|s| s.path == src.path) {
-                                    existing.sources.push(src);
+                                    existing.sources.push(src.clone());
                                 }
                             }
 
@@ -216,6 +216,7 @@ impl Controller {
                     if let Some(playlist) = this.library.playlists.get_mut(pid) {
                         playlist.tracks.push(*tid);
                     }
+                    cx.notify()
                 });
             }
             ScannerEvent::AddTrackSource(id, source) => {
