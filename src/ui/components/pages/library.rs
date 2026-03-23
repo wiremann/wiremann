@@ -12,18 +12,18 @@ use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
 use gpui::prelude::FluentBuilder;
-use gpui::{div, img, px, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window};
+use gpui::{div, img, px, App, AppContext, Context, Div, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window};
 
 const THUMBNAIL_MARGIN: usize = 16;
 
 #[derive(Clone)]
 pub struct LibraryPage {
     scroll_handle: ScrollHandle,
-    show_playlists: Entity<bool>,
     rows: Rc<Vec<LibraryRow>>,
     heights: Rc<Vec<Pixels>>,
     pub sorted_tracks: Vec<&'static TrackId>,
     grid_cols: usize,
+    last_fp: u128,
 }
 
 #[derive(Clone, PartialEq)]
@@ -45,8 +45,6 @@ enum LibraryRow {
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
         let scroll_handle = ScrollHandle::new();
-        let show_playlists = cx.new(|_| true);
-
         let library = &cx.global::<Controller>().state.read(cx).library;
 
         let cols = 4;
@@ -55,11 +53,11 @@ impl LibraryPage {
 
         LibraryPage {
             scroll_handle,
-            show_playlists,
             rows: Rc::new(rows),
             heights: Rc::new(heights),
             grid_cols: cols,
             sorted_tracks: Vec::new(),
+            last_fp: 0,
         }
     }
 
@@ -397,12 +395,17 @@ impl Render for LibraryPage {
         let state = controller.state.read(cx);
         let scroll_handle = self.scroll_handle.clone();
 
+        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().cloned());
+        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().cloned());
+
+        let combined_fp = tracks_fp ^ playlists_fp;
+
         let width = window.bounds().size.width;
         let tile = 256.0;
 
         let cols = ((width.to_f64() / tile) as usize).max(1);
 
-        if cols != self.grid_cols {
+        if cols != self.grid_cols || combined_fp != self.last_fp {
             let library = &state.library;
 
             let (rows, heights) = build_rows(library, cols);
@@ -411,14 +414,6 @@ impl Render for LibraryPage {
             self.heights = Rc::new(heights);
             self.grid_cols = cols;
         }
-
-        let _show_playlists = self.show_playlists.clone();
-
-        let _current = if let Some(id) = state.playback.current {
-            state.library.tracks.get(&id)
-        } else {
-            None
-        };
 
         let rows = self.rows.clone();
         let heights = self.heights.clone();
@@ -539,3 +534,22 @@ fn build_rows(
     (rows, heights)
 }
 
+fn fingerprint_tracks(ids: impl IntoIterator<Item=TrackId>) -> u128 {
+    let mut acc = 0u128;
+
+    for id in ids {
+        acc ^= u128::from_le_bytes(id.0);
+    }
+
+    acc
+}
+
+fn fingerprint_playlists(ids: impl IntoIterator<Item=PlaylistId>) -> u128 {
+    let mut acc = 0u128;
+
+    for id in ids {
+        acc ^= u128::from_le_bytes(*id.0.as_bytes());
+    }
+
+    acc
+}
