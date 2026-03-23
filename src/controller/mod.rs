@@ -541,6 +541,20 @@ impl Controller {
         });
     }
 
+    pub fn load_playlist(&mut self, id: PlaylistId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            if let Some(playlist) = this.library.playlists.get(&id) {
+                this.playback.current_playlist = Some(playlist.id);
+                this.queue.tracks.clone_from(&playlist.tracks);
+                this.queue.order = (0..playlist.tracks.len()).collect();
+
+                cx.notify();
+            }
+        });
+        
+        self.load_queue_current(cx);
+    }
+
     pub fn scan_track(&self, path: PathBuf) {
         let _ = self.scanner_tx.send(ScannerCommand::ScanTrack(path));
     }

@@ -236,8 +236,6 @@ impl Scanner {
             while let Ok(ScanJob::PlaylistThumbnail(id, tracks)) = playlist_thumb_rx.recv() {
                 let mut images = Vec::with_capacity(4);
 
-                println!("received tracks: {:#?}", tracks);
-
                 for path in tracks {
                     if images.len() == 4 {
                         break;

@@ -174,6 +174,7 @@ impl LibraryPage {
                             .id(format!("playlist_{}", playlist.id.0.to_string()))
                             .bg(theme.bg_main)
                             .size_full()
+                            .max_w_64()
                             .flex()
                             .flex_col()
                             .items_start()
@@ -183,6 +184,15 @@ impl LibraryPage {
                             .rounded_lg()
                             .hover(|this| this.bg(theme.accent_10))
                             .cursor_pointer()
+                            .on_click({
+                                let id = playlist.id.clone();
+                                move |_, _, cx| {
+                                    let mut controller = cx.global_mut::<Controller>().clone();
+
+                                    controller.load_playlist(id, cx);
+                                }
+                            })
+                            .when(state.playback.current_playlist == Some(playlist.id), |this| this.bg(theme.accent_15))
                             .child(match thumbnail {
                                 Some(image) => div().size_full().mb_3().child(
                                     img(image.clone())
