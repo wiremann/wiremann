@@ -302,6 +302,7 @@ impl Controller {
                         drop_image_from_app(cx, img);
                     }
                 }
+                cx.notify(view.entity_id());
             }
             ScannerEvent::UpdateImageLookup(lookup) => {
                 self.state.update(cx, |this, cx| {
@@ -336,10 +337,11 @@ impl Controller {
                     });
                 }
 
-                self.state.update(cx, |this, _| {
+                self.state.update(cx, |this, cx| {
                     if let Some(playlist) = this.library.playlists.get_mut(id) {
                         playlist.image_id = Some(*image_id);
                     }
+                    cx.notify();
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
@@ -386,7 +388,8 @@ impl Controller {
                 for (id, image) in thumbnails {
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
-                        thumbnail_cache.add(id.clone(), image.clone())
+                        thumbnail_cache.inflight.remove(id);
+                        thumbnail_cache.add(*id, image.clone())
                     };
 
                     if let Some(img) = evicted {
@@ -403,6 +406,8 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             CacherEvent::PlaylistThumbnail(id, thumbnail) => {
+                cx.global_mut::<ImageCache>().inflight.remove(id);
+                
                 let evicted = {
                     let image_cache = cx.global_mut::<ImageCache>();
                     image_cache.add(id.clone(), thumbnail.clone())
@@ -457,6 +462,8 @@ impl Controller {
                 }
             }
             CacherEvent::MissingPlaylistThumbnail(id) => {
+                cx.global_mut::<ImageCache>().inflight.remove(id);
+                
                 let state = self.state.read(cx);
                 let playlists = state.library.playlists.clone();
 
