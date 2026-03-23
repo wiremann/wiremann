@@ -259,6 +259,7 @@ impl Controller {
             }
             ScannerEvent::InsertAlbumArt(image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
+                image_cache.inflight.remove(image_id);
 
                 image_cache.current = Some(image.clone());
 
@@ -295,6 +296,7 @@ impl Controller {
 
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
+                        thumbnail_cache.inflight.remove(id);
                         thumbnail_cache.add(id.clone(), image.clone())
                     };
 
@@ -321,6 +323,9 @@ impl Controller {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
                 thumbnail_cache.add(*image_id, image.clone());
+
+                thumbnail_cache.inflight.remove(image_id);
+
 
                 let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
 
@@ -407,7 +412,7 @@ impl Controller {
             }
             CacherEvent::PlaylistThumbnail(id, thumbnail) => {
                 cx.global_mut::<ImageCache>().inflight.remove(id);
-                
+
                 let evicted = {
                     let image_cache = cx.global_mut::<ImageCache>();
                     image_cache.add(id.clone(), thumbnail.clone())
@@ -463,7 +468,7 @@ impl Controller {
             }
             CacherEvent::MissingPlaylistThumbnail(id) => {
                 cx.global_mut::<ImageCache>().inflight.remove(id);
-                
+
                 let state = self.state.read(cx);
                 let playlists = state.library.playlists.clone();
 
