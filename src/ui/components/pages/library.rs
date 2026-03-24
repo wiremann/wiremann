@@ -530,9 +530,9 @@ fn build_rows(
     heights.push(px(60.0));
 
     if !library.tracks.is_empty() {
-        let sorted_tracks: Vec<_> = library.tracks.values().collect();
+        let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
 
-        // sorted_tracks.sort_by(|a, b| a.sources[0].cmp(&b.sources[0]));
+        sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
 
         rows.push(LibraryRow::TrackTableHeader);
         heights.push(px(40.0));
