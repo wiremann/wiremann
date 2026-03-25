@@ -28,6 +28,7 @@ pub struct LibraryPage {
     last_fp: u128,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, PartialEq)]
 enum HeaderKind {
     Playlists,

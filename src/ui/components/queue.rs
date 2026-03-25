@@ -59,12 +59,6 @@ impl Render for Item {
 
         let is_current = Some(&self.data.id) == state.playback.current.as_ref();
 
-        let current = if let Some(id) = state.playback.current {
-            state.library.tracks.get(&id)
-        } else {
-            None
-        };
-
         div()
             .id(format!("track_item_{:?}", self.data.id.0))
             .h(px(64.))
