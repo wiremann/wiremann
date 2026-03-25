@@ -337,7 +337,7 @@ impl Render for PlaylistsPage {
             .text_color(theme.text_primary)
             .flex()
             .child(
-                div().w_1_4().h_full().flex().flex_col().gap_3()
+                div().w_1_3().h_full().flex().flex_col().gap_2().border_r_1().border_color(theme.white_05)
                     .bg(theme.bg_queue)
                     .child(
                         div()
@@ -355,90 +355,104 @@ impl Render for PlaylistsPage {
                             ),
                     )
                     .child(
-                        div().id("playlist_sidebar_container").size_full().flex_1().child(
-                            uniform_list("playlist_sidebar", len, {
-                                let selected = selected.clone();
-                                let playlists = playlists.clone();
-                                move |range, _, cx| {
-                                    range.map(|i| {
-                                        let playlist = &playlists[i];
-                                        let is_current = Some(playlist.id) == *selected.read(cx);
+                        div()
+                            .id("playlist_sidebar_container")
+                            .w_full()
+                            .h_full()
+                            .px_4()
+                            .pb_4()
+                            .flex()
+                            .relative()
+                            .size_full()
+                            .flex_1()
+                            .child(
+                                uniform_list("playlist_sidebar", len, {
+                                    let selected = selected.clone();
+                                    let playlists = playlists.clone();
+                                    move |range, _, cx| {
+                                        range.map(|i| {
+                                            let playlist = &playlists[i];
+                                            let is_current = Some(playlist.id) == *selected.read(cx);
 
-                                        let controller = cx.global_mut::<Controller>().clone();
+                                            let controller = cx.global_mut::<Controller>().clone();
 
-                                        controller.request_playlist_thumbnails(&[playlist.id], cx);
+                                            controller.request_playlist_thumbnails(&[playlist.id], cx);
 
-                                        let thumbnail = playlist.image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+                                            let thumbnail = playlist.image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-                                        div()
-                                            .id(format!("playlist_sidebar_{}", playlist.id.0))
-                                            .h(px(64.))
-                                            .w_full()
-                                            .flex()
-                                            .items_center()
-                                            .p_3()
-                                            .gap_4()
-                                            .rounded_lg()
-                                            .hover(|d| d.bg(theme.white_05))
-                                            .when(is_current, |d| d.bg(theme.accent_15))
-                                            .cursor_pointer()
-                                            .on_click({
-                                                let id = playlist.id;
-                                                let selected = selected.clone();
-                                                move |_, _, cx| {
-                                                    selected.update(cx, |this, cx| {
-                                                        *this = Some(id);
-                                                        cx.notify();
-                                                    });
-                                                }
-                                            })
-                                            .child(match thumbnail {
-                                                Some(image) => div().size_12().flex_shrink_0().child(
-                                                    img(image.clone())
-                                                        .object_fit(ObjectFit::Contain)
-                                                        .size_full()
-                                                        .rounded_md(),
-                                                ),
-                                                None => div().size_12().flex_shrink_0(),
-                                            })
-                                            .child(
-                                                div()
-                                                    .flex_col()
-                                                    .flex_1()
-                                                    .justify_center()
-                                                    .child(
-                                                        div()
-                                                            .text_base()
-                                                            .truncate()
-                                                            .text_color(if is_current {
-                                                                theme.accent
-                                                            } else {
-                                                                theme.text_primary
-                                                            })
-                                                            .child(playlist.name.clone()),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .text_sm()
-                                                            .text_color(theme.text_muted)
-                                                            .truncate()
-                                                            .child(format!("{} tracks", playlist.tracks.len())),
-                                                    )
-                                            )
-                                    }).collect::<Vec<_>>()
-                                }
-                            })
-                                .track_scroll(&sidebar_scroll_handle)
-                                .w_full()
-                                .h_full()
-                                .flex()
-                                .flex_col())
+                                            div()
+                                                .py(px(2.0))
+                                                .child(
+                                                    div()
+                                                        .id(format!("playlist_sidebar_{}", playlist.id.0))
+                                                        .h(px(64.))
+                                                        .w_full()
+                                                        .flex()
+                                                        .items_center()
+                                                        .p_3()
+                                                        .mb_2()
+                                                        .gap_4()
+                                                        .rounded_lg()
+                                                        .hover(|d| d.bg(theme.white_05))
+                                                        .when(is_current, |d| d.bg(theme.accent_15))
+                                                        .cursor_pointer()
+                                                        .on_click({
+                                                            let id = playlist.id;
+                                                            let selected = selected.clone();
+                                                            move |_, _, cx| {
+                                                                selected.update(cx, |this, cx| {
+                                                                    *this = Some(id);
+                                                                    cx.notify();
+                                                                });
+                                                            }
+                                                        })
+                                                        .child(match thumbnail {
+                                                            Some(image) => div().size_12().flex_shrink_0().child(
+                                                                img(image.clone())
+                                                                    .object_fit(ObjectFit::Contain)
+                                                                    .size_full()
+                                                                    .rounded_md(),
+                                                            ),
+                                                            None => div().size_12().flex_shrink_0(),
+                                                        })
+                                                        .child(
+                                                            div()
+                                                                .flex_col()
+                                                                .flex_1()
+                                                                .justify_center()
+                                                                .child(
+                                                                    div()
+                                                                        .text_base()
+                                                                        .truncate()
+                                                                        .text_color(if is_current {
+                                                                            theme.accent
+                                                                        } else {
+                                                                            theme.text_primary
+                                                                        })
+                                                                        .child(playlist.name.clone()),
+                                                                )
+                                                                .child(
+                                                                    div()
+                                                                        .text_sm()
+                                                                        .text_color(theme.text_muted)
+                                                                        .truncate()
+                                                                        .child(format!("{} tracks", playlist.tracks.len())),
+                                                                )
+                                                        ))
+                                        }).collect::<Vec<_>>()
+                                    }
+                                })
+                                    .track_scroll(&sidebar_scroll_handle)
+                                    .w_full()
+                                    .h_full()
+                                    .flex()
+                                    .flex_col())
+                            .child(floating_scrollbar(
+                                "queue_scrollbar",
+                                self.sidebar_scroll_handle.clone(),
+                                RightPad::Pad,
+                            ))
                     )
-                    .child(floating_scrollbar(
-                        "queue_scrollbar",
-                        self.sidebar_scroll_handle.clone(),
-                        RightPad::Pad,
-                    ))
             )
             .child(
                 div().w_full().h_full().flex().flex_grow().child(vlist(

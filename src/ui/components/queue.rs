@@ -9,7 +9,6 @@ use gpui::{
     InteractiveElement, IntoElement, ObjectFit, ParentElement, Render,
     ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window,
 };
-use std::path::PathBuf;
 use std::sync::Arc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -66,16 +65,8 @@ impl Render for Item {
             None
         };
 
-        let path = if let Some(track) = current
-            && let Some(source) = track.get_valid_source()
-        {
-            source.path.clone()
-        } else {
-            PathBuf::new()
-        };
-
         div()
-            .id(format!("track_item_{}", path.to_string_lossy()))
+            .id(format!("track_item_{:?}", self.data.id.0))
             .h(px(64.))
             .w_full()
             .flex()
@@ -246,12 +237,9 @@ impl Render for Queue {
                             let real_index = &tracks[queue_order[i]];
 
                             if let Some(track) = state.library.tracks.get(real_index)
-                                && let Some(source) = track.get_valid_source()
                             {
-                                let path = source.path.clone();
-
                                 div()
-                                    .id(format!("track_{}", path.to_string_lossy()))
+                                    .id(format!("track_{:?}", track.id.0))
                                     .child(Queue::get_or_create_item(&views, track.clone(), cx))
                                     .on_click({
                                         let id = track.id;
