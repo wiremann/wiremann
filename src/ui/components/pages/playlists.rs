@@ -2,12 +2,13 @@ use crate::controller::state::LibraryState;
 use crate::controller::Controller;
 use crate::library::playlists::PlaylistId;
 use crate::library::TrackId;
+use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
-use gpui::{div, px, uniform_list, App, AppContext, Context, Entity, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window};
+use gpui::{div, img, px, uniform_list, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -43,6 +44,252 @@ impl PlaylistsPage {
             heights: Rc::new(Vec::new()),
             selected_playlist: cx.new(|_| None),
             last_fp: 0,
+        }
+    }
+
+    fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App) -> Div {
+        let theme = cx.global::<Theme>();
+        let controller = cx.global::<Controller>().clone();
+
+        let state = controller.state.read(cx).clone();
+
+
+        let cache = cx.global_mut::<ImageCache>();
+
+        if let Some(id) = id && let Some(playlist) = state.library.playlists.get(&id) {
+            controller.request_playlist_thumbnails(&[id], cx);
+            let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
+
+            div()
+                .flex()
+                .w_full()
+                .h(height)
+                .bg(theme.bg_queue)
+                .child(
+                    div()
+                        .size(height)
+                        .p_12()
+                        .child(
+                            match thumbnail {
+                                Some(image) => div().size_full().child(
+                                    img(image.clone())
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .rounded_lg(),
+                                ),
+                                None => div().size(height).flex_shrink_0(),
+                            }
+                        )
+                )
+                .child(
+                    div()
+                        .w_full()
+                        .h(height)
+                        .flex()
+                        .flex_col()
+                        .px_10()
+                        .py_12()
+                        .gap_y_4()
+                        .child(
+                            div().text_xl().text_color(theme.text_primary).child(playlist.name)
+                        )
+                        .child(
+                            div().text_base().text_color(theme.text_secondary)
+                                .child(format!("{} tracks", playlist.tracks.len()))
+                        )
+                )
+        } else {
+            div()
+        }
+    }
+
+    fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
+        let theme = cx.global::<Theme>();
+
+        div()
+            .h(height)
+            .w_full()
+            .flex()
+            .items_center()
+            .text_xs()
+            .font_weight(FontWeight::NORMAL)
+            .text_color(theme.text_muted)
+            .border_b_1()
+            .border_color(theme.white_05)
+            .child(
+                div()
+                    .w_20()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child("#"),
+            )
+            .child(
+                div()
+                    .w_3_5()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child("TITLE"),
+            )
+            .child(
+                div()
+                    .w_1_2()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child("ARTIST"),
+            )
+            .child(
+                div()
+                    .w_1_2()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child("ALBUM"),
+            )
+            .child(
+                div()
+                    .w_24()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child("DURATION"),
+            )
+    }
+
+    fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
+        let image_id = {
+            let state = cx.global::<Controller>().state.read(cx);
+            state.library.tracks.get(id).and_then(|t| t.image_id)
+        };
+
+        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+
+        let controller = cx.global::<Controller>().clone();
+        let theme = cx.global::<Theme>().clone();
+        let state = controller.state.read(cx).clone();
+        let is_current = Some(id) == state.playback.current.as_ref();
+
+        if let Some(track) = state.library.tracks.get(id) {
+            div()
+                .h(height)
+                .py_1()
+                .border_b_1()
+                .border_color(theme.white_05)
+                .child(
+                    div()
+                        .id(format!("track_{:?}", track.id.0))
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .rounded_md()
+                        .cursor_pointer()
+                        .hover(|this| this.bg(theme.accent_10))
+                        .when(is_current, |this| this.bg(theme.accent_15))
+                        .on_click({
+                            let id = *id;
+                            move |_, _, cx| {
+                                let controller = cx.global::<Controller>().clone();
+
+                                controller.load_track(id, cx)
+                            }
+                        })
+                        .child(
+                            div()
+                                .w_20()
+                                .h_full()
+                                .flex()
+                                .px_6()
+                                .items_center()
+                                .justify_start()
+                                .child(format! {"{:02}", i}),
+                        )
+                        .child(
+                            div()
+                                .w_2_3()
+                                .max_w_2_3()
+                                .h_full()
+                                .px_6()
+                                .py_1()
+                                .flex()
+                                .gap_x_3()
+                                .items_center()
+                                .justify_start()
+                                .child(match thumbnail {
+                                    Some(image) => div().size_11().flex_shrink_0().child(
+                                        img(image.clone())
+                                            .object_fit(ObjectFit::Contain)
+                                            .size_full()
+                                            .rounded_sm(),
+                                    ),
+                                    None => div().size_11().flex_shrink_0(),
+                                })
+                                .when(is_current, |this| {
+                                    this.text_color(theme.accent)
+                                        .font_weight(FontWeight::MEDIUM)
+                                })
+                                .child(track.title.to_string())
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis(),
+                        )
+                        .child(
+                            div()
+                                .w_1_3()
+                                .px_6()
+                                .max_w_1_3()
+                                .h_full()
+                                .flex()
+                                .items_center()
+                                .justify_start()
+                                .child(track.artist.to_string())
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis(),
+                        )
+                        .child(
+                            div()
+                                .w_1_3()
+                                .max_w_1_3()
+                                .px_6()
+                                .h_full()
+                                .flex()
+                                .items_center()
+                                .justify_start()
+                                .child(track.album.to_string())
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis(),
+                        )
+                        .child(
+                            div()
+                                .w_24()
+                                .max_w_24()
+                                .h_full()
+                                .px_4()
+                                .flex()
+                                .items_center()
+                                .justify_start()
+                                .text_sm()
+                                .font_family("JetBrains Mono")
+                                .child(format!(
+                                    "{:02}:{:02}",
+                                    track.duration / 60,
+                                    track.duration % 60
+                                ))
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis(),
+                        ),
+                )
+        } else {
+            div().h(height).py_2()
         }
     }
 }
@@ -151,7 +398,7 @@ impl Render for PlaylistsPage {
 
                         range
                             .map(|idx| match &rows[idx] {
-                                PlaylistsRows::Header => Self::render_header(heights[idx], cx),
+                                PlaylistsRows::Header => Self::render_header(heights[idx], self.selected_playlist.read(cx).clone(), cx),
 
                                 PlaylistsRows::TrackTableHeader => {
                                     Self::render_track_table_header(heights[idx], cx)
