@@ -37,27 +37,28 @@ impl PlaylistsPage {
         let sidebar_scroll_handle = UniformListScrollHandle::new();
         let main_scroll_handle = ScrollHandle::new();
 
+        let current_playlist = cx.global::<Controller>().state.read(cx).playback.current_playlist.clone();
+
         PlaylistsPage {
             sidebar_scroll_handle,
             main_scroll_handle,
             rows: Rc::new(Vec::new()),
             heights: Rc::new(Vec::new()),
-            selected_playlist: cx.new(|_| None),
+            selected_playlist: cx.new(|_| current_playlist),
             last_fp: 0,
         }
     }
 
     fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App) -> Div {
-        let theme = cx.global::<Theme>();
+        let theme = cx.global::<Theme>().clone();
         let controller = cx.global::<Controller>().clone();
 
         let state = controller.state.read(cx).clone();
 
-
-        let cache = cx.global_mut::<ImageCache>();
-
         if let Some(id) = id && let Some(playlist) = state.library.playlists.get(&id) {
             controller.request_playlist_thumbnails(&[id], cx);
+
+            let cache = cx.global_mut::<ImageCache>();
             let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
 
             div()
@@ -91,7 +92,7 @@ impl PlaylistsPage {
                         .py_12()
                         .gap_y_4()
                         .child(
-                            div().text_xl().text_color(theme.text_primary).child(playlist.name)
+                            div().text_xl().text_color(theme.text_primary).child(playlist.name.clone())
                         )
                         .child(
                             div().text_base().text_color(theme.text_secondary)
@@ -296,24 +297,37 @@ impl PlaylistsPage {
 
 impl Render for PlaylistsPage {
     #[allow(clippy::too_many_lines)]
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>().clone();
 
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
         let sidebar_scroll_handle = self.sidebar_scroll_handle.clone();
         let main_scroll_handle = self.main_scroll_handle.clone();
+        let selected = self.selected_playlist.clone();
 
         let tracks_fp = fingerprint_tracks(state.library.tracks.keys().cloned());
         let playlists_fp = fingerprint_playlists(state.library.playlists.keys().cloned());
 
-        let combined_fp = tracks_fp ^ playlists_fp;
+        let selected_id = selected.read(cx).map(|p| p.0.as_u128()).unwrap_or(0);
+        let combined_fp = tracks_fp ^ playlists_fp ^ selected_id;
+
+        if combined_fp != self.last_fp {
+            let (rows, heights) = build_rows(
+                &state.library,
+                *self.selected_playlist.read(cx),
+            );
+
+            self.rows = Rc::new(rows);
+            self.heights = Rc::new(heights);
+            self.last_fp = combined_fp;
+        }
+
 
         let rows = self.rows.clone();
         let heights = self.heights.clone();
 
         let playlists: Vec<_> = state.library.playlists.values().cloned().collect();
-        let selected = self.selected_playlist.clone();
         let len = playlists.len();
 
         div()
@@ -322,7 +336,7 @@ impl Render for PlaylistsPage {
             .text_color(theme.text_primary)
             .flex()
             .child(
-                div().w_1_3().h_full().flex().flex_col().gap_3()
+                div().w_1_4().h_full().flex().flex_col().gap_3()
                     .bg(theme.bg_queue)
                     .child(
                         div()
@@ -340,34 +354,45 @@ impl Render for PlaylistsPage {
                             ),
                     )
                     .child(
-                        uniform_list("playlist_sidebar", len, move |range, _, cx| {
-                            range.map(|i| {
-                                let playlist = &playlists[i];
+                        div().id("playlist_sidebar_container").size_full().flex_1().child(
+                            uniform_list("playlist_sidebar", len, {
+                                let selected = selected.clone();
+                                let playlists = playlists.clone();
+                                move |range, _, cx| {
+                                    range.map(|i| {
+                                        dbg!(len);
+                                        let playlist = &playlists[i];
 
-                                div()
-                                    .id(format!("playlist_sidebar_{}", playlist.id.0))
-                                    .px_4()
-                                    .py_3()
-                                    .cursor_pointer()
-                                    .rounded_md()
-                                    .hover(|d| d.bg(theme.accent_10))
-                                    .when(
-                                        Some(playlist.id) == *self.selected_playlist.read(cx),
-                                        |d| d.bg(theme.accent_15),
-                                    )
-                                    .on_click({
-                                        let id = playlist.id;
-                                        move |_, _, cx| {
-                                            selected.update(cx, |this, cx| {
-                                                *this = Some(id);
-                                                cx.notify();
-                                            });
-                                        }
-                                    })
-                                    .child(playlist.name.clone())
-                            }).collect::<Vec<_>>()
-                        })
-                            .track_scroll(&sidebar_scroll_handle)
+                                        div()
+                                            .id(format!("playlist_sidebar_{}", playlist.id.0))
+                                            .px_4()
+                                            .py_3()
+                                            .cursor_pointer()
+                                            .rounded_md()
+                                            .hover(|d| d.bg(theme.accent_10))
+                                            .when(
+                                                Some(playlist.id) == *selected.read(cx),
+                                                |d| d.bg(theme.accent_15),
+                                            )
+                                            .on_click({
+                                                let id = playlist.id;
+                                                let selected = selected.clone();
+                                                move |_, _, cx| {
+                                                    selected.update(cx, |this, cx| {
+                                                        *this = Some(id);
+                                                        cx.notify();
+                                                    });
+                                                }
+                                            })
+                                            .child(playlist.name.clone())
+                                    }).collect::<Vec<_>>()
+                                }
+                            })
+                                .track_scroll(&sidebar_scroll_handle)
+                                .w_full()
+                                .h_full()
+                                .flex()
+                                .flex_col())
                     )
                     .child(floating_scrollbar(
                         "queue_scrollbar",
@@ -376,39 +401,42 @@ impl Render for PlaylistsPage {
                     ))
             )
             .child(
-                div().w_full().h_full().flex().flex_grow().child(vlist(
+                div().w_full().h_full().flex().flex_grow().px_4().child(vlist(
                     cx.entity(),
                     "playlists_main",
                     heights.clone(),
                     main_scroll_handle,
-                    move |_this, range, _, cx| {
-                        let len = rows.len();
+                    {
+                        let selected = selected.clone();
+                        move |_this, range, _, cx| {
+                            let len = rows.len();
 
-                        let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                        let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                            let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                            let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                        let thumb_track_ids: Vec<TrackId> = (start..end)
-                            .filter_map(|idx| match &rows[idx] {
-                                PlaylistsRows::TrackRow(_, id) => Some(*id),
-                                _ => None,
-                            })
-                            .collect();
+                            let thumb_track_ids: Vec<TrackId> = (start..end)
+                                .filter_map(|idx| match &rows[idx] {
+                                    PlaylistsRows::TrackRow(_, id) => Some(*id),
+                                    _ => None,
+                                })
+                                .collect();
 
-                        controller.request_track_thumbnails(&thumb_track_ids, cx);
+                            controller.request_track_thumbnails(&thumb_track_ids, cx);
 
-                        range
-                            .map(|idx| match &rows[idx] {
-                                PlaylistsRows::Header => Self::render_header(heights[idx], self.selected_playlist.read(cx).clone(), cx),
+                            range
+                                .map(|idx| match &rows[idx] {
+                                    PlaylistsRows::Header => Self::render_header(heights[idx], selected.read(cx).clone(), cx),
 
-                                PlaylistsRows::TrackTableHeader => {
-                                    Self::render_track_table_header(heights[idx], cx)
-                                }
+                                    PlaylistsRows::TrackTableHeader => {
+                                        Self::render_track_table_header(heights[idx], cx)
+                                    }
 
-                                PlaylistsRows::TrackRow(i, id) => {
-                                    Self::render_track(*i, id, heights[idx], cx)
-                                }
-                            })
-                            .collect::<Vec<_>>()
+                                    PlaylistsRows::TrackRow(i, id) => {
+                                        Self::render_track(*i, id, heights[idx], cx)
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                        }
                     },
                 ))
                     .child(floating_scrollbar(
@@ -420,24 +448,35 @@ impl Render for PlaylistsPage {
     }
 }
 
-fn build_rows(library: &LibraryState) -> (Vec<PlaylistsRows>, Vec<Pixels>) {
+fn build_rows(
+    library: &LibraryState,
+    selected: Option<PlaylistId>,
+) -> (Vec<PlaylistsRows>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();
 
     rows.push(PlaylistsRows::Header);
     heights.push(px(120.0));
 
-    if !library.tracks.is_empty() {
-        let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
+    if let Some(pid) = selected {
+        if let Some(playlist) = library.playlists.get(&pid) {
+            if !playlist.tracks.is_empty() {
+                let mut tracks: Vec<_> = playlist
+                    .tracks
+                    .iter()
+                    .filter_map(|id| library.tracks.get(id))
+                    .collect();
 
-        sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
+                tracks.sort_by(|a, b| a.title.cmp(&b.title));
 
-        rows.push(PlaylistsRows::TrackTableHeader);
-        heights.push(px(40.0));
+                rows.push(PlaylistsRows::TrackTableHeader);
+                heights.push(px(40.0));
 
-        for (i, track) in sorted_tracks.iter().enumerate() {
-            rows.push(PlaylistsRows::TrackRow(i + 1, track.id));
-            heights.push(px(60.0));
+                for (i, track) in tracks.iter().enumerate() {
+                    rows.push(PlaylistsRows::TrackRow(i + 1, track.id));
+                    heights.push(px(60.0));
+                }
+            }
         }
     }
 

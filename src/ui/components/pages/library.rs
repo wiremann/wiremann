@@ -441,6 +441,7 @@ impl Render for LibraryPage {
 
             self.rows = Rc::new(rows);
             self.heights = Rc::new(heights);
+            self.last_fp = combined_fp;
             self.grid_cols = cols;
         }
 

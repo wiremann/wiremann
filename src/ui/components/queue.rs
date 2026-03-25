@@ -5,9 +5,9 @@ use crate::{controller::Controller, library::Track};
 use ahash::AHashMap;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, AppContext, Context, Entity, InteractiveElement, IntoElement, ObjectFit, ParentElement,
-    Render, ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, uniform_list,
+    div, img, px, uniform_list, App, AppContext, Context, Entity,
+    InteractiveElement, IntoElement, ObjectFit, ParentElement, Render,
+    ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -270,11 +270,11 @@ impl Render for Queue {
                         })
                         .collect()
                 })
-                .w_full()
-                .h_full()
-                .flex()
-                .flex_col()
-                .track_scroll(&scroll_handle),
+                    .w_full()
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .track_scroll(&scroll_handle),
             )
     }
 }

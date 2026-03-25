@@ -1,24 +1,26 @@
 use crate::controller::Controller;
 use crate::ui::components;
 use crate::ui::components::controlbar::ControlBar;
+use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use components::{
-    Page,
     image_cache::ImageCache,
     pages::{library::LibraryPage, player::PlayerPage},
     titlebar::Titlebar,
+    Page,
 };
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement,
-    Render, Styled, Window, div,
+    div, AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement,
+    ParentElement, Render, Styled, Window,
 };
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
     pub player_page: Entity<PlayerPage>,
     pub library_page: Entity<LibraryPage>,
+    pub playlists_page: Entity<PlaylistsPage>,
 }
 
 impl Wiremann {
@@ -50,7 +52,7 @@ impl Wiremann {
                 }
             },
         )
-        .detach();
+            .detach();
 
         cx.subscribe(
             &playback_slider_state,
@@ -76,7 +78,7 @@ impl Wiremann {
                 }
             },
         )
-        .detach();
+            .detach();
 
         cx.set_global(Theme::default());
         cx.set_global(Page::Player);
@@ -86,6 +88,7 @@ impl Wiremann {
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
+        let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
 
@@ -93,6 +96,7 @@ impl Wiremann {
             titlebar,
             player_page,
             library_page,
+            playlists_page,
         }
     }
 }
@@ -113,6 +117,7 @@ impl Render for Wiremann {
             .child(match cx.global::<Page>() {
                 Page::Player => div().w_full().h_full().child(self.player_page.clone()),
                 Page::Library => div().w_full().h_full().child(self.library_page.clone()),
+                Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
                 _ => div(),
             })
     }
