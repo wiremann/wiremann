@@ -1,20 +1,20 @@
 use crate::{
-    controller::Controller,
     controller::state::PlaybackStatus,
+    controller::Controller,
     ui::{
         components::controlbar::ControlBar,
         components::icons::{Icon, Icons},
         components::image_cache::ImageCache,
         components::queue::Queue,
-        components::scrollbar::{RightPad, floating_scrollbar},
+        components::scrollbar::{floating_scrollbar, RightPad},
         theme::Theme,
     },
 };
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, AppContext, Context, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px,
+    div, img, px, App, AppContext, Context, Entity, FontWeight,
+    InteractiveElement, IntoElement, ObjectFit, ParentElement, Render,
+    StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window,
 };
 
 #[derive(Clone)]
@@ -245,7 +245,7 @@ impl Render for PlayerPage {
             .child(if *show_queue.read(cx) {
                 div()
                     .h_full()
-                    .w_80()
+                    .w_1_4()
                     .flex_shrink_0()
                     .flex()
                     .flex_col()
