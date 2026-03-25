@@ -455,49 +455,53 @@ impl Render for PlaylistsPage {
                     )
             )
             .child(
-                div().w_full().h_full().flex().flex_grow().child(vlist(
-                    cx.entity(),
-                    "playlists_main",
-                    heights.clone(),
-                    main_scroll_handle,
-                    {
-                        let selected = selected.clone();
-                        move |_this, range, _, cx| {
-                            let len = rows.len();
+                if selected.read(cx).is_some() {
+                    div().w_full().h_full().flex().flex_grow().child(vlist(
+                        cx.entity(),
+                        "playlists_main",
+                        heights.clone(),
+                        main_scroll_handle,
+                        {
+                            let selected = selected.clone();
+                            move |_this, range, _, cx| {
+                                let len = rows.len();
 
-                            let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                            let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                                let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                                let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                            let thumb_track_ids: Vec<TrackId> = (start..end)
-                                .filter_map(|idx| match &rows[idx] {
-                                    PlaylistsRows::TrackRow(_, id) => Some(*id),
-                                    _ => None,
-                                })
-                                .collect();
+                                let thumb_track_ids: Vec<TrackId> = (start..end)
+                                    .filter_map(|idx| match &rows[idx] {
+                                        PlaylistsRows::TrackRow(_, id) => Some(*id),
+                                        _ => None,
+                                    })
+                                    .collect();
 
-                            controller.request_track_thumbnails(&thumb_track_ids, cx);
+                                controller.request_track_thumbnails(&thumb_track_ids, cx);
 
-                            range
-                                .map(|idx| match &rows[idx] {
-                                    PlaylistsRows::Header => Self::render_header(heights[idx], selected.read(cx).clone(), cx),
+                                range
+                                    .map(|idx| match &rows[idx] {
+                                        PlaylistsRows::Header => Self::render_header(heights[idx], selected.read(cx).clone(), cx),
 
-                                    PlaylistsRows::TrackTableHeader => {
-                                        Self::render_track_table_header(heights[idx], cx)
-                                    }
+                                        PlaylistsRows::TrackTableHeader => {
+                                            Self::render_track_table_header(heights[idx], cx)
+                                        }
 
-                                    PlaylistsRows::TrackRow(i, id) => {
-                                        Self::render_track(*i, id, heights[idx], cx)
-                                    }
-                                })
-                                .collect::<Vec<_>>()
-                        }
-                    },
-                ))
-                    .child(floating_scrollbar(
-                        "queue_scrollbar",
-                        self.main_scroll_handle.clone(),
-                        RightPad::Pad,
+                                        PlaylistsRows::TrackRow(i, id) => {
+                                            Self::render_track(*i, id, heights[idx], cx)
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                            }
+                        },
                     ))
+                        .child(floating_scrollbar(
+                            "queue_scrollbar",
+                            self.main_scroll_handle.clone(),
+                            RightPad::Pad,
+                        ))
+                } else {
+                    div().size_full().flex().items_center().justify_center().text_base().text_color(theme.text_muted).child("Select a playlist to view...")
+                }
             )
     }
 }
