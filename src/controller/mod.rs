@@ -605,6 +605,8 @@ impl Controller {
                 this.queue.tracks.clone_from(&playlist.tracks);
                 this.queue.order = (0..playlist.tracks.len()).collect();
                 this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
 
                 cx.notify();
             }

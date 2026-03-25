@@ -159,13 +159,7 @@ impl PlaylistsPage {
                                                 let controller = cx.global::<Controller>().clone();
 
                                                 controller.load_playlist(id, cx);
-                                                if controller.state.read(cx).playback.shuffling {
-                                                    // TODO: fix this abomination.
-                                                    controller.set_shuffle(cx);
-                                                    controller.set_shuffle(cx);
-                                                } else {
-                                                    controller.set_shuffle(cx);
-                                                }
+                                                controller.set_shuffle(cx);
 
                                                 *cx.global_mut::<Page>() = Page::Player;
                                             }
