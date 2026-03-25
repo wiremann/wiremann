@@ -5,7 +5,7 @@ use crate::ui::components::scrollbar::{floating_scrollbar, RightPad};
 use crate::ui::components::virtual_list::vlist;
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
 use crate::ui::theme::Theme;
-use gpui::{div, px, Context, IntoElement, Pixels, Render, ScrollHandle, UniformListScrollHandle, Window};
+use gpui::{div, px, Context, IntoElement, ParentElement, Pixels, Render, ScrollHandle, Styled, UniformListScrollHandle, Window};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -61,18 +61,6 @@ impl Render for PlaylistsPage {
         let width = window.bounds().size.width;
         let tile = 256.0;
 
-        let cols = ((width.to_f64() / tile) as usize).max(1);
-
-        if cols != self.grid_cols || combined_fp != self.last_fp {
-            let library = &state.library;
-
-            let (rows, heights) = build_rows(library, cols);
-
-            self.rows = Rc::new(rows);
-            self.heights = Rc::new(heights);
-            self.grid_cols = cols;
-        }
-
         let rows = self.rows.clone();
         let heights = self.heights.clone();
 
@@ -86,7 +74,7 @@ impl Render for PlaylistsPage {
                 cx.entity(),
                 "library",
                 heights.clone(),
-                scroll_handle,
+                main_scroll_handle,
                 move |_this, range, _, cx| {
                     let len = rows.len();
 
@@ -95,7 +83,7 @@ impl Render for PlaylistsPage {
 
                     let thumb_track_ids: Vec<TrackId> = (start..end)
                         .filter_map(|idx| match &rows[idx] {
-                            crate::ui::components::pages::library::LibraryRow::TrackRow(_, id) => Some(*id),
+                            PlaylistsRows::TrackRow(_, id) => Some(*id),
                             _ => None,
                         })
                         .collect();
@@ -104,21 +92,17 @@ impl Render for PlaylistsPage {
 
                     range
                         .map(|idx| match &rows[idx] {
-                            crate::ui::components::pages::library::LibraryRow::Header(kind) => Self::render_header(kind, heights[idx], cx),
+                            PlaylistsRows::Header => Self::render_header(heights[idx], cx),
 
-                            crate::ui::components::pages::library::LibraryRow::PlaylistGridRow(ids) => {
-                                Self::render_playlist_grid(ids, heights[idx], cx)
-                            }
-
-                            crate::ui::components::pages::library::LibraryRow::TrackTableHeader => {
+                            PlaylistsRows::TrackTableHeader => {
                                 Self::render_track_table_header(heights[idx], cx)
                             }
 
-                            crate::ui::components::pages::library::LibraryRow::TrackRow(i, id) => {
+                            PlaylistsRows::TrackRow(i, id) => {
                                 Self::render_track(*i, id, heights[idx], cx)
                             }
 
-                            crate::ui::components::pages::library::LibraryRow::Empty(kind) => match kind {
+                            PlaylistsRows::Empty => match kind {
                                 crate::ui::components::pages::library::HeaderKind::Playlists => div()
                                     .w_full()
                                     .h_48()
@@ -153,60 +137,32 @@ impl Render for PlaylistsPage {
             ))
             .child(floating_scrollbar(
                 "queue_scrollbar",
-                self.scroll_handle.clone(),
+                self.main_scroll_handle.clone(),
                 RightPad::Pad,
             ))
     }
 }
 
-fn build_rows(library: &LibraryState, cols: usize) -> (Vec<crate::ui::components::pages::library::LibraryRow>, Vec<Pixels>) {
+fn build_rows(library: &LibraryState) -> (Vec<PlaylistsRows>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();
 
-    rows.push(crate::ui::components::pages::library::LibraryRow::Header(crate::ui::components::pages::library::HeaderKind::Playlists));
-    heights.push(px(60.0));
-
-    if !library.playlists.is_empty() {
-        let mut chunk = Vec::with_capacity(cols);
-
-        for pid in library.playlists.keys() {
-            chunk.push(*pid);
-
-            if chunk.len() == cols {
-                rows.push(crate::ui::components::pages::library::LibraryRow::PlaylistGridRow(chunk));
-                heights.push(px(280.0));
-                chunk = Vec::with_capacity(cols);
-            }
-        }
-
-        if !chunk.is_empty() {
-            rows.push(crate::ui::components::pages::library::LibraryRow::PlaylistGridRow(chunk));
-            heights.push(px(280.0));
-        }
-    } else {
-        rows.push(crate::ui::components::pages::library::LibraryRow::Empty(crate::ui::components::pages::library::HeaderKind::Playlists));
-        heights.push(px(192.0));
-    }
-
-    rows.push(crate::ui::components::pages::library::LibraryRow::Header(crate::ui::components::pages::library::HeaderKind::Tracks));
-    heights.push(px(60.0));
+    rows.push(PlaylistsRows::Header);
+    heights.push(px(120.0));
 
     if !library.tracks.is_empty() {
         let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
 
         sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
 
-        rows.push(crate::ui::components::pages::library::LibraryRow::TrackTableHeader);
+        rows.push(PlaylistsRows::TrackTableHeader);
         heights.push(px(40.0));
 
         for (i, track) in sorted_tracks.iter().enumerate() {
-            rows.push(crate::ui::components::pages::library::LibraryRow::TrackRow(i + 1, track.id));
+            rows.push(PlaylistsRows::TrackRow(i + 1, track.id));
             heights.push(px(60.0));
         }
-    } else {
-        rows.push(crate::ui::components::pages::library::LibraryRow::Empty(crate::ui::components::pages::library::HeaderKind::Tracks));
-        heights.push(px(192.0));
-    }
+    } 
 
     (rows, heights)
 }
