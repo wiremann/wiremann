@@ -8,7 +8,7 @@ use crate::ui::components::virtual_list::vlist;
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
-use gpui::{div, img, px, uniform_list, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window};
+use gpui::{div, img, px, rems, uniform_list, App, AppContext, Context, Div, Entity, FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -65,11 +65,10 @@ impl PlaylistsPage {
                 .flex()
                 .w_full()
                 .h(height)
-                .bg(theme.bg_queue)
                 .child(
                     div()
                         .size(height)
-                        .p_12()
+                        .p_6()
                         .child(
                             match thumbnail {
                                 Some(image) => div().size_full().child(
@@ -88,11 +87,11 @@ impl PlaylistsPage {
                         .h(height)
                         .flex()
                         .flex_col()
-                        .px_10()
-                        .py_12()
-                        .gap_y_4()
+                        .justify_end()
+                        .px_2()
+                        .py_4()
                         .child(
-                            div().text_xl().text_color(theme.text_primary).child(playlist.name.clone())
+                            div().text_size(rems(3.2)).font_weight(FontWeight::BLACK).truncate().text_ellipsis().text_color(theme.text_primary).child(playlist.name.clone())
                         )
                         .child(
                             div().text_base().text_color(theme.text_secondary)
@@ -111,6 +110,7 @@ impl PlaylistsPage {
             .h(height)
             .w_full()
             .flex()
+            .px_3()
             .items_center()
             .text_xs()
             .font_weight(FontWeight::NORMAL)
@@ -181,6 +181,7 @@ impl PlaylistsPage {
             div()
                 .h(height)
                 .py_1()
+                .px_4()
                 .border_b_1()
                 .border_color(theme.white_05)
                 .child(
@@ -360,7 +361,6 @@ impl Render for PlaylistsPage {
                                 let playlists = playlists.clone();
                                 move |range, _, cx| {
                                     range.map(|i| {
-                                        dbg!(len);
                                         let playlist = &playlists[i];
 
                                         div()
@@ -401,7 +401,7 @@ impl Render for PlaylistsPage {
                     ))
             )
             .child(
-                div().w_full().h_full().flex().flex_grow().px_4().child(vlist(
+                div().w_full().h_full().flex().flex_grow().child(vlist(
                     cx.entity(),
                     "playlists_main",
                     heights.clone(),
@@ -456,7 +456,7 @@ fn build_rows(
     let mut heights = Vec::new();
 
     rows.push(PlaylistsRows::Header);
-    heights.push(px(120.0));
+    heights.push(px(240.0));
 
     if let Some(pid) = selected {
         if let Some(playlist) = library.playlists.get(&pid) {
