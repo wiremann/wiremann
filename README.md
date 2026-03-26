@@ -3,7 +3,7 @@
     <img src="https://img.shields.io/github/commit-activity/m/wiremann/wiremann?style=for-the-badge" alt="commits"/>
     <img src="https://img.shields.io/github/stars/wiremann/wiremann?style=for-the-badge" alt="stars"/>
     <img src="https://img.shields.io/github/watchers/wiremann/wiremann.svg?style=for-the-badge" alt="watchers"/>
-    <img src="https://img.shields.io/github/license/wiremann/wiremann?style=for-the-badge" alt="license"/>
+    <img src="https://img.shields.io/github/license/wiremann/wiremann.svg?style=for-the-badge" alt="license"/>
 </p>
 
 # Wiremann
