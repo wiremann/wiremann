@@ -2,6 +2,7 @@
 name = "wiremann"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/wiremann/wiremann"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -38,12 +39,17 @@ codegen-units = 256
 lto = false
 panic = "abort"
 
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [package.metadata.bundle]
 name = "Wiremann"
 identifier = "com.anantnrg.wiremann"
 icon = ["assets/logos/logo.png"]
-version = "0.1.0-alpha"
-resources = ["assets"]
+version = "0.1.0"
+resources = []
 copyright = "Copyright (c) Anant Narayan"
 category = "Music"
 short_description = "A fast native music player built with Rust."
