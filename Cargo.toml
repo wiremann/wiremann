@@ -41,9 +41,9 @@ panic = "abort"
 [package.metadata.bundle]
 name = "Wiremann"
 identifier = "com.anantnrg.wiremann"
-icon = ["logos/logo.png"]
+icon = ["assets/logos/logo.png"]
 version = "0.1.0-alpha"
-resources = []
+resources = ["assets"]
 copyright = "Copyright (c) Anant Narayan"
 category = "Music"
 short_description = "A fast native music player built with Rust."
