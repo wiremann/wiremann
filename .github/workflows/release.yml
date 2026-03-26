@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            archive: zip
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+            archive: tar.gz
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: ""
+            archive: tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Optional: cross (mainly useful for linux cross builds)
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (reduce size)
+        run: |
+          strip target/${{ matrix.target }}/release/wiremann${{ matrix.ext }} || true
+
+      - name: Prepare package
+        run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/wiremann${{ matrix.ext }} dist/
+
+      - name: Compress
+        run: |
+          cd dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            zip wiremann-${{ matrix.target }}.zip wiremann${{ matrix.ext }}
+          else
+            tar -czf wiremann-${{ matrix.target }}.tar.gz wiremann${{ matrix.ext }}
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            **/*.zip
+            **/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
