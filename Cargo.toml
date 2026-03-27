@@ -3,6 +3,7 @@ name = "wiremann"
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/wiremann/wiremann"
+authors = ["Anant Narayan"]
 
 [dependencies]
 anyhow = "1.0.102"
@@ -53,3 +54,9 @@ resources = []
 copyright = "Copyright (c) Anant Narayan"
 category = "Music"
 short_description = "A fast native music player built with Rust."
+
+[package.metadata.wix]
+upgrade-guid = "B19FE058-B27E-4809-9ECC-BA29026F65ED"
+path-guid = "1A4BBFB0-451C-440C-9C43-A8170F2BF9CA"
+license = false
+eula = false
