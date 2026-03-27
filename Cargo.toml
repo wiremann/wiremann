@@ -32,6 +32,9 @@ lru = "0.16.3"
 fast_image_resize = "6.0.0"
 rfd = "0.17.2"
 
+[build-dependencies]
+winres = "0.1.12"
+
 [profile.dev]
 opt-level = 0
 debug = 0
