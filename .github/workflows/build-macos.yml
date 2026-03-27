@@ -18,6 +18,9 @@ jobs:
           - target: x86_64-apple-darwin
             arch: x86_64
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
