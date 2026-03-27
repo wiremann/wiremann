@@ -64,6 +64,7 @@ jobs:
           tag_name: latest-unstable
           name: Latest Unstable Build
           prerelease: true
+          allow_update: true
           files: dist/wiremann-windows-${{ matrix.arch }}/wiremann.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
