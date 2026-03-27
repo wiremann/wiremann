@@ -85,19 +85,24 @@ jobs:
           </plist>
           EOF
 
-      - name: Create portable ZIP
+      - name: Create portable app directory
         run: |
-          ditto -c -k --keepParent Wiremann.app Wiremann-${{ matrix.arch }}-portable.zip
+          mkdir -p dist
+          cp -r Wiremann.app dist/Wiremann-${{ matrix.arch }}.app
 
-      - name: Upload portable artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload portable to Latest Unstable (main and PRs)
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
         with:
-          name: wiremann-macos-${{ matrix.arch }}-portable
-          path: Wiremann-${{ matrix.arch }}-portable.zip
-          retention-days: 30
+          tag_name: latest-unstable
+          name: Latest Unstable Build
+          prerelease: true
+          files: dist/Wiremann-${{ matrix.arch }}.app/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create DMG installer (only for tags and PRs)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
+      - name: Create DMG (only for semantic version tags)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           mkdir -p dmg_temp
           cp -r Wiremann.app dmg_temp/Wiremann.app
@@ -105,16 +110,19 @@ jobs:
           hdiutil create -volname "Wiremann" -srcfolder dmg_temp -ov -format UDZO Wiremann-${{ matrix.arch }}.dmg
           rm -rf dmg_temp
 
-      - name: Upload DMG installer artifact
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+      - name: Upload to semantic version release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
         with:
-          name: wiremann-macos-${{ matrix.arch }}-dmg
-          path: Wiremann-${{ matrix.arch }}.dmg
-          retention-days: 30
+          files: |
+            dist/Wiremann-${{ matrix.arch }}.app
+            Wiremann-${{ matrix.arch }}.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cleanup build artifacts
+      - name: Cleanup
         if: always()
         run: |
           rm -rf Wiremann.app
+          rm -rf dist
           rm -rf target
