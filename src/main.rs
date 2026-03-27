@@ -1,5 +1,5 @@
 #![warn(clippy::pedantic)]
-
+#![windows_subsystem = "windows"]
 pub mod app;
 pub mod audio;
 mod cacher;
