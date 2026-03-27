@@ -97,10 +97,11 @@ jobs:
           tag_name: latest-unstable
           name: Latest Unstable Build
           prerelease: true
+          allow_update: true
           files: dist/Wiremann-${{ matrix.arch }}.app/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          
       - name: Create DMG (only for semantic version tags)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
