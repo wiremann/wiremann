@@ -96,7 +96,8 @@ jobs:
           path: Wiremann-${{ matrix.arch }}-portable.zip
           retention-days: 30
 
-      - name: Create DMG installer
+      - name: Create DMG installer (only for tags and PRs)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
         run: |
           mkdir -p dmg_temp
           cp -r Wiremann.app dmg_temp/Wiremann.app
@@ -105,6 +106,7 @@ jobs:
           rm -rf dmg_temp
 
       - name: Upload DMG installer artifact
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: wiremann-macos-${{ matrix.arch }}-dmg

@@ -68,25 +68,28 @@ jobs:
           path: dist/wiremann-windows-${{ matrix.arch }}-portable.tar.gz
           retention-days: 30
 
-      - name: Install Inno Setup
+      - name: Install Inno Setup (only for tags and PRs)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
         run: choco install innosetup -y --no-progress
 
       - name: Wait for Inno Setup
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
         run: Start-Sleep -Seconds 5
 
       - name: Build installer (x86_64)
-        if: matrix.arch == 'x86_64'
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request') && matrix.arch == 'x86_64'
         shell: cmd
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q "package\inno\Wiremann_x86_64.iss"
 
       - name: Build installer (aarch64)
-        if: matrix.arch == 'aarch64'
+        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request') && matrix.arch == 'aarch64'
         shell: cmd
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q "package\inno\Wiremann_aarch64.iss"
 
       - name: Upload installer artifact
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: wiremann-windows-${{ matrix.arch }}-installer
