@@ -47,6 +47,20 @@ fn read_full(path: &Path) -> Result<(Track, Option<Box<[u8]>>), ScannerError> {
 
     let artist = artist.unwrap_or_else(|| "Unknown Artist".to_string());
     let album = album.unwrap_or_else(|| "Unknown Album".to_string());
+    let duration = probed
+        .format
+        .default_track()
+        .and_then(|track| {
+            let params = &track.codec_params;
+
+            match (params.n_frames, params.sample_rate) {
+                (Some(frames), Some(rate)) if rate > 0 => {
+                    Some(frames / rate as u64)
+                }
+                _ => None,
+            }
+        })
+        .unwrap_or(0);
 
     let sources = {
         let size = file_meta.len();
@@ -70,7 +84,47 @@ fn read_full(path: &Path) -> Result<(Track, Option<Box<[u8]>>), ScannerError> {
         duration,
         image_id: None,
     };
+
+    Ok((track, image))
 }
+
+fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
+    let mut hint = Hint::new();
+
+    if let Some(ext) = path.extension().and_then(|this| this.to_str()) {
+        hint.with_extension(ext);
+    }
+
+    let source = File::open(path)?;
+    let mss = MediaSourceStream::new(Box::new(source), Default::default());
+    let mut probed = symphonia::default::get_probe().format(
+        &hint,
+        mss,
+        &FormatOptions::default(),
+        &MetadataOptions::default(),
+    )?;
+
+    let mut image: Option<Box<[u8]>> = None;
+
+    if let Some(meta) = probed.metadata.get().as_ref().and_then(|m| m.current()) {
+        if image.is_none() {
+            if let Some(pic) = meta.visuals().first() {
+                *image = Some(pic.data.clone());
+            }
+        }
+    }
+
+    if let Some(meta) = probed.format.metadata().current() {
+        if image.is_none() {
+            if let Some(pic) = meta.visuals().first() {
+                *image = Some(pic.data.clone());
+            }
+        }
+    }
+
+    Ok(image)
+}
+
 
 fn apply_metadata(
     meta: &MetadataRevision,
