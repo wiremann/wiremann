@@ -45,6 +45,8 @@ impl Scanner {
         let scanner = Scanner {
             tx: event_tx,
             rx: cmd_rx,
+
+            inflight_images: DashSet::new(),
         };
 
         (scanner, cmd_tx, event_rx)

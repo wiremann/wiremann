@@ -5,7 +5,7 @@ use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{Receiver, Sender, select, tick};
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use gpui::RenderImage;
 use image::Frame;
 use ron::ser::PrettyConfig;
@@ -14,11 +14,12 @@ use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
+use walkdir::WalkDir;
 
 #[derive(Clone)]
 pub struct Cacher {
@@ -763,6 +764,30 @@ impl Cacher {
                 }
             }
         });
+    }
+
+    fn build_cached_thumbnails_index(base: &Path) -> HashSet<ImageId> {
+        let mut set = HashSet::new();
+
+        let images_dir = base.join("images");
+
+        for entry in WalkDir::new(images_dir)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+        {
+            if let Some(name) = entry.file_name().to_str() && name.ends_with("_thumb.bgra.zstd") {
+                if let Some((hex_part, _rest)) = name.split_once('_') {
+                    let mut arr = [0u8; 16];
+
+                    if hex::decode_to_slice(hex_part, &mut arr).is_ok() {
+                        set.insert(ImageId(arr));
+                    }
+                }
+            }
+        }
+
+        set
     }
 }
 
