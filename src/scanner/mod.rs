@@ -11,11 +11,10 @@ use crate::{
 use crossbeam_channel::{select, tick, Receiver, Sender};
 use fast_image_resize as fr;
 use gpui::RenderImage;
-use image::{imageops, DynamicImage, EncodableLayout, Frame, ImageReader, RgbaImage};
+use image::{imageops, DynamicImage, EncodableLayout, Frame, RgbaImage};
 use lofty::prelude::*;
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
-use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{path::PathBuf, time::UNIX_EPOCH};
@@ -378,9 +377,7 @@ impl Scanner {
 }
 
 fn render_album_art(bytes: &[u8], is_thumbnail: bool) -> Result<Arc<RenderImage>, ScannerError> {
-    let img = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()?
-        .decode()?;
+    let img = image::load_from_memory(bytes)?;
 
     let rgba = img.into_rgba8();
 
