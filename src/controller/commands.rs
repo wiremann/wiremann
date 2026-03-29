@@ -22,7 +22,7 @@ pub enum ScannerCommand {
         path: PathBuf,
         track_id: TrackId,
     },
-    GetThumbnail(HashSet<(TrackId, PathBuf)>, ImageKind),
+    GetThumbnails(HashSet<(TrackId, PathBuf)>, ImageKind),
 
     ScanTrack(PathBuf),
     ScanFolder {

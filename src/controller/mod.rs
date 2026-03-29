@@ -218,13 +218,6 @@ impl Controller {
                     }
                     cx.notify();
                 });
-                self.request_playlist_thumbnails(
-                    &modified_playlists
-                        .iter()
-                        .copied()
-                        .collect::<Vec<PlaylistId>>(),
-                    cx,
-                );
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
@@ -239,7 +232,6 @@ impl Controller {
                     }
                     cx.notify()
                 });
-                self.request_playlist_thumbnails(&[*pid], cx);
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
@@ -301,7 +293,7 @@ impl Controller {
 
                 cx.notify(view.entity_id());
             }
-            ScannerEvent::InsertThumbnails(thumbnails) => {
+            ScannerEvent::InsertThumbnails(thumbnails, kind) => {
                 for (id, image) in thumbnails {
                     let width = image.size(0).width.0.cast_unsigned();
                     let height = image.size(0).height.0.cast_unsigned();
@@ -309,7 +301,7 @@ impl Controller {
                         let image = image.to_vec();
                         let _ = self.cacher_tx.send(CacherCommand::WriteImage {
                             id: *id,
-                            kind: ImageKind::Thumbnail,
+                            kind: *kind,
                             width,
                             height,
                             image,
@@ -373,6 +365,29 @@ impl Controller {
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::MetadataScanFinished => {
+                let tracks = self.state.read(cx).library.tracks;
+
+                let to_request: HashSet<(TrackId, PathBuf)> = tracks
+                    .iter()
+                    .filter(|(_, track)| track.image_id.is_none())
+                    .filter_map(|(id, track)| {
+                        track
+                            .get_valid_source()
+                            .and_then(|src| Some(src.path.clone()))
+                            .map(|path| (*id, path))
+                    })
+                    .collect();
+                let _ = self.scanner_tx.send(ScannerCommand::GetThumbnails(to_request, ImageKind::ThumbnailSmall));
+                
+                // self.request_playlist_thumbnails(
+                //     &modified_playlists
+                //         .iter()
+                //         .copied()
+                //         .collect::<Vec<PlaylistId>>(),
+                //     cx,
+                // );
             }
         }
         Ok(())

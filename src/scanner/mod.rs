@@ -85,7 +85,7 @@ impl Scanner {
                         self.enqueue_track(path, &meta_tx);
                     }
                 }
-                ScannerCommand::GetThumbnail(images, kind) => {
+                ScannerCommand::GetThumbnails(images, kind) => {
                     let cached_thumbnails_index = Arc::new(Cacher::build_cached_thumbnails_index(&Cacher::get_base_dir(), kind));
                     for image in images {
                         let _ = thumb_tx.send(ScanJob::Thumbnail(image.0, image.1, kind, cached_thumbnails_index.clone()));
@@ -146,7 +146,7 @@ impl Scanner {
                                             );
                                         }
 
-                                        if scan_jobs.fetch_sub(1, Ordering::Relaxed) == 1 {
+                                        if scan_jobs.fetch_sub(1, Ordering::AcqRel) == 1 {
                                             let _ = events_tx.send(ScannerEvent::MetadataScanFinished);
                                         }
                                     }
@@ -176,10 +176,12 @@ impl Scanner {
             let ticker = ticker.clone();
             let thumb_rx = thumb_rx.clone();
             let seen_images = self.seen_images.clone();
+            let mut resizer = fr::Resizer::new();
 
             std::thread::spawn(move || {
                 let mut image_batch = HashMap::with_capacity(16);
                 let mut lookup_batch = HashMap::with_capacity(16);
+                let mut last_kind;
 
                 loop {
                     select! {
@@ -187,14 +189,14 @@ impl Scanner {
                             if let Ok(ScanJob::Thumbnail(id, path, kind, cached_images)) = job {
                                 if let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
                                     lookup_batch.insert(id, hash);
+                                    last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
-                                        if let Ok(image) = render_album_art(&bytes, true) {
+                                        if let Ok(image) = render_album_art(&bytes, kind, &mut resizer) {
                                             image_batch.insert(hash, image);
-                                            lookup_batch.insert(id, hash);
 
                                             if image_batch.len() >= 16 {
                                                 let _ = events_tx.send(
-                                                    ScannerEvent::InsertThumbnails(std::mem::take(&mut image_batch))
+                                                    ScannerEvent::InsertThumbnails(std::mem::take(&mut image_batch), kind)
                                                 );
                                                 let _ = events_tx.send(ScannerEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
                                             }
@@ -207,7 +209,7 @@ impl Scanner {
                         recv(ticker) -> _ => {
                             if !image_batch.is_empty() || !lookup_batch.is_empty() {
                                 let _ = events_tx.send(
-                                    ScannerEvent::InsertThumbnails(std::mem::take(&mut image_batch))
+                                    ScannerEvent::InsertThumbnails(std::mem::take(&mut image_batch), last_kind)
                                 );
                                 let _ = events_tx.send(ScannerEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
                             }
@@ -222,6 +224,7 @@ impl Scanner {
         let events_tx = self.tx.clone();
 
         std::thread::spawn(move || {
+            let mut resizer = fr::Resizer::new();
             while let Ok(ScanJob::AlbumArt(id, path)) = album_art_rx.recv() {
                 match metadata::read_album_art(&path) {
                     Ok(Some(image)) => {
@@ -229,7 +232,7 @@ impl Scanner {
                             let path = get_cached_image_path(hash, ImageKind::AlbumArt);
 
                             if !path.exists() {
-                                if let Ok(album_art) = render_album_art(&image, false) {
+                                if let Ok(album_art) = render_album_art(&image, ImageKind::AlbumArt, &mut resizer) {
                                     let _ = events_tx
                                         .send(ScannerEvent::InsertAlbumArt(hash, album_art));
                                     let _ = events_tx.send(ScannerEvent::UpdateImageLookup(
@@ -496,9 +499,7 @@ fn render_playlist_thumbnail(
         None
     };
 
-    for px in <[u8] as AsMut<[u8]>>::as_mut(&mut image).chunks_exact_mut(4) {
-        px.swap(0, 2);
-    }
+    rgba_to_bgra_inplace(image.as_mut()).ok();
 
     let frame = Frame::new(image);
 

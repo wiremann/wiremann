@@ -1,3 +1,4 @@
+use crate::cacher::ImageKind;
 use crate::controller::state::{AppState, PlaybackStatus};
 use crate::library::playlists::{Playlist, PlaylistId};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
@@ -25,7 +26,7 @@ pub enum ScannerEvent {
     InsertPlaylist(Playlist),
 
     InsertAlbumArt(ImageId, Arc<RenderImage>),
-    InsertThumbnails(HashMap<ImageId, Arc<RenderImage>>),
+    InsertThumbnails(HashMap<ImageId, Arc<RenderImage>>, ImageKind),
     InsertPlaylistThumbnail(PlaylistId, ImageId, Arc<RenderImage>),
     UpdateImageLookup(HashMap<TrackId, ImageId>),
 
