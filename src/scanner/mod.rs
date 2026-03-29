@@ -1,6 +1,6 @@
 pub mod metadata;
 
-use crate::cacher::ImageKind;
+use crate::cacher::{Cacher, ImageKind};
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
 use crate::library::{ImageId, Track, TrackSource};
 use crate::{
@@ -83,6 +83,25 @@ impl Scanner {
                     if inflight_tracks.insert(track_id) {
                         self.enqueue_track(path, &meta_tx);
                     }
+                }
+                ScannerCommand::GetThumbnail(images, kind) => {
+                    let cached_thumbnails_index = Arc::new(Cacher::build_cached_thumbnails_index(&Cacher::get_base_dir(), kind));
+                    match kind {
+                        ImageKind::ThumbnailSmall => {
+                            for image in images {
+                                let _ = thumb_tx.send(ScanJob::SmallThumbnail(image.0, image.1, cached_thumbnails_index.clone()));
+                                self.album_art_scan_jobs.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        ImageKind::ThumbnailLarge => {
+                            for image in images {
+                                let _ = thumb_tx.send(ScanJob::LargeThumbnail(image.0, image.1, cached_thumbnails_index.clone()));
+                                self.album_art_scan_jobs.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        _ => {}
+                    }
+                    
                 }
                 ScannerCommand::ScanFolder { path, tracks } => {
                     self.enqueue_folder(&tracks, &path, &meta_tx)?;

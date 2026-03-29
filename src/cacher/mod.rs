@@ -51,6 +51,7 @@ struct CacheFile<T> {
     payload: T,
 }
 
+#[derive(Copy, Clone)]
 pub enum ImageKind {
     ThumbnailSmall,
     ThumbnailLarge,
@@ -323,10 +324,7 @@ impl Cacher {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
 
-        let base_dir = dirs::audio_dir()
-            .unwrap_or_default()
-            .join("wiremann")
-            .join("cache");
+        let base_dir = Self::get_base_dir();
         fs::create_dir_all(base_dir.clone()).expect("failed to create cache directory");
 
         let cacher = Cacher {
@@ -336,6 +334,13 @@ impl Cacher {
         };
 
         (cacher, cmd_tx, event_rx)
+    }
+
+    pub fn get_base_dir() -> PathBuf {
+        dirs::audio_dir()
+            .unwrap_or_default()
+            .join("wiremann")
+            .join("cache")
     }
 
     pub fn run(&self, workers: usize) -> Result<(), CacherError> {
@@ -780,7 +785,7 @@ impl Cacher {
         });
     }
 
-    pub fn build_cached_thumbnails_index(base: &Path) -> HashSet<ImageId> {
+    pub fn build_cached_thumbnails_index(base: &Path, kind: ImageKind) -> HashSet<ImageId> {
         let mut set = HashSet::new();
 
         let images_dir = base.join("images");
@@ -790,7 +795,12 @@ impl Cacher {
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
         {
-            if let Some(name) = entry.file_name().to_str() && name.ends_with("_thumb.bgra.zstd") {
+            let ends_with = match kind {
+                ImageKind::ThumbnailSmall => "_thumb.tmbhs",
+                ImageKind::ThumbnailLarge => "_thumb.tmbhl",
+                _ => continue,
+            };
+            if let Some(name) = entry.file_name().to_str() && name.ends_with(ends_with) {
                 if let Some((hex_part, _rest)) = name.split_once('_') {
                     let mut arr = [0u8; 16];
 
