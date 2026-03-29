@@ -11,6 +11,7 @@ use crate::{
 use crossbeam_channel::{select, tick, Receiver, Sender};
 use dashmap::DashSet;
 use fast_image_resize as fr;
+use garb::bytes::rgba_to_bgra_inplace;
 use gpui::RenderImage;
 use image::{imageops, DynamicImage, EncodableLayout, Frame, GenericImageView, RgbaImage};
 use lofty::prelude::*;
@@ -396,37 +397,42 @@ impl Scanner {
     }
 }
 
-fn render_album_art(bytes: &[u8], kind: ImageKind, resizer: &mut fr::Resizer) -> Result<Arc<RenderImage>, ScannerError> {
+fn render_album_art(
+    bytes: &[u8],
+    kind: ImageKind,
+    resizer: &mut fr::Resizer,
+) -> Result<Arc<RenderImage>, ScannerError> {
     let raw_img = image::load_from_memory(bytes)?;
 
-    let image = if kind == ImageKind::AlbumArt {
-        let bytes = raw_img.as_bytes();
-        let rgba = raw_img.into_rgba8();
-        rgba
-    } else {
-        let (new_w, new_h) = match kind {
-            ImageKind::ThumbnailSmall => (64, 64),
-            ImageKind::ThumbnailLarge => (256, 256),
-            _ => unreachable!()
-        };
+    let image = match kind {
+        ImageKind::AlbumArt => {
+            let mut rgba = raw_img.into_rgba8();
+            rgba_to_bgra_inplace(rgba.as_mut())?;
+            rgba
+        }
+        ImageKind::ThumbnailSmall | ImageKind::ThumbnailLarge => {
+            let (new_w, new_h) = match kind {
+                ImageKind::ThumbnailSmall => (64, 64),
+                ImageKind::ThumbnailLarge => (256, 256),
+                _ => unreachable!(),
+            };
 
-        let mut dst = fr::images::Image::new(new_w, new_h, fr::PixelType::U8x4);
+            let mut dst = fr::images::Image::new(new_w, new_h, fr::PixelType::U8x4);
 
-        resizer.resize(
-            &raw_img,
-            &mut dst,
-            &fr::ResizeOptions::new()
-                .resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)),
-        )?;
+            resizer.resize(
+                &raw_img,
+                &mut dst,
+                &fr::ResizeOptions::new()
+                    .resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)),
+            )?;
 
-        RgbaImage::from_raw(dst.width(), dst.height(), dst.into_vec()).unwrap()
+            let mut buf = dst.into_vec();
+            rgba_to_bgra_inplace(&mut buf)?;
+
+            RgbaImage::from_raw(new_w, new_h, buf).unwrap()
+        }
+        _ => unreachable!(),
     };
-
-    let mut image = image;
-
-    for px in <[u8] as AsMut<[u8]>>::as_mut(&mut image).chunks_exact_mut(4) {
-        px.swap(0, 2);
-    }
 
     let frame = Frame::new(image);
 

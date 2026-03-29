@@ -48,6 +48,8 @@ pub enum ScannerError {
     ImageResizeError(#[from] ResizeError),
     #[error("Symphonia Error occurred: `{0}`")]
     SymphoniaError(#[from] symphonia::core::errors::Error),
+    #[error("Garb Resize Error occurred: `{0}`")]
+    GarbSizeError(#[from] garb::SizeError),
 }
 
 #[derive(Error, Debug)]
