@@ -658,8 +658,8 @@ impl Cacher {
                                 Ok(CacheJob::LoadThumbnails(ids, kind)) => {
                                     for id in ids {
                                         match cacher.read_cached_image(id, &kind) {
-                                            Ok(Some(image)) => {batch.insert(id, image);},
-                                            Ok(None) | Err(_) => {missing.push(id);},
+                                            Ok(Some(image)) => { batch.insert(id, image); },
+                                            Ok(None) | Err(_) => { missing.push(id); },
                                         }
 
                                         if batch.len() >= 16 {
