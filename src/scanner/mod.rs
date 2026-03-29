@@ -29,11 +29,13 @@ pub struct Scanner {
 
     seen_images: Arc<DashSet<ImageId>>,
     meta_scan_jobs: Arc<AtomicUsize>,
+    album_art_scan_jobs: Arc<AtomicUsize>,
 }
 
 enum ScanJob {
     Metadata(TrackSource, Option<PlaylistId>),
-    Thumbnail(TrackId, ImageId, Box<[u8]>, Arc<HashSet<ImageId>>),
+    SmallThumbnail(TrackId, PathBuf, Arc<HashSet<ImageId>>),
+    LargeThumbnail(TrackId, PathBuf, Arc<HashSet<ImageId>>),
     AlbumArt(TrackId, PathBuf),
     PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
 }
@@ -50,6 +52,7 @@ impl Scanner {
 
             seen_images: Arc::new(DashSet::new()),
             meta_scan_jobs: Arc::new(AtomicUsize::new(0)),
+            album_art_scan_jobs: Arc::new(AtomicUsize::new(0)),
         };
 
         (scanner, cmd_tx, event_rx)

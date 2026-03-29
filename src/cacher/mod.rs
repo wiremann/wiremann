@@ -40,7 +40,7 @@ enum CacheJob {
         image: Vec<u8>,
     },
     LoadAppState,
-    LoadThumbnails(HashSet<ImageId>),
+    LoadThumbnails(HashSet<ImageId>, ImageKind),
     LoadAlbumArt(ImageId),
     LoadPlaylistThumbnail(ImageId),
 }
@@ -52,7 +52,8 @@ struct CacheFile<T> {
 }
 
 pub enum ImageKind {
-    Thumbnail,
+    ThumbnailSmall,
+    ThumbnailLarge,
     AlbumArt,
     Playlist,
 }
@@ -375,10 +376,19 @@ impl Cacher {
                             image,
                         });
                     }
-                    ImageKind::Thumbnail => {
+                    ImageKind::ThumbnailSmall => {
                         let _ = thumb_tx.send(CacheJob::WriteImage {
                             id,
-                            kind: ImageKind::Thumbnail,
+                            kind: ImageKind::ThumbnailSmall,
+                            width,
+                            height,
+                            image,
+                        });
+                    }
+                    ImageKind::ThumbnailLarge => {
+                        let _ = thumb_tx.send(CacheJob::WriteImage {
+                            id,
+                            kind: ImageKind::ThumbnailLarge,
                             width,
                             height,
                             image,
@@ -398,8 +408,11 @@ impl Cacher {
                     let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
                 CacherCommand::GetImage(ids, kind) => match kind {
-                    ImageKind::Thumbnail => {
-                        let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids));
+                    ImageKind::ThumbnailSmall => {
+                        let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailSmall));
+                    }
+                    ImageKind::ThumbnailLarge => {
+                        let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailLarge));
                     }
                     ImageKind::AlbumArt => {
                         for id in ids {
@@ -462,7 +475,8 @@ impl Cacher {
         let folder = &hex[0..2];
 
         let name = match kind {
-            ImageKind::Thumbnail => format!("{hex}_thumb.bgra.zstd"),
+            ImageKind::ThumbnailSmall => format!("{hex}_tmbhs.bgra.zstd"),
+            ImageKind::ThumbnailLarge => format!("{hex}_tmbhl.bgra.zstd"),
             ImageKind::AlbumArt => format!("{hex}_art.bgra.zstd"),
             ImageKind::Playlist => format!("{hex}_playlist.bgra.zstd"),
         };
@@ -641,9 +655,9 @@ impl Cacher {
                                         Err(err) => {eprintln!("Error occurred: {err:#?}");}
                                     }
                                 }
-                                Ok(CacheJob::LoadThumbnails(ids)) => {
+                                Ok(CacheJob::LoadThumbnails(ids, kind)) => {
                                     for id in ids {
-                                        match cacher.read_cached_image(id, &ImageKind::Thumbnail) {
+                                        match cacher.read_cached_image(id, &kind) {
                                             Ok(Some(image)) => {batch.insert(id, image);},
                                             Ok(None) | Err(_) => {missing.push(id);},
                                         }
