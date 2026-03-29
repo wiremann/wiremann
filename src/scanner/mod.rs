@@ -103,7 +103,7 @@ impl Scanner {
                 }
                 ScannerCommand::PlaylistThumbnail { id, tracks } => {
                     if inflight_playlists.insert(id) {
-                        let _ = playlist_thumb_tx.send(ScanJob::PlaylistThumbnail(id, tracks));
+                        // let _ = playlist_thumb_tx.send(ScanJob::PlaylistThumbnail(id, tracks));
                     }
                 }
                 ScannerCommand::MetaJobFinished(id) => {
@@ -181,7 +181,7 @@ impl Scanner {
             std::thread::spawn(move || {
                 let mut image_batch = HashMap::with_capacity(16);
                 let mut lookup_batch = HashMap::with_capacity(16);
-                let mut last_kind;
+                let mut last_kind = ImageKind::ThumbnailSmall;
 
                 loop {
                     select! {

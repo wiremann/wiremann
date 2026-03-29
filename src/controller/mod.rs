@@ -367,7 +367,7 @@ impl Controller {
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::MetadataScanFinished => {
-                let tracks = self.state.read(cx).library.tracks;
+                let tracks = self.state.read(cx).library.tracks.clone();
 
                 let to_request: HashSet<(TrackId, PathBuf)> = tracks
                     .iter()
@@ -380,7 +380,7 @@ impl Controller {
                     })
                     .collect();
                 let _ = self.scanner_tx.send(ScannerCommand::GetThumbnails(to_request, ImageKind::ThumbnailSmall));
-                
+
                 // self.request_playlist_thumbnails(
                 //     &modified_playlists
                 //         .iter()
@@ -822,7 +822,7 @@ impl Controller {
         }
 
         cx.global_mut::<ImageCache>()
-            .request(cache_ids, &self.cacher_tx, ImageKind::Thumbnail);
+            .request(cache_ids, &self.cacher_tx, ImageKind::ThumbnailSmall);
 
         for (track_id, path) in scan_jobs {
             let _ = self
