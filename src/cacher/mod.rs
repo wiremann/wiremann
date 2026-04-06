@@ -1,3 +1,4 @@
+use crate::app::AppPaths;
 use crate::controller::commands::CacherCommand;
 use crate::controller::events::CacherEvent;
 use crate::controller::state::{AppState, LibraryState, PlaybackState, PlaybackStatus, QueueState};
@@ -5,7 +6,7 @@ use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{select, tick, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, select, tick};
 use gpui::RenderImage;
 use image::Frame;
 use ron::ser::PrettyConfig;
@@ -25,7 +26,7 @@ use walkdir::WalkDir;
 pub struct Cacher {
     pub tx: Sender<CacherEvent>,
     pub rx: Receiver<CacherCommand>,
-    base_dir: PathBuf,
+    app_paths: AppPaths,
 }
 
 enum CacheJob {
@@ -320,27 +321,17 @@ impl From<CachedQueueState> for QueueState {
 }
 
 impl Cacher {
-    pub fn new() -> (Self, Sender<CacherCommand>, Receiver<CacherEvent>) {
+    pub fn new(app_paths: AppPaths) -> (Self, Sender<CacherCommand>, Receiver<CacherEvent>) {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
-
-        let base_dir = Self::get_base_dir();
-        fs::create_dir_all(base_dir.clone()).expect("failed to create cache directory");
 
         let cacher = Cacher {
             tx: event_tx,
             rx: cmd_rx,
-            base_dir,
+            app_paths,
         };
 
         (cacher, cmd_tx, event_rx)
-    }
-
-    pub fn get_base_dir() -> PathBuf {
-        dirs::audio_dir()
-            .unwrap_or_default()
-            .join("wiremann")
-            .join("cache")
     }
 
     pub fn run(&self, workers: usize) -> Result<(), CacherError> {
@@ -414,10 +405,12 @@ impl Cacher {
                 }
                 CacherCommand::GetImage(ids, kind) => match kind {
                     ImageKind::ThumbnailSmall => {
-                        let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailSmall));
+                        let _ =
+                            thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailSmall));
                     }
                     ImageKind::ThumbnailLarge => {
-                        let _ = thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailLarge));
+                        let _ =
+                            thumb_tx.send(CacheJob::LoadThumbnails(ids, ImageKind::ThumbnailLarge));
                     }
                     ImageKind::AlbumArt => {
                         for id in ids {
@@ -435,8 +428,8 @@ impl Cacher {
     }
 
     fn write_library_state(&self, state: &LibraryState) -> Result<(), CacherError> {
-        let tmp_path = self.base_dir.join("library.tmp");
-        let final_path = self.base_dir.join("library.bin");
+        let tmp_path = self.app_paths.cache.join("library.tmp");
+        let final_path = self.app_paths.cache.join("library.bin");
 
         let library = CachedLibraryState::from(state);
 
@@ -446,8 +439,8 @@ impl Cacher {
     }
 
     fn write_playback_state(&self, state: &PlaybackState) -> Result<(), CacherError> {
-        let tmp_path = self.base_dir.join("session.tmp");
-        let final_path = self.base_dir.join("session.ron");
+        let tmp_path = self.app_paths.cache.join("session.tmp");
+        let final_path = self.app_paths.cache.join("session.ron");
 
         let payload = CachedPlaybackState::from(state);
 
@@ -465,8 +458,8 @@ impl Cacher {
     }
 
     fn write_queue_state(&self, state: &QueueState) -> Result<(), CacherError> {
-        let tmp_path = self.base_dir.join("queue.tmp");
-        let final_path = self.base_dir.join("queue.bin");
+        let tmp_path = self.app_paths.cache.join("queue.tmp");
+        let final_path = self.app_paths.cache.join("queue.bin");
 
         let queue = CachedQueueState::from(state);
 
@@ -486,7 +479,7 @@ impl Cacher {
             ImageKind::Playlist => format!("{hex}_playlist.bgra.zstd"),
         };
 
-        self.base_dir.join("images").join(folder).join(name)
+        self.app_paths.cache.join("images").join(folder).join(name)
     }
 
     fn write_cached_image(
@@ -532,7 +525,7 @@ impl Cacher {
     }
 
     fn read_library_state(&self) -> Result<LibraryState, CacherError> {
-        let path = self.base_dir.join("library.bin");
+        let path = self.app_paths.cache.join("library.bin");
 
         if !path.exists() {
             return Ok(LibraryState::default());
@@ -545,7 +538,7 @@ impl Cacher {
     }
 
     fn read_queue_state(&self) -> Result<QueueState, CacherError> {
-        let path = self.base_dir.join("queue.bin");
+        let path = self.app_paths.cache.join("queue.bin");
 
         if !path.exists() {
             return Ok(QueueState::default());
@@ -558,7 +551,7 @@ impl Cacher {
     }
 
     fn read_playback_state(&self) -> Result<PlaybackState, CacherError> {
-        let path = self.base_dir.join("session.ron");
+        let path = self.app_paths.cache.join("session.ron");
 
         if !path.exists() {
             return Ok(PlaybackState::default());
@@ -800,7 +793,9 @@ impl Cacher {
                 ImageKind::ThumbnailLarge => "_thumb.tmbhl",
                 _ => continue,
             };
-            if let Some(name) = entry.file_name().to_str() && name.ends_with(ends_with) {
+            if let Some(name) = entry.file_name().to_str()
+                && name.ends_with(ends_with)
+            {
                 if let Some((hex_part, _rest)) = name.split_once('_') {
                     let mut arr = [0u8; 16];
 

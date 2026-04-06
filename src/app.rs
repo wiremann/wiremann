@@ -13,11 +13,18 @@ use crate::{
 };
 use gpui::{AppContext, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 use gpui_platform::application;
+use std::path::PathBuf;
 use std::{
     sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+
+pub struct AppPaths {
+    pub cache: PathBuf,
+    pub config: PathBuf,
+    pub data: PathBuf,
+}
 
 #[allow(
     clippy::too_many_lines,
@@ -37,9 +44,12 @@ pub fn run() -> Result<(), AppError> {
             cacher: cacher_workers,
         } = calculate_worker_config();
 
+        let app_paths = get_app_paths();
+        ensure_app_paths(&app_paths);
+
         let (mut audio, audio_tx, audio_rx) = Audio::new();
-        let (mut scanner, scanner_tx, scanner_rx) = Scanner::new();
-        let (cacher, cacher_tx, cacher_rx) = Cacher::new();
+        let (mut scanner, scanner_tx, scanner_rx) = Scanner::new(app_paths);
+        let (cacher, cacher_tx, cacher_rx) = Cacher::new(app_paths));
 
         let controller = Controller::new(
             cx.new(|_| AppState::default()),
@@ -166,4 +176,25 @@ pub fn run() -> Result<(), AppError> {
     });
 
     Ok(())
+}
+
+fn get_app_paths() -> AppPaths {
+    let project_dir = directories::ProjectDirs::from("app", "wiremann", "wiremann")
+        .expect("Couldn't get application paths");
+
+    let cache = project_dir.cache_dir().to_path_buf();
+    let config = project_dir.config_dir().to_path_buf();
+    let data = project_dir.data_dir().to_path_buf();
+
+    AppPaths {
+        cache,
+        config,
+        data,
+    }
+}
+
+fn ensure_app_paths(app_paths: &AppPaths) {
+    fs::create_dir_all(app_paths.cache).expect("failed to create cache directory");
+    fs::create_dir_all(app_paths.config).expect("failed to create cache directory");
+    fs::create_dir_all(app_paths.data).expect("failed to create cache directory");
 }
