@@ -109,10 +109,10 @@ impl Controller {
             AudioEvent::TrackLoaded(track_id, path) => {
                 let state = self.state.read(cx);
                 if !state.library.tracks.contains_key(&track_id) {
-                    let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                        path: path.clone(),
-                        track_id: *track_id,
-                    });
+                    // let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
+                    //     path: path.clone(),
+                    //     track_id: *track_id,
+                    // });
                 }
 
                 if let Some(track) = state.library.tracks.get(&track_id)
@@ -123,9 +123,9 @@ impl Controller {
                         ImageKind::AlbumArt,
                     ));
                 } else {
-                    let _ = self
-                        .scanner_tx
-                        .send(ScannerCommand::GetCurrentAlbumArt(*track_id, path.clone()));
+                    // let _ = self
+                    //     .scanner_tx
+                    //     .send(ScannerCommand::GetCurrentAlbumArt(*track_id, path.clone()));
                 }
 
                 self.state.update(cx, |this, cx| {
@@ -205,7 +205,7 @@ impl Controller {
                             this.library.tracks.insert(id, Arc::new(track.clone()));
                         }
 
-                        let _ = self.scanner_tx.send(ScannerCommand::MetaJobFinished(id));
+                        // let _ = self.scanner_tx.send(ScannerCommand::MetaJobFinished(id));
 
                         if let Some(pid) = playlist_id {
                             if let Some(playlist) = this.library.playlists.get_mut(pid) {
@@ -340,9 +340,9 @@ impl Controller {
 
                 thumbnail_cache.inflight.remove(image_id);
 
-                let _ = self
-                    .scanner_tx
-                    .send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
+                // let _ = self
+                //     .scanner_tx
+                //     .send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
 
                 let width = image.size(0).width.0.cast_unsigned();
                 let height = image.size(0).height.0.cast_unsigned();
@@ -380,7 +380,7 @@ impl Controller {
                             .map(|path| (*id, path))
                     })
                     .collect();
-                let _ = self.scanner_tx.send(ScannerCommand::GetThumbnails(to_request, ImageKind::ThumbnailSmall));
+                // let _ = self.scanner_tx.send(ScannerCommand::GetThumbnails(to_request, ImageKind::ThumbnailSmall));
 
                 // self.request_playlist_thumbnails(
                 //     &modified_playlists
@@ -495,10 +495,10 @@ impl Controller {
                 if let Some(track_id) = track_id {
                     if let Some(track) = tracks.get(track_id) {
                         if let Some(source) = track.get_valid_source() {
-                            let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
-                                *track_id,
-                                source.path.clone(),
-                            ));
+                            // let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
+                            //     *track_id,
+                            //     source.path.clone(),
+                            // ));
                         }
                     }
                 }
@@ -525,10 +525,10 @@ impl Controller {
                     if let Some(track_id) = track_id {
                         if let Some(track) = tracks.get(track_id) {
                             if let Some(source) = track.get_valid_source() {
-                                let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                                    path: source.path.clone(),
-                                    track_id: *track_id,
-                                });
+                                // let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
+                                //     path: source.path.clone(),
+                                //     track_id: *track_id,
+                                // });
                             }
                         }
                     }
@@ -561,10 +561,10 @@ impl Controller {
                             )
                         };
 
-                        let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
-                            id: *playlist_id,
-                            tracks: thumb_tracks,
-                        });
+                        // let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
+                        //     id: *playlist_id,
+                        //     tracks: thumb_tracks,
+                        // });
                     }
                 }
             }
@@ -579,9 +579,9 @@ impl Controller {
                 let _ = self
                     .audio_tx
                     .send(AudioCommand::Load(*id, source.path.clone()));
-                let _ = self
-                    .scanner_tx
-                    .send(ScannerCommand::GetCurrentAlbumArt(*id, source.path.clone()));
+                // let _ = self
+                //     .scanner_tx
+                //     .send(ScannerCommand::GetCurrentAlbumArt(*id, source.path.clone()));
             }
         }
     }
@@ -596,10 +596,10 @@ impl Controller {
                 let _ = self
                     .audio_tx
                     .send(AudioCommand::Load(track_id, source.path.clone()));
-                let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
-                    track_id,
-                    source.path.clone(),
-                ));
+                // let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
+                //     track_id,
+                //     source.path.clone(),
+                // ));
             }
         }
     }
@@ -608,10 +608,8 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
 
-    pub fn scan_folder(&self, tracks: HashMap<TrackId, Arc<Track>>, path: PathBuf) {
-        let _ = self
-            .scanner_tx
-            .send(ScannerCommand::ScanFolder { path, tracks });
+    pub fn scan_folder(&self, _tracks: HashMap<TrackId, Arc<Track>>, path: PathBuf) {
+        let _ = self.scanner_tx.send(ScannerCommand::ScanFolder(path));
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
@@ -662,7 +660,7 @@ impl Controller {
     }
 
     pub fn scan_track(&self, path: PathBuf) {
-        let _ = self.scanner_tx.send(ScannerCommand::ScanTrack(path));
+        // let _ = self.scanner_tx.send(ScannerCommand::ScanTrack(path));
     }
 
     pub fn play(&self) {
@@ -822,13 +820,16 @@ impl Controller {
             }
         }
 
-        cx.global_mut::<ImageCache>()
-            .request(cache_ids, &self.cacher_tx, ImageKind::ThumbnailSmall);
+        cx.global_mut::<ImageCache>().request(
+            cache_ids,
+            &self.cacher_tx,
+            ImageKind::ThumbnailSmall,
+        );
 
         for (track_id, path) in scan_jobs {
-            let _ = self
-                .scanner_tx
-                .send(ScannerCommand::GetTrackMetadata { path, track_id });
+            // let _ = self
+            //     .scanner_tx
+            //     .send(ScannerCommand::GetTrackMetadata { path, track_id });
         }
     }
 
@@ -851,10 +852,10 @@ impl Controller {
                     };
 
                     if thumb_tracks.len() >= 4 {
-                        let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
-                            id: *pid,
-                            tracks: thumb_tracks,
-                        });
+                        // let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
+                        //     id: *pid,
+                        //     tracks: thumb_tracks,
+                        // });
                     }
                 }
             }

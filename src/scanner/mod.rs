@@ -90,7 +90,19 @@ impl Scanner {
         }
     }
 
-    fn spawn_metadata_workers(&self, meta_rx: &Receiver<PathBuf>, workers: usize) {}
+    fn spawn_metadata_workers(&self, worker_rx: &Receiver<PathBuf>, workers: usize) {
+        for _ in 0..workers {
+            let worker_rx = worker_rx.clone();
+            let scan_progress = self.scan_progress.clone();
+            let tx = self.tx.clone();
+
+            // let batch = Vec::with_capacity(64);
+
+            while let Ok(path) = worker_rx.recv() {
+                println!("{path:#?}")
+            }
+        }
+    }
 
     fn scan_folder(&self, path: PathBuf, worker_tx: &Sender<PathBuf>) {
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
