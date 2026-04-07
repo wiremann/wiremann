@@ -33,7 +33,6 @@ zstd = "0.13.3"
 lru = "0.16.3"
 fast_image_resize = { version = "6.0.0", features = ["image"] }
 rfd = "0.17.2"
-symphonia = "0.5.5"
 dashmap = "7.0.0-rc2"
 garb = "0.2.5"
 

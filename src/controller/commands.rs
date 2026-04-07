@@ -4,7 +4,6 @@ use crate::library::playlists::PlaylistId;
 use crate::library::{ImageId, Track, TrackId};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
 
 pub enum AudioCommand {
     Load(TrackId, PathBuf),
