@@ -74,11 +74,7 @@ impl Scanner {
     }
 
     #[allow(clippy::missing_errors_doc)]
-    pub fn run(
-        &mut self,
-        metadata_workers: usize,
-        _thumbnail_workers: usize,
-    ) -> Result<(), ScannerError> {
+    pub fn run(&mut self, metadata_workers: usize) -> Result<(), ScannerError> {
         let (worker_tx, worker_rx) = crossbeam_channel::bounded(64);
 
         self.spawn_metadata_workers(&worker_rx, metadata_workers);

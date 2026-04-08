@@ -52,6 +52,8 @@ pub enum ImageProcessorError {
     ImageResizeError(#[from] ResizeError),
     #[error("Garb Resize Error occurred: `{0}`")]
     GarbSizeError(#[from] garb::SizeError),
+    #[error("Recv Error occurred: `{0}`")]
+    RecvError(#[from] RecvError),
 }
 
 #[derive(Error, Debug)]

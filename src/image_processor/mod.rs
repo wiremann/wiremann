@@ -1,4 +1,5 @@
 use crate::app::AppPaths;
+use crate::cacher::Cacher;
 use crate::controller::commands::ImageProcessorCommand;
 use crate::controller::events::ImageProcessorEvent;
 use crate::library::playlists::PlaylistId;
@@ -51,6 +52,45 @@ impl ImageProcessor {
         };
 
         (scanner, cmd_tx, event_rx)
+    }
+
+    pub fn run(&mut self, thumbnail_workers: usize) -> Result<(), ImageProcessorError> {
+        let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
+        let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
+        let (playlist_thumb_tx, playlist_thumb_rx) = crossbeam_channel::unbounded();
+
+        self.spawn_thumbnail_workers(&thumb_rx, thumbnail_workers);
+        self.spawn_album_art_worker(album_art_rx);
+        self.spawn_playlist_thumbnail_worker(playlist_thumb_rx);
+
+        let mut inflight_playlists = HashSet::new();
+
+        loop {
+            match self.rx.recv()? {
+                ImageProcessorCommand::GetThumbnails(images, kind) => {
+                    let cached_thumbnails_index = Arc::new(Cacher::build_cached_thumbnails_index(
+                        self.app_paths.cache.as_path(),
+                        kind,
+                    ));
+                    for image in images {
+                        let _ = thumb_tx.send(ImageJob::Thumbnail(
+                            image.0,
+                            image.1,
+                            kind,
+                            cached_thumbnails_index.clone(),
+                        ));
+                    }
+                }
+                ImageProcessorCommand::GetCurrentAlbumArt(id, path) => {
+                    let _ = album_art_tx.send(ImageJob::AlbumArt(id, path));
+                }
+                ImageProcessorCommand::PlaylistThumbnail { id, tracks } => {
+                    if inflight_playlists.insert(id) {
+                        let _ = playlist_thumb_tx.send(ImageJob::PlaylistThumbnail(id, tracks));
+                    }
+                }
+            }
+        }
     }
 
     fn spawn_thumbnail_workers(&self, thumb_rx: &Receiver<ImageJob>, workers: usize) {

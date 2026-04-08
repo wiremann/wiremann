@@ -2,8 +2,8 @@ pub mod commands;
 pub mod events;
 pub mod state;
 use crate::cacher::ImageKind;
-use crate::controller::commands::CacherCommand;
-use crate::controller::events::CacherEvent;
+use crate::controller::commands::{CacherCommand, ImageProcessorCommand};
+use crate::controller::events::{CacherEvent, ImageProcessorEvent};
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
@@ -36,6 +36,10 @@ pub struct Controller {
     // Cacher channel
     pub cacher_tx: Sender<CacherCommand>,
     pub cacher_rx: Receiver<CacherEvent>,
+
+    // Image processor channel
+    pub image_processor_tx: Sender<ImageProcessorCommand>,
+    pub image_processor_rx: Receiver<ImageProcessorEvent>,
 }
 
 impl Controller {
@@ -48,6 +52,8 @@ impl Controller {
         scanner_rx: Receiver<ScannerEvent>,
         cacher_tx: Sender<CacherCommand>,
         cacher_rx: Receiver<CacherEvent>,
+        image_processor_tx: Sender<ImageProcessorCommand>,
+        image_processor_rx: Receiver<ImageProcessorEvent>,
     ) -> Self {
         Controller {
             state,
@@ -57,6 +63,8 @@ impl Controller {
             scanner_rx,
             cacher_tx,
             cacher_rx,
+            image_processor_tx,
+            image_processor_rx,
         }
     }
 
@@ -123,9 +131,12 @@ impl Controller {
                         ImageKind::AlbumArt,
                     ));
                 } else {
-                    // let _ = self
-                    //     .scanner_tx
-                    //     .send(ScannerCommand::GetCurrentAlbumArt(*track_id, path.clone()));
+                    let _ =
+                        self.image_processor_tx
+                            .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                                *track_id,
+                                path.clone(),
+                            ));
                 }
 
                 self.state.update(cx, |this, cx| {
@@ -205,8 +216,6 @@ impl Controller {
                             this.library.tracks.insert(id, Arc::new(track.clone()));
                         }
 
-                        // let _ = self.scanner_tx.send(ScannerCommand::MetaJobFinished(id));
-
                         if let Some(pid) = playlist_id {
                             if let Some(playlist) = this.library.playlists.get_mut(pid) {
                                 if !playlist.tracks.contains(&id) {
@@ -271,116 +280,26 @@ impl Controller {
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
-            // ScannerEvent::InsertAlbumArt(image_id, image) => {
-            //     let image_cache = cx.global_mut::<ImageCache>();
-            //     image_cache.inflight.remove(image_id);
-            //
-            //     image_cache.current = Some(image.clone());
-            //
-            //     let image = image.clone();
-            //     let width = image.size(0).width.0.cast_unsigned();
-            //     let height = image.size(0).height.0.cast_unsigned();
-            //     if let Some(image) = image.as_bytes(0) {
-            //         let image = image.to_vec();
-            //         let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-            //             id: *image_id,
-            //             kind: ImageKind::AlbumArt,
-            //             width,
-            //             height,
-            //             image,
-            //         });
-            //     }
-            //
-            //     cx.notify(view.entity_id());
-            // }
-            // ScannerEvent::InsertThumbnails(thumbnails, kind) => {
-            //     for (id, image) in thumbnails {
-            //         let width = image.size(0).width.0.cast_unsigned();
-            //         let height = image.size(0).height.0.cast_unsigned();
-            //         if let Some(image) = image.as_bytes(0) {
-            //             let image = image.to_vec();
-            //             let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-            //                 id: *id,
-            //                 kind: *kind,
-            //                 width,
-            //                 height,
-            //                 image,
-            //             });
-            //         }
-            //
-            //         let evicted = {
-            //             let thumbnail_cache = cx.global_mut::<ImageCache>();
-            //             thumbnail_cache.inflight.remove(id);
-            //             thumbnail_cache.add(*id, image.clone())
-            //         };
-            //
-            //         if let Some(img) = evicted {
-            //             drop_image_from_app(cx, img);
-            //         }
-            //     }
-            //     cx.notify(view.entity_id());
-            // }
-            // ScannerEvent::UpdateImageLookup(lookup) => {
-            //     self.state.update(cx, |this, cx| {
-            //         for (id, image_id) in lookup {
-            //             if let Some(track) = this.library.tracks.get_mut(&id) {
-            //                 Arc::make_mut(track).image_id = Some(*image_id);
-            //             }
-            //         }
-            //
-            //         cx.notify();
-            //     });
-            //     let state = self.state.read(cx).library.clone();
-            //     let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            // }
-            // ScannerEvent::InsertPlaylistThumbnail(id, image_id, image) => {
-            //     let thumbnail_cache = cx.global_mut::<ImageCache>();
-            //
-            //     thumbnail_cache.add(*image_id, image.clone());
-            //
-            //     thumbnail_cache.inflight.remove(image_id);
-            //
-            //     // let _ = self
-            //     //     .scanner_tx
-            //     //     .send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
-            //
-            //     let width = image.size(0).width.0.cast_unsigned();
-            //     let height = image.size(0).height.0.cast_unsigned();
-            //     if let Some(image) = image.as_bytes(0) {
-            //         let image = image.to_vec();
-            //         let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-            //             id: *image_id,
-            //             kind: ImageKind::Playlist,
-            //             width,
-            //             height,
-            //             image,
-            //         });
-            //     }
-            //
-            //     self.state.update(cx, |this, cx| {
-            //         if let Some(playlist) = this.library.playlists.get_mut(id) {
-            //             playlist.image_id = Some(*image_id);
-            //         }
-            //         cx.notify();
-            //     });
-            //     let state = self.state.read(cx).library.clone();
-            //     let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            // }
             ScannerEvent::ScanFinished => {
                 self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
-                // let tracks = self.state.read(cx).library.tracks.clone();
-                //
-                // let to_request: HashSet<(TrackId, PathBuf)> = tracks
-                //     .iter()
-                //     .filter(|(_, track)| track.image_id.is_none())
-                //     .filter_map(|(id, track)| {
-                //         track
-                //             .get_valid_source()
-                //             .and_then(|src| Some(src.path.clone()))
-                //             .map(|path| (*id, path))
-                //     })
-                //     .collect();
-                // let _ = self.scanner_tx.send(ScannerCommand::GetThumbnails(to_request, ImageKind::ThumbnailSmall));
+                let tracks = self.state.read(cx).library.tracks.clone();
+
+                let to_request: HashSet<(TrackId, PathBuf)> = tracks
+                    .iter()
+                    .filter(|(_, track)| track.image_id.is_none())
+                    .filter_map(|(id, track)| {
+                        track
+                            .get_valid_source()
+                            .and_then(|src| Some(src.path.clone()))
+                            .map(|path| (*id, path))
+                    })
+                    .collect();
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::GetThumbnails(
+                        to_request,
+                        ImageKind::ThumbnailSmall,
+                    ));
 
                 // self.request_playlist_thumbnails(
                 //     &modified_playlists
@@ -391,6 +310,114 @@ impl Controller {
                 // );
             }
         }
+        Ok(())
+    }
+
+    #[allow(clippy::missing_errors_doc)]
+    pub fn handle_image_processor_event(
+        &mut self,
+        cx: &mut App,
+        event: &ImageProcessorEvent,
+        view: &Entity<Wiremann>,
+    ) -> Result<(), ControllerError> {
+        match event {
+            ImageProcessorEvent::InsertAlbumArt(image_id, image) => {
+                let image_cache = cx.global_mut::<ImageCache>();
+                image_cache.inflight.remove(image_id);
+
+                image_cache.current = Some(image.clone());
+
+                let image = image.clone();
+                let width = image.size(0).width.0.cast_unsigned();
+                let height = image.size(0).height.0.cast_unsigned();
+                if let Some(image) = image.as_bytes(0) {
+                    let image = image.to_vec();
+                    let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                        id: *image_id,
+                        kind: ImageKind::AlbumArt,
+                        width,
+                        height,
+                        image,
+                    });
+                }
+
+                cx.notify(view.entity_id());
+            }
+            ImageProcessorEvent::InsertThumbnails(thumbnails, kind) => {
+                for (id, image) in thumbnails {
+                    let width = image.size(0).width.0.cast_unsigned();
+                    let height = image.size(0).height.0.cast_unsigned();
+                    if let Some(image) = image.as_bytes(0) {
+                        let image = image.to_vec();
+                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                            id: *id,
+                            kind: *kind,
+                            width,
+                            height,
+                            image,
+                        });
+                    }
+
+                    let evicted = {
+                        let thumbnail_cache = cx.global_mut::<ImageCache>();
+                        thumbnail_cache.inflight.remove(id);
+                        thumbnail_cache.add(*id, image.clone())
+                    };
+
+                    if let Some(img) = evicted {
+                        drop_image_from_app(cx, img);
+                    }
+                }
+                cx.notify(view.entity_id());
+            }
+            ImageProcessorEvent::UpdateImageLookup(lookup) => {
+                self.state.update(cx, |this, cx| {
+                    for (id, image_id) in lookup {
+                        if let Some(track) = this.library.tracks.get_mut(&id) {
+                            Arc::make_mut(track).image_id = Some(*image_id);
+                        }
+                    }
+
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ImageProcessorEvent::InsertPlaylistThumbnail(id, image_id, image) => {
+                let thumbnail_cache = cx.global_mut::<ImageCache>();
+
+                thumbnail_cache.add(*image_id, image.clone());
+
+                thumbnail_cache.inflight.remove(image_id);
+
+                // let _ = self
+                //     .scanner_tx
+                //     .send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
+
+                let width = image.size(0).width.0.cast_unsigned();
+                let height = image.size(0).height.0.cast_unsigned();
+                if let Some(image) = image.as_bytes(0) {
+                    let image = image.to_vec();
+                    let _ = self.cacher_tx.send(CacherCommand::WriteImage {
+                        id: *image_id,
+                        kind: ImageKind::Playlist,
+                        width,
+                        height,
+                        image,
+                    });
+                }
+
+                self.state.update(cx, |this, cx| {
+                    if let Some(playlist) = this.library.playlists.get_mut(id) {
+                        playlist.image_id = Some(*image_id);
+                    }
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+        }
+
         Ok(())
     }
 
@@ -579,9 +606,12 @@ impl Controller {
                 let _ = self
                     .audio_tx
                     .send(AudioCommand::Load(*id, source.path.clone()));
-                // let _ = self
-                //     .scanner_tx
-                //     .send(ScannerCommand::GetCurrentAlbumArt(*id, source.path.clone()));
+                self.image_processor_tx
+                    .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                        *id,
+                        source.path.clone(),
+                    ))
+                    .ok();
             }
         }
     }
@@ -593,13 +623,15 @@ impl Controller {
             && let Some(track) = state.library.tracks.get(&track_id)
         {
             if let Some(source) = track.get_valid_source() {
-                let _ = self
-                    .audio_tx
-                    .send(AudioCommand::Load(track_id, source.path.clone()));
-                // let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
-                //     track_id,
-                //     source.path.clone(),
-                // ));
+                self.audio_tx
+                    .send(AudioCommand::Load(track_id, source.path.clone()))
+                    .ok();
+                self.image_processor_tx
+                    .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                        track_id,
+                        source.path.clone(),
+                    ))
+                    .ok();
             }
         }
     }
@@ -638,7 +670,11 @@ impl Controller {
             let insert_pos = this.playback.current_index + 1;
 
             if !queue.tracks.contains(&track_id) {
-                queue.tracks.insert(insert_pos, track_id);
+                if queue.tracks.len() > 0 {
+                    queue.tracks.insert(insert_pos, track_id)
+                } else {
+                    queue.tracks.push(track_id);
+                };
 
                 queue.order = (0..queue.tracks.len()).collect();
 
@@ -852,10 +888,12 @@ impl Controller {
                     };
 
                     if thumb_tracks.len() >= 4 {
-                        // let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
-                        //     id: *pid,
-                        //     tracks: thumb_tracks,
-                        // });
+                        let _ = self.image_processor_tx.send(
+                            ImageProcessorCommand::PlaylistThumbnail {
+                                id: *pid,
+                                tracks: thumb_tracks,
+                            },
+                        );
                     }
                 }
             }
