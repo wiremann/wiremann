@@ -1,3 +1,4 @@
+use crate::app::AppPaths;
 use crate::controller::commands::ImageProcessorCommand;
 use crate::controller::events::ImageProcessorEvent;
 use crate::library::playlists::PlaylistId;
@@ -19,18 +20,21 @@ pub struct ImageProcessor {
     pub tx: Sender<ImageProcessorEvent>,
     pub rx: Receiver<ImageProcessorCommand>,
 
-    seen_images: Arc<DashSet<ImageId>>,
+    app_paths: AppPaths,
+    seen_images: Arc<DashSet<(ImageId, ImageKind)>>,
 }
 
 enum ImageJob {
-    Thumbnail(TrackId, ImageId, Box<[u8]>, Arc<HashSet<ImageId>>),
+    Thumbnail(TrackId, PathBuf, ImageKind, Arc<HashSet<ImageId>>),
     AlbumArt(TrackId, PathBuf),
     PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
 }
 
 impl ImageProcessor {
     #[must_use]
-    pub fn new() -> (
+    pub fn new(
+        app_paths: AppPaths,
+    ) -> (
         Self,
         Sender<ImageProcessorCommand>,
         Receiver<ImageProcessorEvent>,
@@ -42,6 +46,7 @@ impl ImageProcessor {
             tx: event_tx,
             rx: cmd_rx,
 
+            app_paths,
             seen_images: Arc::new(DashSet::new()),
         };
 
@@ -102,6 +107,7 @@ impl ImageProcessor {
 
     fn spawn_album_art_worker(&self, album_art_rx: Receiver<ImageJob>) {
         let events_tx = self.tx.clone();
+        let cache_path = self.app_paths.cache.clone();
 
         std::thread::spawn(move || {
             let mut resizer = fr::Resizer::new();
@@ -109,7 +115,11 @@ impl ImageProcessor {
                 match metadata::read_album_art(&path) {
                     Ok(Some(image)) => {
                         if let Ok(hash) = ImageId::generate(&image) {
-                            let path = get_cached_image_path(hash, ImageKind::AlbumArt);
+                            let path = get_cached_image_path(
+                                cache_path.clone(),
+                                hash,
+                                ImageKind::AlbumArt,
+                            );
 
                             if !path.exists() {
                                 if let Ok(album_art) =
@@ -193,7 +203,7 @@ fn render_album_art(
         ImageKind::ThumbnailSmall | ImageKind::ThumbnailLarge => {
             let (new_w, new_h) = match kind {
                 ImageKind::ThumbnailSmall => (128, 128),
-                ImageKind::ThumbnailLarge => (256, 256),
+                ImageKind::ThumbnailLarge => (512, 512),
                 _ => unreachable!(),
             };
 
@@ -283,4 +293,18 @@ fn render_playlist_thumbnail(
     let render_image = Arc::new(RenderImage::new(smallvec![frame]));
 
     (Some(render_image), hash)
+}
+
+fn get_cached_image_path(cache_path: PathBuf, id: ImageId, kind: ImageKind) -> PathBuf {
+    let hex = hex::encode(id.0);
+    let folder = &hex[0..2];
+
+    let name = match kind {
+        ImageKind::ThumbnailSmall => format!("{hex}_tmbhs.bgra.zstd"),
+        ImageKind::ThumbnailLarge => format!("{hex}_tmbhl.bgra.zstd"),
+        ImageKind::AlbumArt => format!("{hex}_art.bgra.zstd"),
+        ImageKind::Playlist => format!("{hex}_playlist.bgra.zstd"),
+    };
+
+    cache_path.join("images").join(folder).join(name)
 }

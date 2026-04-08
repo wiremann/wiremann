@@ -21,7 +21,14 @@ pub enum ScannerCommand {
     StartNextScan,
 }
 
-pub enum ImageProcessorCommand {}
+pub enum ImageProcessorCommand {
+    GetThumbnails(HashSet<(TrackId, PathBuf)>, ImageKind),
+    GetCurrentAlbumArt(TrackId, PathBuf),
+    PlaylistThumbnail {
+        id: PlaylistId,
+        tracks: Vec<PathBuf>,
+    },
+}
 
 pub enum CacherCommand {
     GetAppState,
