@@ -117,10 +117,9 @@ impl Controller {
             AudioEvent::TrackLoaded(track_id, path) => {
                 let state = self.state.read(cx);
                 if !state.library.tracks.contains_key(&track_id) {
-                    // let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                    //     path: path.clone(),
-                    //     track_id: *track_id,
-                    // });
+                    let _ = self
+                        .scanner_tx
+                        .send(ScannerCommand::ScanTrack(path.clone()));
                 }
 
                 if let Some(track) = state.library.tracks.get(&track_id)
@@ -182,7 +181,7 @@ impl Controller {
         &mut self,
         cx: &mut App,
         event: &ScannerEvent,
-        view: &Entity<Wiremann>,
+        _view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::UpsertTracks(tracks) => {
@@ -522,10 +521,12 @@ impl Controller {
                 if let Some(track_id) = track_id {
                     if let Some(track) = tracks.get(track_id) {
                         if let Some(source) = track.get_valid_source() {
-                            // let _ = self.scanner_tx.send(ScannerCommand::GetCurrentAlbumArt(
-                            //     *track_id,
-                            //     source.path.clone(),
-                            // ));
+                            let _ = self.image_processor_tx.send(
+                                ImageProcessorCommand::GetCurrentAlbumArt(
+                                    *track_id,
+                                    source.path.clone(),
+                                ),
+                            );
                         }
                     }
                 }
@@ -552,10 +553,14 @@ impl Controller {
                     if let Some(track_id) = track_id {
                         if let Some(track) = tracks.get(track_id) {
                             if let Some(source) = track.get_valid_source() {
-                                // let _ = self.scanner_tx.send(ScannerCommand::GetTrackMetadata {
-                                //     path: source.path.clone(),
-                                //     track_id: *track_id,
-                                // });
+                                let mut set = HashSet::new();
+                                set.insert((*track_id, source.path.clone()));
+                                let _ = self.image_processor_tx.send(
+                                    ImageProcessorCommand::GetThumbnails(
+                                        set,
+                                        ImageKind::ThumbnailSmall,
+                                    ),
+                                );
                             }
                         }
                     }
@@ -588,10 +593,12 @@ impl Controller {
                             )
                         };
 
-                        // let _ = self.scanner_tx.send(ScannerCommand::PlaylistThumbnail {
-                        //     id: *playlist_id,
-                        //     tracks: thumb_tracks,
-                        // });
+                        let _ = self.image_processor_tx.send(
+                            ImageProcessorCommand::PlaylistThumbnail {
+                                id: *playlist_id,
+                                tracks: thumb_tracks,
+                            },
+                        );
                     }
                 }
             }
@@ -696,7 +703,7 @@ impl Controller {
     }
 
     pub fn scan_track(&self, path: PathBuf) {
-        // let _ = self.scanner_tx.send(ScannerCommand::ScanTrack(path));
+        let _ = self.scanner_tx.send(ScannerCommand::ScanTrack(path));
     }
 
     pub fn play(&self) {
@@ -839,7 +846,7 @@ impl Controller {
 
     pub fn request_track_thumbnails(&self, track_ids: &[TrackId], cx: &mut App) {
         let mut cache_ids = Vec::new();
-        let mut scan_jobs = Vec::new();
+        let mut scan_jobs = HashSet::new();
 
         let state = self.state.read(cx);
         let tracks = &state.library.tracks;
@@ -850,7 +857,7 @@ impl Controller {
                     cache_ids.push(image_id);
                 } else {
                     if let Some(source) = track.get_valid_source() {
-                        scan_jobs.push((track.id, source.path.clone()));
+                        scan_jobs.insert((track.id, source.path.clone()));
                     }
                 }
             }
@@ -862,11 +869,12 @@ impl Controller {
             ImageKind::ThumbnailSmall,
         );
 
-        for (track_id, path) in scan_jobs {
-            // let _ = self
-            //     .scanner_tx
-            //     .send(ScannerCommand::GetTrackMetadata { path, track_id });
-        }
+        self.image_processor_tx
+            .send(ImageProcessorCommand::GetThumbnails(
+                scan_jobs,
+                ImageKind::ThumbnailSmall,
+            ))
+            .ok();
     }
 
     pub fn request_playlist_thumbnails(&self, playlist_ids: &[PlaylistId], cx: &mut App) {

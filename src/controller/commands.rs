@@ -18,6 +18,7 @@ pub enum AudioCommand {
 
 pub enum ScannerCommand {
     ScanDir(PathBuf),
+    ScanTrack(PathBuf),
     StartNextScan,
 }
 

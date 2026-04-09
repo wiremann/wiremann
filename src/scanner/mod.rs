@@ -102,6 +102,9 @@ impl Scanner {
                         self.scan_folder(path, &worker_tx);
                     }
                 }
+                ScannerCommand::ScanTrack(path) => {
+                    worker_tx.send((path, None)).ok();
+                }
             }
         }
     }
