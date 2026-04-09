@@ -8,9 +8,13 @@ authors = ["Anant Narayan"]
 [dependencies]
 anyhow = "1.0.102"
 crossbeam-channel = "0.5.15"
-gpui = { git = "https://github.com/zed-industries/zed", features = ["wayland"] }
+gpui = { git = "https://github.com/zed-industries/zed", features = [
+  "wayland",
+  "x11",
+] }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = [
   "wayland",
+  "x11",
 ] }
 image = "0.25.9"
 lofty = "0.23.2"
