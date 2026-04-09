@@ -3,14 +3,13 @@ use crate::cacher::Cacher;
 use crate::controller::commands::ImageProcessorCommand;
 use crate::controller::events::ImageProcessorEvent;
 use crate::library::playlists::PlaylistId;
-use crate::library::{ImageId, TrackId, TrackSource};
+use crate::library::{ImageId, TrackId};
 use crate::{cacher::ImageKind, errors::ImageProcessorError, scanner::metadata};
 use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
-use fast_image_resize as fr;
 use garb::bytes::rgba_to_bgra_inplace;
 use gpui::RenderImage;
-use image::{DynamicImage, EncodableLayout, Frame, RgbaImage, imageops};
+use image::{DynamicImage, EncodableLayout, Frame, imageops};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -89,6 +88,9 @@ impl ImageProcessor {
                         let _ = playlist_thumb_tx.send(ImageJob::PlaylistThumbnail(id, tracks));
                     }
                 }
+                ImageProcessorCommand::PlaylistJobFinished(id) => {
+                    inflight_playlists.remove(&id);
+                }
             }
         }
     }
@@ -101,11 +103,10 @@ impl ImageProcessor {
             let ticker = ticker.clone();
             let thumb_rx = thumb_rx.clone();
             let seen_images = self.seen_images.clone();
-            let mut resizer = fr::Resizer::new();
 
             std::thread::spawn(move || {
-                let mut image_batch = HashMap::with_capacity(128);
-                let mut lookup_batch = HashMap::with_capacity(128);
+                let mut image_batch = HashMap::with_capacity(64);
+                let mut lookup_batch = HashMap::with_capacity(64);
                 let mut last_kind = ImageKind::ThumbnailSmall;
 
                 loop {
@@ -116,14 +117,18 @@ impl ImageProcessor {
                                     lookup_batch.insert(id, hash);
                                     last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
-                                        if let Ok(image) = render_album_art(&bytes, kind, &mut resizer) {
-                                            image_batch.insert(hash, image);
-
-                                            if image_batch.len() >= 128 {
-                                                let _ = events_tx.send(
-                                                    ImageProcessorEvent::InsertThumbnails(std::mem::take(&mut image_batch), kind)
-                                                );
-                                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
+                                        match render_album_art(&bytes, kind) {
+                                            Ok(image) => {
+                                                image_batch.insert(hash, image.clone());
+                                                if image_batch.len() >= 64 {
+                                                    let _ = events_tx.send(
+                                                        ImageProcessorEvent::InsertThumbnails(std::mem::take(&mut image_batch), kind)
+                                                    );
+                                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error occurred while processing image: {e:#?}");
                                             }
                                         }
                                     }
@@ -150,7 +155,6 @@ impl ImageProcessor {
         let cache_path = self.app_paths.cache.clone();
 
         std::thread::spawn(move || {
-            let mut resizer = fr::Resizer::new();
             while let Ok(ImageJob::AlbumArt(id, path)) = album_art_rx.recv() {
                 match metadata::read_album_art(&path) {
                     Ok(Some(image)) => {
@@ -162,8 +166,7 @@ impl ImageProcessor {
                             );
 
                             if !path.exists() {
-                                if let Ok(album_art) =
-                                    render_album_art(&image, ImageKind::AlbumArt, &mut resizer)
+                                if let Ok(album_art) = render_album_art(&image, ImageKind::AlbumArt)
                                 {
                                     let _ = events_tx
                                         .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
@@ -230,7 +233,6 @@ impl ImageProcessor {
 fn render_album_art(
     bytes: &[u8],
     kind: ImageKind,
-    resizer: &mut fr::Resizer,
 ) -> Result<Arc<RenderImage>, ImageProcessorError> {
     let raw_img = image::load_from_memory(bytes)?;
 
@@ -247,26 +249,19 @@ fn render_album_art(
                 _ => unreachable!(),
             };
 
-            let mut dst = fr::images::Image::new(new_w, new_h, fr::PixelType::U8x4);
+            let thumb = raw_img.thumbnail(new_w, new_h);
 
-            resizer.resize(
-                &raw_img,
-                &mut dst,
-                &fr::ResizeOptions::new()
-                    .resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)),
-            )?;
+            let mut rgba = thumb.into_rgba8();
+            rgba_to_bgra_inplace(rgba.as_mut())?;
 
-            let mut buf = dst.into_vec();
-            rgba_to_bgra_inplace(&mut buf)?;
-
-            RgbaImage::from_raw(new_w, new_h, buf).unwrap()
+            rgba
         }
         _ => unreachable!(),
     };
 
-    let frame = Frame::new(image);
+    let render_image = Arc::new(RenderImage::new(smallvec![Frame::new(image)]));
 
-    Ok(Arc::new(RenderImage::new(smallvec![frame])))
+    Ok(render_image)
 }
 
 fn render_playlist_thumbnail(

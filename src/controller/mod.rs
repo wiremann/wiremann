@@ -390,9 +390,9 @@ impl Controller {
 
                 thumbnail_cache.inflight.remove(image_id);
 
-                // let _ = self
-                //     .scanner_tx
-                //     .send(ScannerCommand::PlaylistThumbnailJobFinished(*id));
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::PlaylistJobFinished(*id));
 
                 let width = image.size(0).width.0.cast_unsigned();
                 let height = image.size(0).height.0.cast_unsigned();

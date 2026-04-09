@@ -1,8 +1,8 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::{LibraryState, PlaybackState, QueueState};
 use crate::library::playlists::PlaylistId;
-use crate::library::{ImageId, Track, TrackId};
-use std::collections::{HashMap, HashSet};
+use crate::library::{ImageId, TrackId};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 pub enum AudioCommand {
@@ -28,6 +28,7 @@ pub enum ImageProcessorCommand {
         id: PlaylistId,
         tracks: Vec<PathBuf>,
     },
+    PlaylistJobFinished(PlaylistId),
 }
 
 pub enum CacherCommand {
