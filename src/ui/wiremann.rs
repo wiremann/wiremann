@@ -118,7 +118,6 @@ impl Render for Wiremann {
                 Page::Player => div().w_full().h_full().child(self.player_page.clone()),
                 Page::Library => div().w_full().h_full().child(self.library_page.clone()),
                 Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
-                _ => div(),
             })
     }
 }
