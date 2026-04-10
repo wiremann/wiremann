@@ -3,8 +3,8 @@ use crate::ui::theme::Theme;
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    Animation, AnimationExt as _, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
+    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, ease_in_out, px,
 };
 
 #[derive(Clone)]
@@ -19,8 +19,8 @@ impl NavBar {
 }
 
 impl Render for NavBar {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>();
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.global::<Theme>().clone();
         let page = *cx.global::<Page>();
 
         let active_highlight_offset = match page {
@@ -39,17 +39,49 @@ impl Render for NavBar {
             .bg(theme.switcher_bg)
             .border_1()
             .border_color(theme.border)
-            .child(
+            .child({
+                let pill_state = window
+                    .use_keyed_state("navbar_pill", cx, |_, _| (page, active_highlight_offset));
+
+                let (prev_page, prev_offset) = pill_state.read(cx).clone();
+                let duration = std::time::Duration::from_millis(250);
+
                 div()
                     .id("active_highlight")
                     .absolute()
                     .top_0()
-                    .left(px(active_highlight_offset))
                     .h_full()
                     .w_24()
                     .rounded_full()
-                    .bg(theme.switcher_active),
-            )
+                    .bg(theme.switcher_active)
+                    .map(move |this| {
+                        if prev_page != page {
+                            cx.spawn({
+                                let pill_state = pill_state.clone();
+                                async move |_, cx| {
+                                    cx.background_executor().timer(duration).await;
+                                    _ = pill_state.update(cx, |state, _| {
+                                        *state = (page, active_highlight_offset);
+                                    });
+                                }
+                            })
+                            .detach();
+
+                            this.with_animation(
+                                ElementId::NamedInteger("pill_move".into(), page as u64),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                move |this, delta| {
+                                    let x = prev_offset
+                                        + (active_highlight_offset - prev_offset) * delta;
+                                    this.left(px(x))
+                                },
+                            )
+                            .into_any_element()
+                        } else {
+                            this.left(px(active_highlight_offset)).into_any_element()
+                        }
+                    })
+            })
             .child(
                 div()
                     .id("library")
