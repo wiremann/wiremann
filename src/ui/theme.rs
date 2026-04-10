@@ -69,11 +69,11 @@ impl Default for Theme {
 
             switcher_bg: rgb(0x161616),
             switcher_active: rgb(0xFFFFFF),
-            switcher_text: rgb(0x9A9A9A),
+            switcher_text: rgba(0xFFFFFF99),
             switcher_text_hover: rgb(0xFFFFFF),
             switcher_text_active: rgb(0x090909),
 
-            border: rgb(0x202020),
+            border: rgba(0xFFFFFF1A),
         }
     }
 }

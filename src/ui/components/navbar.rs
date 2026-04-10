@@ -93,7 +93,13 @@ impl Render for NavBar {
                     .text_sm()
                     .text_color(theme.switcher_text)
                     .font_weight(FontWeight::MEDIUM)
-                    .hover(|this| this.text_color(theme.switcher_text_hover))
+                    .hover(|this| {
+                        if page != Page::Library {
+                            this.text_color(theme.switcher_text_hover)
+                        } else {
+                            this
+                        }
+                    })
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Library)
                     .when(page == Page::Library, |this| {
                         this.text_color(theme.switcher_text_active)
@@ -111,7 +117,13 @@ impl Render for NavBar {
                     .text_sm()
                     .text_color(theme.switcher_text)
                     .font_weight(FontWeight::MEDIUM)
-                    .hover(|this| this.text_color(theme.switcher_text_hover))
+                    .hover(|this| {
+                        if page != Page::Player {
+                            this.text_color(theme.switcher_text_hover)
+                        } else {
+                            this
+                        }
+                    })
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Player)
                     .when(page == Page::Player, |this| {
                         this.text_color(theme.switcher_text_active)
@@ -130,7 +142,13 @@ impl Render for NavBar {
                     .text_color(theme.switcher_text)
                     .font_weight(FontWeight::MEDIUM)
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Playlists)
-                    .hover(|this| this.text_color(theme.switcher_text_hover))
+                    .hover(|this| {
+                        if page != Page::Playlists {
+                            this.text_color(theme.switcher_text_hover)
+                        } else {
+                            this
+                        }
+                    })
                     .when(page == Page::Playlists, |this| {
                         this.text_color(theme.switcher_text_active)
                     })
