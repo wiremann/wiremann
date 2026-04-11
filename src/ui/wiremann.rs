@@ -11,9 +11,10 @@ use components::{
     pages::{library::LibraryPage, player::PlayerPage},
     titlebar::Titlebar,
 };
+use gpui::prelude::FluentBuilder;
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement,
-    Render, Styled, Window, div,
+    Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
+    InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
 };
 
 pub struct Wiremann {
@@ -102,8 +103,28 @@ impl Wiremann {
 }
 
 impl Render for Wiremann {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>();
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.global::<Theme>().clone();
+
+        let page = cx.global::<Page>().clone();
+
+        let page_state = window.use_keyed_state("page_transition", cx, |_, _| (page, page));
+        let (current_page, prev_page) = page_state.read(cx).clone();
+
+        let direction = match (prev_page, page) {
+            (Page::Library, Page::Player) => 1.0,
+            (Page::Player, Page::Playlists) => 1.0,
+            (Page::Playlists, Page::Player) => -1.0,
+            (Page::Player, Page::Library) => -1.0,
+            _ => 1.0,
+        };
+
+        let page_el = match page {
+            Page::Player => div().w_full().h_full().child(self.player_page.clone()),
+            Page::Library => div().w_full().h_full().child(self.library_page.clone()),
+            Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
+        };
+
         div()
             .id("main_container")
             .size_full()
@@ -114,10 +135,40 @@ impl Render for Wiremann {
             .items_center()
             .bg(theme.bg_main)
             .child(self.titlebar.clone())
-            .child(match cx.global::<Page>() {
-                Page::Player => div().w_full().h_full().child(self.player_page.clone()),
-                Page::Library => div().w_full().h_full().child(self.library_page.clone()),
-                Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
-            })
+            .child(
+                div()
+                    .id("animation_container")
+                    .w_full()
+                    .h_full()
+                    .map(move |this| {
+                        if prev_page != page {
+                            let duration = std::time::Duration::from_millis(300);
+
+                            cx.spawn({
+                                let page_state = page_state.clone();
+                                async move |_, cx| {
+                                    cx.background_executor().timer(duration).await;
+                                    _ = page_state.update(cx, |state, _| {
+                                        *state = (page, page);
+                                    });
+                                }
+                            })
+                            .detach();
+
+                            this.child(page_el)
+                                .with_animation(
+                                    ElementId::NamedInteger("page_slide".into(), page as u64),
+                                    Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                    move |this, delta| {
+                                        let offset = 360.0 * direction * (1.0 - delta);
+                                        this.left(px(offset)).opacity(delta)
+                                    },
+                                )
+                                .into_any_element()
+                        } else {
+                            this.child(page_el).into_any_element()
+                        }
+                    }),
+            )
     }
 }

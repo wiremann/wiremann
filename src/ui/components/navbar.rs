@@ -4,7 +4,7 @@ use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt as _, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, ease_in_out, px,
+    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, px,
 };
 
 #[derive(Clone)]

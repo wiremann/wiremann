@@ -2,8 +2,8 @@ use super::navbar::NavBar;
 use crate::ui::components::icons::Icons;
 use crate::ui::theme::Theme;
 use gpui::{
-    div, rgb, rgba, white, App, AppContext, Context, Entity, InteractiveElement, IntoElement,
-    ParentElement, Render, Styled, Window, WindowControlArea,
+    App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    Styled, Window, WindowControlArea, div, rgb, rgba, white,
 };
 
 #[derive(Clone)]
@@ -40,7 +40,7 @@ impl Render for Titlebar {
                             .w_full()
                             .h_full()
                             .window_control_area(WindowControlArea::Drag),
-                    )
+                    ),
             )
             .child(
                 div()
@@ -104,15 +104,6 @@ impl Render for Titlebar {
 }
 
 impl Titlebar {
-    pub fn new(cx: &mut App) -> Titlebar {
-        let navbar = cx.new(|_| NavBar::new());
-
-        Titlebar { navbar }
-    }
-}
-        Titlebar { navbar }
-    }
-}
     pub fn new(cx: &mut App) -> Titlebar {
         let navbar = cx.new(|_| NavBar::new());
 
