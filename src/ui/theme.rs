@@ -61,7 +61,6 @@ pub struct Theme {
     pub queue_item_artist: Rgba,
     pub queue_item_bg_hover: Rgba,
     pub queue_item_bg_current: Rgba,
-    pub queue_item_border_current: Rgba,
 
     // Controlbar
     pub playback_slider_track: Rgba,
@@ -127,7 +126,6 @@ impl Default for Theme {
             queue_item_artist: rgba(0xFFFFFF80),
             queue_item_bg_hover: rgba(0xFFFFFF1A),
             queue_item_bg_current: rgba(0xFFFFFF1A),
-            queue_item_border_current: rgba(0xFFFFFF66),
 
             playback_slider_track: rgba(0xFFFFFF1A),
             playback_slider_fill: rgb(0xFFFFFF),
@@ -136,7 +134,7 @@ impl Default for Theme {
             volume_slider_track: rgba(0xFFFFFF1A),
             volume_slider_fill: rgb(0xFFFFFF),
 
-            border: rgba(0xFFFFFF1A),
+            border: rgba(0xFFFFFF33),
         }
     }
 }

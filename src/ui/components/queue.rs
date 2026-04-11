@@ -73,7 +73,7 @@ impl Render for Item {
             .when(is_current, |d| {
                 d.bg(theme.queue_item_bg_current)
                     .border_1()
-                    .border_color(theme.queue_item_border_current)
+                    .border_color(theme.border)
             })
             .cursor_pointer()
             .child(match thumbnail {
