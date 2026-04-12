@@ -95,46 +95,53 @@ impl Default for Theme {
             accent_15: rgba(0x8B7BF726),
             accent_30: rgba(0x8B7BF74D),
 
-            titlebar_bg: rgb(0x090909),
+            titlebar_bg: rgb(0x0A070F),
 
-            switcher_bg: rgb(0x161616),
-            switcher_active: rgb(0xFFFFFF),
-            switcher_text: rgba(0xFFFFFF99),
+            switcher_bg: rgba(0xFFFFFF0D),
+            switcher_active: rgb(0x8B7BF7),
+            switcher_text: rgba(0xFFFFFFCC),
             switcher_text_hover: rgb(0xFFFFFF),
-            switcher_text_active: rgb(0x090909),
+            switcher_text_active: rgb(0x0A070F),
 
-            player_bg: rgb(0x0a0a0a),
-            player_title_text: rgba(0xFFFFFFF2),
-            player_artist_text: rgba(0xFFFFFF66),
-            player_icons_text: rgba(0xFFFFFF80),
-            player_icons_text_hover: rgb(0xFFFFFF),
-            player_icons_text_active: rgb(0xFFFFFF),
+            player_bg: rgb(0x0A070F),
+            player_title_text: rgb(0xFFFFFF),
+            player_artist_text: rgb(0x6B6B7B),
+
+            player_icons_text: rgb(0x5A5A6B),
+            player_icons_text_hover: rgb(0x8B7BF7),
+            player_icons_text_active: rgb(0x8B7BF7),
+
             player_icons_bg: rgba(0xFFFFFF00),
-            player_icons_bg_hover: rgba(0xFFFFFF1A),
-            player_icons_bg_active: rgba(0xFFFFFF1A),
-            player_play_pause_bg: rgb(0xFFFFFF),
-            player_play_pause_hover: rgba(0xFFFFFFE6),
-            player_play_pause_text: rgb(0x090909),
+            player_icons_bg_hover: rgba(0xFFFFFF14),
+            player_icons_bg_active: rgba(0xFFFFFF14),
 
-            queue_bg: rgba(0x090909),
-            queue_heading_text: rgba(0xFFFFFFF2),
-            queue_show_hide_text: rgba(0xFFFFFFCC),
+            player_play_pause_bg: rgb(0x8B7BF7),
+            player_play_pause_hover: rgba(0x8B7BF7E6),
+            player_play_pause_text: rgb(0x0A070F),
+
+            queue_bg: rgb(0x0A070F),
+            queue_heading_text: rgb(0xFFFFFF),
+
+            queue_show_hide_text: rgb(0x6B6B7B),
             queue_show_hide_text_hover: rgb(0xFFFFFF),
-            queue_show_hide_bg_hover: rgba(0xFFFFFF1A),
-            queue_item_title: rgba(0xFFFFFFF2),
-            queue_item_title_current: rgb(0xFFFFFF),
-            queue_item_artist: rgba(0xFFFFFF80),
-            queue_item_bg_hover: rgba(0xFFFFFF1A),
-            queue_item_bg_current: rgba(0xFFFFFF1A),
+            queue_show_hide_bg_hover: rgba(0xFFFFFF14),
+
+            queue_item_title: rgb(0xFFFFFF),
+            queue_item_title_current: rgb(0x8B7BF7),
+            queue_item_artist: rgb(0x5A5A6B),
+
+            queue_item_bg_hover: rgba(0xFFFFFF0D),
+            queue_item_bg_current: rgba(0x8B7BF71A),
 
             playback_slider_track: rgba(0xFFFFFF1A),
-            playback_slider_fill: rgb(0xFFFFFF),
-            playback_position_text: rgba(0xFFFFFF66),
-            volume_icon: rgba(0xFFFFFF66),
-            volume_slider_track: rgba(0xFFFFFF1A),
-            volume_slider_fill: rgb(0xFFFFFF),
+            playback_slider_fill: rgb(0x8B7BF7),
+            playback_position_text: rgb(0x6B6B7B),
 
-            border: rgba(0xFFFFFF33),
+            volume_icon: rgb(0x6B6B7B),
+            volume_slider_track: rgba(0xFFFFFF1A),
+            volume_slider_fill: rgb(0x8B7BF7),
+
+            border: rgba(0xFFFFFF1A),
         }
     }
 }
