@@ -12,7 +12,7 @@ use gpui::RenderImage;
 use image::{DynamicImage, EncodableLayout, Frame, imageops};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -160,7 +160,7 @@ impl ImageProcessor {
                     Ok(Some(image)) => {
                         if let Ok(hash) = ImageId::generate(&image) {
                             let path = get_cached_image_path(
-                                cache_path.clone(),
+                                cache_path.as_path(),
                                 hash,
                                 ImageKind::AlbumArt,
                             );
@@ -204,11 +204,11 @@ impl ImageProcessor {
                             if let Ok(img) = image::load_from_memory(&image) {
                                 images.push(img);
                             } else {
-                                eprintln!("Invalid album art in {path}");
+                                eprintln!("Invalid album art in {}", path.display());
                             }
                         }
                         Ok(None) => {}
-                        Err(err) => eprintln!("Failed album art for {path}: {err}"),
+                        Err(err) => eprintln!("Failed album art for {}: {err}", path.display()),
                     }
                 }
 

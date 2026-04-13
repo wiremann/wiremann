@@ -488,7 +488,7 @@ impl Cacher {
         kind: ImageKind,
         cached_image: &CachedImage,
     ) -> Result<(), CacherError> {
-        let final_path = self.cached_image_path(id, *kind);
+        let final_path = self.cached_image_path(id, kind);
         let tmp_path = final_path.with_extension("tmp");
 
         if final_path.exists() {
@@ -566,7 +566,7 @@ impl Cacher {
     fn read_cached_image(
         &self,
         id: ImageId,
-        kind: &ImageKind,
+        kind: ImageKind,
     ) -> Result<Option<Arc<RenderImage>>, CacherError> {
         let path = self.cached_image_path(id, *kind);
 
@@ -655,7 +655,7 @@ impl Cacher {
                                 }
                                 Ok(CacheJob::LoadThumbnails(ids, kind)) => {
                                     for id in ids {
-                                        match cacher.read_cached_image(id, &kind) {
+                                        match cacher.read_cached_image(id, kind) {
                                             Ok(Some(image)) => { batch.insert(id, image); },
                                             Ok(None) | Err(_) => { missing.push(id); },
                                         }
@@ -695,7 +695,7 @@ impl Cacher {
             while let Ok(job) = rx.recv() {
                 match job {
                     CacheJob::LoadAlbumArt(id) => {
-                        match cacher.read_cached_image(id, &ImageKind::AlbumArt) {
+                        match cacher.read_cached_image(id, ImageKind::AlbumArt) {
                             Ok(Some(image)) => {
                                 let _ = cacher.tx.send(CacherEvent::AlbumArt(image));
                             }
@@ -740,7 +740,7 @@ impl Cacher {
             while let Ok(job) = rx.recv() {
                 match job {
                     CacheJob::LoadPlaylistThumbnail(id) => {
-                        match cacher.read_cached_image(id, &ImageKind::Playlist) {
+                        match cacher.read_cached_image(id, ImageKind::Playlist) {
                             Ok(Some(image)) => {
                                 let _ = cacher.tx.send(CacherEvent::PlaylistThumbnail(id, image));
                             }
