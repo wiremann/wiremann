@@ -53,6 +53,7 @@ impl ImageProcessor {
         (scanner, cmd_tx, event_rx)
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn run(&mut self, thumbnail_workers: usize) -> Result<(), ImageProcessorError> {
         let (thumb_tx, thumb_rx) = crossbeam_channel::unbounded();
         let (album_art_tx, album_art_rx) = crossbeam_channel::unbounded();
@@ -112,8 +113,8 @@ impl ImageProcessor {
                 loop {
                     select! {
                         recv(thumb_rx) -> job => {
-                            if let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job {
-                                if let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                            if let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job &&
+                                 let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
                                     lookup_batch.insert(id, hash);
                                     last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
@@ -132,7 +133,6 @@ impl ImageProcessor {
                                             }
                                         }
                                     }
-                                }
                             }
                         }
 
@@ -165,16 +165,15 @@ impl ImageProcessor {
                                 ImageKind::AlbumArt,
                             );
 
-                            if !path.exists() {
-                                if let Ok(album_art) = render_album_art(&image, ImageKind::AlbumArt)
-                                {
-                                    let _ = events_tx
-                                        .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
-                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                        HashMap::from([(id, hash)]),
-                                    ));
-                                }
-                            } else {
+                            if path.exists() {
+                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                    HashMap::from([(id, hash)]),
+                                ));
+                            } else if let Ok(album_art) =
+                                render_album_art(&image, ImageKind::AlbumArt)
+                            {
+                                let _ = events_tx
+                                    .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
                                 let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
                                     HashMap::from([(id, hash)]),
                                 ));
@@ -205,11 +204,11 @@ impl ImageProcessor {
                             if let Ok(img) = image::load_from_memory(&image) {
                                 images.push(img);
                             } else {
-                                eprintln!("Invalid album art in {:?}", path);
+                                eprintln!("Invalid album art in {path}");
                             }
                         }
                         Ok(None) => {}
-                        Err(err) => eprintln!("Failed album art for {:?}: {err}", path),
+                        Err(err) => eprintln!("Failed album art for {path}: {err}"),
                     }
                 }
 
@@ -256,7 +255,7 @@ fn render_album_art(
 
             rgba
         }
-        _ => unreachable!(),
+        ImageKind::Playlist => unreachable!(),
     };
 
     let render_image = Arc::new(RenderImage::new(smallvec![Frame::new(image)]));
@@ -281,6 +280,7 @@ fn render_playlist_thumbnail(
         2 => {
             for (i, img) in images.into_iter().enumerate() {
                 let resized = img.resize_exact(128, 256, imageops::FilterType::Lanczos3);
+                #[allow(clippy::cast_possible_wrap)]
                 imageops::overlay(&mut canvas, &resized, (i * 128) as i64, 0);
             }
         }
@@ -308,6 +308,7 @@ fn render_playlist_thumbnail(
                 let x = (i % 2) * 128;
                 let y = (i / 2) * 128;
 
+                #[allow(clippy::cast_possible_wrap)]
                 imageops::overlay(&mut canvas, &resized, x as i64, y as i64);
             }
         }
@@ -315,11 +316,7 @@ fn render_playlist_thumbnail(
 
     let mut image = canvas.to_rgba8();
 
-    let hash = if let Ok(hash) = ImageId::generate(image.as_bytes()) {
-        Some(hash)
-    } else {
-        None
-    };
+    let hash = ImageId::generate(image.as_bytes()).ok();
 
     rgba_to_bgra_inplace(image.as_mut()).ok();
 
@@ -330,7 +327,7 @@ fn render_playlist_thumbnail(
     (Some(render_image), hash)
 }
 
-fn get_cached_image_path(cache_path: PathBuf, id: ImageId, kind: ImageKind) -> PathBuf {
+fn get_cached_image_path(cache_path: &Path, id: ImageId, kind: ImageKind) -> PathBuf {
     let hex = hex::encode(id.0);
     let folder = &hex[0..2];
 

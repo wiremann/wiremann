@@ -670,10 +670,10 @@ impl Controller {
             let insert_pos = this.playback.current_index + 1;
 
             if !queue.tracks.contains(&track_id) {
-                if !queue.tracks.is_empty() {
-                    queue.tracks.insert(insert_pos, track_id);
-                } else {
+                if queue.tracks.is_empty() {
                     queue.tracks.push(track_id);
+                } else {
+                    queue.tracks.insert(insert_pos, track_id);
                 }
 
                 queue.order = (0..queue.tracks.len()).collect();
@@ -920,10 +920,9 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
     for id in candidates {
         if let Some(track) = library_tracks.get(&id)
             && albums.insert(track.album.clone())
+            && let Some(source) = track.get_valid_source()
         {
-            if let Some(source) = track.get_valid_source() {
-                chosen.push(source.path.clone());
-            }
+            chosen.push(source.path.clone());
         }
 
         if chosen.len() == count {

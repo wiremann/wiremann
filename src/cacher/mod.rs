@@ -485,7 +485,7 @@ impl Cacher {
     fn write_cached_image(
         &self,
         id: ImageId,
-        kind: &ImageKind,
+        kind: ImageKind,
         cached_image: &CachedImage,
     ) -> Result<(), CacherError> {
         let final_path = self.cached_image_path(id, *kind);
@@ -648,7 +648,7 @@ impl Cacher {
                                         height,
                                         image
                                     };
-                                    match cacher.write_cached_image(id, &kind, &cached_image) {
+                                    match cacher.write_cached_image(id, kind, &cached_image) {
                                         Ok(()) => {}
                                         Err(err) => {eprintln!("Error occurred: {err:#?}");}
                                     }
@@ -720,7 +720,7 @@ impl Cacher {
                             height,
                             image,
                         };
-                        match cacher.write_cached_image(id, &kind, &cached_image) {
+                        match cacher.write_cached_image(id, kind, &cached_image) {
                             Ok(()) => {}
                             Err(err) => {
                                 eprintln!("Error occurred: {err:#?}");
@@ -765,7 +765,7 @@ impl Cacher {
                             height,
                             image,
                         };
-                        match cacher.write_cached_image(id, &kind, &cached_image) {
+                        match cacher.write_cached_image(id, kind, &cached_image) {
                             Ok(()) => {}
                             Err(err) => {
                                 eprintln!("Error occurred: {err:#?}");
