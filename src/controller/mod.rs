@@ -78,7 +78,7 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             AudioEvent::Position(pos) => {
-                let last_pos = *self.state.read(cx).playback.position;
+                let last_pos = self.state.read(cx).playback.position;
 
                 if *pos != last_pos {
                     view.update(cx, |this, cx| {
@@ -918,8 +918,8 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
     let candidates = playlist_tracks.iter().copied().sample(&mut rng, count * 3);
 
     for id in candidates {
-        if albums.insert(track.album.clone())
-            && let Some(track) = library_tracks.get(&id)
+        if let Some(track) = library_tracks.get(&id)
+            && albums.insert(track.album.clone())
         {
             if let Some(source) = track.get_valid_source() {
                 chosen.push(source.path.clone());
@@ -937,8 +937,8 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
                 break;
             }
 
-            if albums.insert(track.album.clone())
-                && let Some(track) = library_tracks.get(id)
+            if let Some(track) = library_tracks.get(id)
+                && albums.insert(track.album.clone())
                 && let Some(source) = track.get_valid_source()
             {
                 chosen.push(source.path.clone());
