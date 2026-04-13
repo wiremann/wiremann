@@ -105,13 +105,13 @@ impl PlaylistsPage {
                                 .font_weight(FontWeight::BLACK)
                                 .truncate()
                                 .text_ellipsis()
-                                .text_color(theme.text_primary)
+                                .text_color(theme.playlist_header_title)
                                 .child(playlist.name.clone()),
                         )
                         .child(
                             div()
                                 .text_base()
-                                .text_color(theme.text_secondary)
+                                .text_color(theme.playlist_header_meta)
                                 .child(format!("{} tracks", playlist.tracks.len())),
                         )
                         .child(
@@ -125,10 +125,10 @@ impl PlaylistsPage {
                                         .py_1()
                                         .px_4()
                                         .text_base()
-                                        .text_color(theme.text_primary)
-                                        .bg(theme.accent_15)
+                                        .text_color(theme.playlist_header_button_text)
+                                        .bg(theme.playlist_header_button_bg)
                                         .border_2()
-                                        .border_color(theme.accent_30)
+                                        .border_color(theme.playlist_header_button_border)
                                         .rounded_md()
                                         .flex()
                                         .items_center()
@@ -137,14 +137,12 @@ impl PlaylistsPage {
                                         .child(Icon::new(Icons::Play).size_4())
                                         .child("Play")
                                         .cursor_pointer()
-                                        .hover(|this| this.bg(theme.accent_30))
+                                        .hover(|this| this.bg(theme.playlist_header_button_hover))
                                         .on_click({
                                             let id = playlist.id.clone();
                                             move |_, _, cx| {
                                                 let controller = cx.global::<Controller>().clone();
-
                                                 controller.load_playlist(id, cx);
-
                                                 *cx.global_mut::<Page>() = Page::Player;
                                             }
                                         }),
@@ -155,10 +153,10 @@ impl PlaylistsPage {
                                         .py_1()
                                         .px_4()
                                         .text_base()
-                                        .text_color(theme.text_primary)
-                                        .bg(theme.accent_15)
+                                        .text_color(theme.playlist_header_button_text)
+                                        .bg(theme.playlist_header_button_bg)
                                         .border_2()
-                                        .border_color(theme.accent_30)
+                                        .border_color(theme.playlist_header_button_border)
                                         .rounded_md()
                                         .flex()
                                         .items_center()
@@ -167,15 +165,13 @@ impl PlaylistsPage {
                                         .child(Icon::new(Icons::Shuffle).size_4())
                                         .child("Shuffle Play")
                                         .cursor_pointer()
-                                        .hover(|this| this.bg(theme.accent_30))
+                                        .hover(|this| this.bg(theme.playlist_header_button_hover))
                                         .on_click({
                                             let id = playlist.id.clone();
                                             move |_, _, cx| {
                                                 let controller = cx.global::<Controller>().clone();
-
                                                 controller.load_playlist(id, cx);
                                                 controller.set_shuffle(cx);
-
                                                 *cx.global_mut::<Page>() = Page::Player;
                                             }
                                         }),
@@ -198,9 +194,9 @@ impl PlaylistsPage {
             .items_center()
             .text_xs()
             .font_weight(FontWeight::NORMAL)
-            .text_color(theme.text_muted)
+            .text_color(theme.playlist_table_header_text)
             .border_b_1()
-            .border_color(theme.white_05)
+            .border_color(theme.playlist_table_header_border)
             .child(
                 div()
                     .w_20()
@@ -267,7 +263,7 @@ impl PlaylistsPage {
                 .py_1()
                 .px_4()
                 .border_b_1()
-                .border_color(theme.white_05)
+                .border_color(theme.playlist_track_border)
                 .child(
                     div()
                         .id(format!("track_{:?}", track.id.0))
@@ -276,13 +272,12 @@ impl PlaylistsPage {
                         .items_center()
                         .rounded_md()
                         .cursor_pointer()
-                        .hover(|this| this.bg(theme.accent_10))
-                        .when(is_current, |this| this.bg(theme.accent_15))
+                        .hover(|this| this.bg(theme.playlist_track_bg_hover))
+                        .when(is_current, |this| this.bg(theme.playlist_track_bg_current))
                         .on_click({
                             let id = *id;
                             move |_, _, cx| {
                                 let controller = cx.global::<Controller>().clone();
-
                                 controller.load_track(id, cx)
                             }
                         })
@@ -294,7 +289,7 @@ impl PlaylistsPage {
                                 .px_6()
                                 .items_center()
                                 .justify_start()
-                                .child(format! {"{:02}", i}),
+                                .child(format!("{:02}", i)),
                         )
                         .child(
                             div()
@@ -317,7 +312,7 @@ impl PlaylistsPage {
                                     None => div().size_11().flex_shrink_0(),
                                 })
                                 .when(is_current, |this| {
-                                    this.text_color(theme.accent)
+                                    this.text_color(theme.playlist_track_title_current)
                                         .font_weight(FontWeight::MEDIUM)
                                 })
                                 .child(track.title.to_string())
@@ -413,8 +408,8 @@ impl Render for PlaylistsPage {
 
         div()
             .size_full()
-            .bg(theme.bg_main)
-            .text_color(theme.text_primary)
+            .bg(theme.playlist_page_bg)
+            .text_color(theme.playlist_page_text)
             .flex()
             .child(
                 div()
@@ -424,8 +419,7 @@ impl Render for PlaylistsPage {
                     .flex_col()
                     .gap_2()
                     .border_r_1()
-                    .border_color(theme.white_05)
-                    // .bg(theme.queue)
+                    .border_color(theme.playlist_sidebar_border)
                     .child(
                         div()
                             .w_full()
@@ -436,7 +430,7 @@ impl Render for PlaylistsPage {
                             .child(
                                 div()
                                     .text_base()
-                                    .text_color(theme.text_primary)
+                                    .text_color(theme.playlist_sidebar_item_title)
                                     .font_weight(FontWeight(500.0))
                                     .child("Playlists"),
                             ),
@@ -456,6 +450,7 @@ impl Render for PlaylistsPage {
                                 uniform_list("playlist_sidebar", len, {
                                     let selected = selected.clone();
                                     let playlists = playlists.clone();
+
                                     move |range, _, cx| {
                                         range
                                             .map(|i| {
@@ -489,8 +484,12 @@ impl Render for PlaylistsPage {
                                                         .mb_2()
                                                         .gap_4()
                                                         .rounded_lg()
-                                                        .hover(|d| d.bg(theme.white_05))
-                                                        .when(is_current, |d| d.bg(theme.accent_15))
+                                                        .hover(|d| {
+                                                            d.bg(theme.playlist_sidebar_item_bg_hover)
+                                                        })
+                                                        .when(is_current, |d| {
+                                                            d.bg(theme.playlist_sidebar_item_bg_current)
+                                                        })
                                                         .cursor_pointer()
                                                         .on_click({
                                                             let id = playlist.id;
@@ -526,9 +525,9 @@ impl Render for PlaylistsPage {
                                                                         .text_base()
                                                                         .truncate()
                                                                         .text_color(if is_current {
-                                                                            theme.accent
+                                                                            theme.playlist_sidebar_item_title_current
                                                                         } else {
-                                                                            theme.text_primary
+                                                                            theme.playlist_sidebar_item_title
                                                                         })
                                                                         .child(
                                                                             playlist.name.clone(),
@@ -538,7 +537,7 @@ impl Render for PlaylistsPage {
                                                                     div()
                                                                         .text_sm()
                                                                         .text_color(
-                                                                            theme.text_muted,
+                                                                            theme.playlist_sidebar_item_meta,
                                                                         )
                                                                         .truncate()
                                                                         .child(format!(
@@ -578,6 +577,7 @@ impl Render for PlaylistsPage {
                         main_scroll_handle,
                         {
                             let selected = selected.clone();
+
                             move |_this, range, _, cx| {
                                 let len = rows.len();
 
@@ -625,7 +625,7 @@ impl Render for PlaylistsPage {
                     .items_center()
                     .justify_center()
                     .text_base()
-                    .text_color(theme.text_muted)
+                    .text_color(theme.playlist_empty_text)
                     .child("Select a playlist to view...")
             })
     }

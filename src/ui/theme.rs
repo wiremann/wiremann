@@ -96,6 +96,37 @@ pub struct Theme {
 
     pub library_empty_text: Rgba,
 
+    // Playlists page
+    pub playlist_page_bg: Rgba,
+    pub playlist_page_text: Rgba,
+
+    pub playlist_header_title: Rgba,
+    pub playlist_header_meta: Rgba,
+
+    pub playlist_header_button_text: Rgba,
+    pub playlist_header_button_bg: Rgba,
+    pub playlist_header_button_border: Rgba,
+    pub playlist_header_button_hover: Rgba,
+
+    pub playlist_table_header_text: Rgba,
+    pub playlist_table_header_border: Rgba,
+
+    pub playlist_track_border: Rgba,
+    pub playlist_track_bg_hover: Rgba,
+    pub playlist_track_bg_current: Rgba,
+    pub playlist_track_title_current: Rgba,
+
+    pub playlist_sidebar_border: Rgba,
+
+    pub playlist_sidebar_item_title: Rgba,
+    pub playlist_sidebar_item_title_current: Rgba,
+    pub playlist_sidebar_item_meta: Rgba,
+
+    pub playlist_sidebar_item_bg_hover: Rgba,
+    pub playlist_sidebar_item_bg_current: Rgba,
+
+    pub playlist_empty_text: Rgba,
+
     // Common
     pub border: Rgba,
 }
@@ -191,6 +222,36 @@ impl Default for Theme {
             library_track_title_text_active: rgb(0x8B7BF7),
 
             library_empty_text: rgb(0x5A5A6B),
+
+            playlist_page_bg: rgb(0x0A070F),
+            playlist_page_text: rgb(0xFFFFFF),
+
+            playlist_header_title: rgb(0xFFFFFF),
+            playlist_header_meta: rgb(0x6B6B7B),
+
+            playlist_header_button_text: rgb(0xFFFFFF),
+            playlist_header_button_bg: rgba(0x8B7BF71A),
+            playlist_header_button_border: rgba(0x8B7BF74D),
+            playlist_header_button_hover: rgba(0x8B7BF74D),
+
+            playlist_table_header_text: rgb(0x5A5A6B),
+            playlist_table_header_border: rgba(0xFFFFFF1A),
+
+            playlist_track_border: rgba(0xFFFFFF1A),
+            playlist_track_bg_hover: rgba(0x8B7BF71A),
+            playlist_track_bg_current: rgba(0x8B7BF726),
+            playlist_track_title_current: rgb(0x8B7BF7),
+
+            playlist_sidebar_border: rgba(0xFFFFFF1A),
+
+            playlist_sidebar_item_title: rgb(0xFFFFFF),
+            playlist_sidebar_item_title_current: rgb(0x8B7BF7),
+            playlist_sidebar_item_meta: rgb(0x5A5A6B),
+
+            playlist_sidebar_item_bg_hover: rgba(0xFFFFFF0D),
+            playlist_sidebar_item_bg_current: rgba(0x8B7BF726),
+
+            playlist_empty_text: rgb(0x5A5A6B),
 
             border: rgba(0xFFFFFF1A),
         }
