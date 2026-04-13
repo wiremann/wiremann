@@ -41,7 +41,7 @@ impl PlayerPage {
 impl Render for PlayerPage {
     #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
 
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);

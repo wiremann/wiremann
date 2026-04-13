@@ -16,7 +16,7 @@ pub trait ElementExt: ParentElement + Sized {
         self.child(
             canvas(
                 move |bounds, window, cx| f(bounds, window, cx),
-                |_, _, _, _| {},
+                |_, (), _, _| {},
             )
             .absolute()
             .size_full(),

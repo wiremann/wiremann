@@ -185,7 +185,7 @@ impl Scanner {
         }
 
         if let Ok(track) = metadata::read_metadata(ts.clone()) {
-            let id = track.id.clone();
+            let id = track.id;
             new.push((track, pid));
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
 
@@ -265,13 +265,12 @@ impl Scanner {
             std::thread::spawn(move || {
                 for entry in WalkDir::new(&path)
                     .into_iter()
-                    .filter_map(|e| e.ok())
+                    .filter_map(std::result::Result::ok)
                     .filter(|e| {
                         e.path()
                             .extension()
                             .and_then(OsStr::to_str)
-                            .map(|ext| exts.contains(&ext))
-                            .unwrap_or(false)
+                            .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
                     scan_progress.total.fetch_add(1, Ordering::Relaxed);

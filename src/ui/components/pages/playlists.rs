@@ -48,8 +48,7 @@ impl PlaylistsPage {
             .state
             .read(cx)
             .playback
-            .current_playlist
-            .clone();
+            .current_playlist;
 
         PlaylistsPage {
             sidebar_scroll_handle,
@@ -62,7 +61,7 @@ impl PlaylistsPage {
     }
 
     fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App) -> Div {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
 
         let state = controller.state.read(cx).clone();
@@ -139,7 +138,7 @@ impl PlaylistsPage {
                                         .cursor_pointer()
                                         .hover(|this| this.bg(theme.playlist_header_button_hover))
                                         .on_click({
-                                            let id = playlist.id.clone();
+                                            let id = playlist.id;
                                             move |_, _, cx| {
                                                 let controller = cx.global::<Controller>().clone();
                                                 controller.load_playlist(id, cx);
@@ -167,7 +166,7 @@ impl PlaylistsPage {
                                         .cursor_pointer()
                                         .hover(|this| this.bg(theme.playlist_header_button_hover))
                                         .on_click({
-                                            let id = playlist.id.clone();
+                                            let id = playlist.id;
                                             move |_, _, cx| {
                                                 let controller = cx.global::<Controller>().clone();
                                                 controller.load_playlist(id, cx);
@@ -253,7 +252,7 @@ impl PlaylistsPage {
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         let controller = cx.global::<Controller>().clone();
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let state = controller.state.read(cx).clone();
         let is_current = Some(id) == state.playback.current.as_ref();
 
@@ -278,7 +277,7 @@ impl PlaylistsPage {
                             let id = *id;
                             move |_, _, cx| {
                                 let controller = cx.global::<Controller>().clone();
-                                controller.load_track(id, cx)
+                                controller.load_track(id, cx);
                             }
                         })
                         .child(
@@ -289,7 +288,7 @@ impl PlaylistsPage {
                                 .px_6()
                                 .items_center()
                                 .justify_start()
-                                .child(format!("{:02}", i)),
+                                .child(format!("{i:02}")),
                         )
                         .child(
                             div()
@@ -320,7 +319,7 @@ impl PlaylistsPage {
                                     this.text_color(theme.playlist_track_title_current)
                                         .font_weight(FontWeight::MEDIUM)
                                 })
-                                .child(track.title.to_string())
+                                .child(track.title.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -334,7 +333,7 @@ impl PlaylistsPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.artist.to_string())
+                                .child(track.artist.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -348,7 +347,7 @@ impl PlaylistsPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.album.to_string())
+                                .child(track.album.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -383,7 +382,7 @@ impl PlaylistsPage {
 impl Render for PlaylistsPage {
     #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
 
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
@@ -391,10 +390,10 @@ impl Render for PlaylistsPage {
         let main_scroll_handle = self.main_scroll_handle.clone();
         let selected = self.selected_playlist.clone();
 
-        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().cloned());
-        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().cloned());
+        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
+        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
 
-        let selected_id = selected.read(cx).map(|p| p.0.as_u128()).unwrap_or(0);
+        let selected_id = selected.read(cx).map_or(0, |p| p.0.as_u128());
         let combined_fp = tracks_fp ^ playlists_fp ^ selected_id;
 
         if combined_fp != self.last_fp {
@@ -615,7 +614,7 @@ impl Render for PlaylistsPage {
                                     .map(|idx| match &rows[idx] {
                                         PlaylistsRows::Header => Self::render_header(
                                             heights[idx],
-                                            selected.read(cx).clone(),
+                                            *selected.read(cx),
                                             cx,
                                         ),
 
@@ -659,9 +658,9 @@ fn build_rows(
     rows.push(PlaylistsRows::Header);
     heights.push(px(240.0));
 
-    if let Some(pid) = selected {
-        if let Some(playlist) = library.playlists.get(&pid) {
-            if !playlist.tracks.is_empty() {
+    if let Some(pid) = selected
+        && let Some(playlist) = library.playlists.get(&pid)
+            && !playlist.tracks.is_empty() {
                 let mut tracks: Vec<_> = playlist
                     .tracks
                     .iter()
@@ -678,8 +677,6 @@ fn build_rows(
                     heights.push(px(60.0));
                 }
             }
-        }
-    }
 
     (rows, heights)
 }

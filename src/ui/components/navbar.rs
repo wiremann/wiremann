@@ -20,7 +20,7 @@ impl NavBar {
 
 impl Render for NavBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let page = *cx.global::<Page>();
 
         let active_highlight_offset = match page {
@@ -43,7 +43,7 @@ impl Render for NavBar {
                 let pill_state = window
                     .use_keyed_state("navbar_pill", cx, |_, _| (page, active_highlight_offset));
 
-                let (prev_page, prev_offset) = pill_state.read(cx).clone();
+                let (prev_page, prev_offset) = *pill_state.read(cx);
                 let duration = std::time::Duration::from_millis(250);
 
                 div()
@@ -55,12 +55,14 @@ impl Render for NavBar {
                     .rounded_full()
                     .bg(theme.switcher_active)
                     .map(move |this| {
-                        if prev_page != page {
+                        if prev_page == page {
+                            this.left(px(active_highlight_offset)).into_any_element()
+                        } else {
                             cx.spawn({
                                 let pill_state = pill_state.clone();
                                 async move |_, cx| {
                                     cx.background_executor().timer(duration).await;
-                                    _ = pill_state.update(cx, |state, _| {
+                                    () = pill_state.update(cx, |state, _| {
                                         *state = (page, active_highlight_offset);
                                     });
                                 }
@@ -77,8 +79,6 @@ impl Render for NavBar {
                                 },
                             )
                             .into_any_element()
-                        } else {
-                            this.left(px(active_highlight_offset)).into_any_element()
                         }
                     })
             })
@@ -94,10 +94,10 @@ impl Render for NavBar {
                     .text_color(theme.switcher_text)
                     .font_weight(FontWeight::MEDIUM)
                     .hover(|this| {
-                        if page != Page::Library {
-                            this.text_color(theme.switcher_text_hover)
-                        } else {
+                        if page == Page::Library {
                             this
+                        } else {
+                            this.text_color(theme.switcher_text_hover)
                         }
                     })
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Library)
@@ -118,10 +118,10 @@ impl Render for NavBar {
                     .text_color(theme.switcher_text)
                     .font_weight(FontWeight::MEDIUM)
                     .hover(|this| {
-                        if page != Page::Player {
-                            this.text_color(theme.switcher_text_hover)
-                        } else {
+                        if page == Page::Player {
                             this
+                        } else {
+                            this.text_color(theme.switcher_text_hover)
                         }
                     })
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Player)
@@ -143,10 +143,10 @@ impl Render for NavBar {
                     .font_weight(FontWeight::MEDIUM)
                     .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Playlists)
                     .hover(|this| {
-                        if page != Page::Playlists {
-                            this.text_color(theme.switcher_text_hover)
-                        } else {
+                        if page == Page::Playlists {
                             this
+                        } else {
+                            this.text_color(theme.switcher_text_hover)
                         }
                     })
                     .when(page == Page::Playlists, |this| {

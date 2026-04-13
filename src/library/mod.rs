@@ -65,6 +65,7 @@ impl ImageId {
 }
 
 impl Track {
+    #[must_use]
     pub fn get_valid_source(&self) -> Option<&TrackSource> {
         self.sources.iter().find(|&t| t.path.exists())
     }

@@ -86,11 +86,13 @@ impl Icon {
         cx.new(|_| self)
     }
 
+    #[must_use]
     pub fn transform(mut self, transformation: Transformation) -> Self {
         self.base = self.base.with_transformation(transformation);
         self
     }
 
+    #[must_use]
     pub fn empty() -> Self {
         Self::default()
     }
@@ -139,7 +141,7 @@ impl From<Icon> for AnyElement {
 
 impl Render for Icon {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let text_color = self.text_color.unwrap_or_else(|| white());
+        let text_color = self.text_color.unwrap_or_else(white);
         let text_size = window.text_style().font_size.to_pixels(window.rem_size());
         let has_base_size = self.style.size.width.is_some() || self.style.size.height.is_some();
 

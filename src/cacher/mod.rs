@@ -568,7 +568,7 @@ impl Cacher {
         id: ImageId,
         kind: ImageKind,
     ) -> Result<Option<Arc<RenderImage>>, CacherError> {
-        let path = self.cached_image_path(id, *kind);
+        let path = self.cached_image_path(id, kind);
 
         let bytes = fs::read(path)?;
 

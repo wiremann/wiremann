@@ -28,7 +28,14 @@ impl Render for DragSlider {
     }
 }
 
+impl Default for SliderState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SliderState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             min: 0.0,
@@ -40,27 +47,32 @@ impl SliderState {
         }
     }
 
+    #[must_use]
     pub fn min(mut self, v: f32) -> Self {
         self.min = v;
         self
     }
 
+    #[must_use]
     pub fn max(mut self, v: f32) -> Self {
         self.max = v;
         self
     }
 
+    #[must_use]
     pub fn step(mut self, v: f32) -> Self {
         self.step = v;
         self
     }
 
+    #[must_use]
     pub fn default_value(mut self, v: f32) -> Self {
         self.value = v;
         self.percentage = self.value_to_percentage(v);
         self
     }
 
+    #[must_use]
     pub fn value(&self) -> f32 {
         self.value
     }
@@ -145,7 +157,7 @@ impl RenderOnce for Slider {
             .and_then(|bg| bg.color())
             .unwrap_or(white().into());
 
-        let fill_color = self.style.text.color.unwrap_or_else(|| white().into());
+        let fill_color = self.style.text.color.unwrap_or_else(white);
 
         let mut root = div()
             .id(("slider", self.state.entity_id()))

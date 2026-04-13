@@ -33,7 +33,7 @@ impl Assets {
         let font_paths = self.list("fonts")?;
         let mut embedded_fonts = Vec::new();
         for font_path in font_paths {
-            println!("FONT FOUND: {}", font_path);
+            println!("FONT FOUND: {font_path}");
             if font_path.ends_with(".ttf") {
                 let font_bytes = cx
                     .asset_source()

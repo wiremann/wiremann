@@ -66,7 +66,7 @@ pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
     {
         return Ok(tag.pictures().first().map(|data| Box::from(data.data())));
     }
-    return Ok(None);
+    Ok(None)
 }
 
 fn fallback_metadata(path: &Path) -> (String, String, String) {
