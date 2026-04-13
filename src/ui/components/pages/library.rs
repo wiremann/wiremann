@@ -197,12 +197,16 @@ impl LibraryPage {
                                 Some(image) => div().size_full().mb_3().child(
                                     img(image.clone())
                                         .object_fit(ObjectFit::Contain)
+                                        .border_1()
+                                        .border_color(theme.border)
                                         .size_full()
                                         .rounded_lg(),
                                 ),
                                 None => div().size_full().mb_3().child(
                                     img("icons/placeholder.svg")
                                         .object_fit(ObjectFit::Contain)
+                                        .border_1()
+                                        .border_color(theme.border)
                                         .size_full()
                                         .rounded_lg(),
                                 ),
@@ -356,12 +360,16 @@ impl LibraryPage {
                                         img(image.clone())
                                             .object_fit(ObjectFit::Contain)
                                             .size_full()
+                                            .border_1()
+                                            .border_color(theme.border)
                                             .rounded_sm(),
                                     ),
                                     None => div().size_11().flex_shrink_0().child(
                                         img("icons/placeholder.svg")
                                             .object_fit(ObjectFit::Contain)
                                             .size_full()
+                                            .border_1()
+                                            .border_color(theme.border)
                                             .rounded_sm(),
                                     ),
                                 })

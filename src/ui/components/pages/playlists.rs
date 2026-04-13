@@ -516,6 +516,8 @@ impl Render for PlaylistsPage {
                                                                             ObjectFit::Contain,
                                                                         )
                                                                         .size_full()
+                                                                        .border_1()
+                                                                        .border_color(theme.border)
                                                                         .rounded_md(),
                                                                 ),
                                                             None => div()
@@ -527,6 +529,8 @@ impl Render for PlaylistsPage {
                                                                             ObjectFit::Contain,
                                                                         )
                                                                         .size_full()
+                                                                        .border_1()
+                                                                        .border_color(theme.border)
                                                                         .rounded_md(),
                                                                 ),                                                        })
                                                         .child(
