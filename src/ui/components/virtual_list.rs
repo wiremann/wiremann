@@ -7,6 +7,7 @@ use gpui::{
 };
 use smallvec::SmallVec;
 
+#[allow(clippy::type_complexity)]
 pub struct VirtualList {
     id: ElementId,
     base: Stateful<Div>,

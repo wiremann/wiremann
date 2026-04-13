@@ -5,6 +5,7 @@ use lofty::read_from_path;
 use lofty::tag::ItemKey;
 use std::path::Path;
 
+#[allow(clippy::missing_errors_doc)]
 pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
     let path = track_source.path.as_path();
 
@@ -56,6 +57,7 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
     })
 }
 
+#[allow(clippy::missing_errors_doc)]
 pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
     let file = read_from_path(path).ok();
 

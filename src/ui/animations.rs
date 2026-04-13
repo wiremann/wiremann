@@ -12,7 +12,7 @@ pub fn ease_in_out_expo() -> impl Fn(f32) -> f32 {
     move |delta| {
         if delta == 0.0 {
             0.0
-        } else if delta == 1.0 {
+        } else if (delta - 1.0).abs() < 0.01 {
             1.0
         } else if delta < 0.5 {
             (2.0_f32.powf(20.0 * delta - 10.0)) / 2.0

@@ -4,6 +4,11 @@ pub struct WorkerConfig {
     pub cacher: usize,
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss
+)]
 pub fn calculate_worker_config() -> WorkerConfig {
     let logical = num_cpus::get().max(1);
 

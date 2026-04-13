@@ -113,11 +113,9 @@ impl Render for Wiremann {
         let prev_page = *page_state.read(cx);
 
         let direction = match (prev_page, page) {
-            (Page::Library, Page::Player) => 1.0,
-            (Page::Player, Page::Playlists) => 1.0,
-            (Page::Playlists, Page::Player) => -1.0,
-            (Page::Player, Page::Library) => -1.0,
-            _ => 1.0,
+            (Page::Library, Page::Player) | (Page::Player, Page::Playlists) => 1.0,
+            (Page::Playlists, Page::Player) | (Page::Player, Page::Library) => -1.0,
+            _ => 0.0,
         };
 
         let page_el = match page {

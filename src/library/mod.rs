@@ -73,6 +73,7 @@ impl Track {
 }
 
 impl TrackSource {
+    #[allow(clippy::missing_errors_doc)]
     pub fn generate(path: &Path) -> Result<Self, io::Error> {
         let meta = std::fs::metadata(path)?;
         let modified = meta

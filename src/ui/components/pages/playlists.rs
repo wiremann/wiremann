@@ -60,6 +60,7 @@ impl PlaylistsPage {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App) -> Div {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
@@ -243,6 +244,7 @@ impl PlaylistsPage {
             )
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
         let image_id = {
             let state = cx.global::<Controller>().state.read(cx);
@@ -660,23 +662,24 @@ fn build_rows(
 
     if let Some(pid) = selected
         && let Some(playlist) = library.playlists.get(&pid)
-            && !playlist.tracks.is_empty() {
-                let mut tracks: Vec<_> = playlist
-                    .tracks
-                    .iter()
-                    .filter_map(|id| library.tracks.get(id))
-                    .collect();
+        && !playlist.tracks.is_empty()
+    {
+        let mut tracks: Vec<_> = playlist
+            .tracks
+            .iter()
+            .filter_map(|id| library.tracks.get(id))
+            .collect();
 
-                tracks.sort_by(|a, b| a.title.cmp(&b.title));
+        tracks.sort_by(|a, b| a.title.cmp(&b.title));
 
-                rows.push(PlaylistsRows::TrackTableHeader);
-                heights.push(px(40.0));
+        rows.push(PlaylistsRows::TrackTableHeader);
+        heights.push(px(40.0));
 
-                for (i, track) in tracks.iter().enumerate() {
-                    rows.push(PlaylistsRows::TrackRow(i + 1, track.id));
-                    heights.push(px(60.0));
-                }
-            }
+        for (i, track) in tracks.iter().enumerate() {
+            rows.push(PlaylistsRows::TrackRow(i + 1, track.id));
+            heights.push(px(60.0));
+        }
+    }
 
     (rows, heights)
 }

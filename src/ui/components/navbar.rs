@@ -19,6 +19,7 @@ impl NavBar {
 }
 
 impl Render for NavBar {
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let page = *cx.global::<Page>();

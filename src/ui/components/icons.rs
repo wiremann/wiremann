@@ -76,6 +76,7 @@ impl Icon {
     /// Set the icon path of the Assets bundle
     ///
     /// For example: `icons/foo.svg`
+    #[must_use]
     pub fn path(mut self, path: impl Into<SharedString>) -> Self {
         self.path = path.into();
         self
@@ -98,6 +99,7 @@ impl Icon {
     }
 
     /// Rotate the icon by the given angle
+    #[must_use]
     pub fn rotate(mut self, radians: impl Into<Radians>) -> Self {
         self.base = self
             .base
