@@ -65,7 +65,6 @@ impl LibraryPage {
             last_fp: 0,
         }
     }
-
     fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
         let heading = match kind {
             HeaderKind::Playlists => "Playlists",
@@ -83,7 +82,7 @@ impl LibraryPage {
             .justify_between()
             .text_lg()
             .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text_primary)
+            .text_color(theme.library_header_text)
             .child(heading)
             .child(if *kind == HeaderKind::Playlists {
                 div()
@@ -96,11 +95,11 @@ impl LibraryPage {
                     .py_1()
                     .rounded_lg()
                     .border_1()
-                    .border_color(theme.accent)
-                    .text_color(theme.accent)
+                    .border_color(theme.library_header_button_border)
+                    .text_color(theme.library_header_button_text)
                     .text_base()
                     .cursor_pointer()
-                    .hover(|this| this.bg(theme.accent_15))
+                    .hover(|this| this.bg(theme.library_header_button_bg_hover))
                     .on_click(move |_, _, cx| {
                         let controller = cx.global::<Controller>().clone();
                         cx.spawn(async move |_| {
@@ -108,7 +107,7 @@ impl LibraryPage {
                                 controller.scan_dir(folder.path().into());
                             }
                         })
-                        .detach()
+                        .detach();
                     })
                     .child("Open Folder")
             } else if *kind == HeaderKind::Tracks {
@@ -122,11 +121,11 @@ impl LibraryPage {
                     .py_1()
                     .rounded_lg()
                     .border_1()
-                    .border_color(theme.accent)
+                    .border_color(theme.library_header_button_border)
                     .text_base()
-                    .text_color(theme.accent)
+                    .text_color(theme.library_header_button_text)
                     .cursor_pointer()
-                    .hover(|this| this.bg(theme.accent_15))
+                    .hover(|this| this.bg(theme.library_header_button_bg_hover))
                     .on_click(move |_, _, cx| {
                         let controller = cx.global::<Controller>().clone();
                         cx.spawn(async move |_| {
@@ -136,7 +135,7 @@ impl LibraryPage {
                                 }
                             }
                         })
-                        .detach()
+                        .detach();
                     })
                     .child("Add Track")
             } else {
@@ -146,7 +145,7 @@ impl LibraryPage {
 
     fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
         let controller = cx.global::<Controller>().clone();
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
 
         div()
             .h(height)
@@ -157,7 +156,7 @@ impl LibraryPage {
             .children({
                 let state = controller.state.read(cx).clone();
 
-                controller.request_playlist_thumbnails(&ids, cx);
+                controller.request_playlist_thumbnails(ids, cx);
 
                 let cache = cx.global_mut::<ImageCache>();
 
@@ -168,21 +167,21 @@ impl LibraryPage {
                         let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
 
                         let el = div()
-                            .id(format!("playlist_{}", playlist.id.0.to_string()))
-                            .bg(theme.bg_main)
+                            .id(format!("playlist_{}", playlist.id.0))
+                            .bg(theme.library_playlist_bg)
                             .size_full()
                             .max_w_64()
                             .flex()
                             .flex_col()
                             .items_start()
                             .justify_center()
-                            .text_color(theme.text_primary)
+                            .text_color(theme.library_playlist_text)
                             .p_3()
                             .rounded_lg()
-                            .hover(|this| this.bg(theme.accent_10))
+                            .hover(|this| this.bg(theme.library_playlist_bg_hover))
                             .cursor_pointer()
                             .on_click({
-                                let id = playlist.id.clone();
+                                let id = playlist.id;
                                 move |_, _, cx| {
                                     let controller = cx.global::<Controller>().clone();
 
@@ -192,7 +191,7 @@ impl LibraryPage {
                             })
                             .when(
                                 state.playback.current_playlist == Some(playlist.id),
-                                |this| this.bg(theme.accent_15),
+                                |this| this.bg(theme.library_playlist_bg_active),
                             )
                             .child(match thumbnail {
                                 Some(image) => div().size_full().mb_3().child(
@@ -206,14 +205,14 @@ impl LibraryPage {
                             .child(
                                 div()
                                     .text_base()
-                                    .text_color(theme.text_primary)
+                                    .text_color(theme.library_playlist_title_text)
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(playlist.name.clone()),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(theme.text_muted)
+                                    .text_color(theme.library_playlist_meta_text)
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(format!("{} tracks", playlist.tracks.len())),
                             );
@@ -236,9 +235,9 @@ impl LibraryPage {
             .items_center()
             .text_xs()
             .font_weight(FontWeight::NORMAL)
-            .text_color(theme.text_muted)
+            .text_color(theme.library_table_header_text)
             .border_b_1()
-            .border_color(theme.white_05)
+            .border_color(theme.library_table_border)
             .child(
                 div()
                     .w_20()
@@ -286,6 +285,7 @@ impl LibraryPage {
             )
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
         let image_id = {
             let state = cx.global::<Controller>().state.read(cx);
@@ -295,7 +295,7 @@ impl LibraryPage {
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         let controller = cx.global::<Controller>().clone();
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let state = controller.state.read(cx).clone();
         let is_current = Some(id) == state.playback.current.as_ref();
 
@@ -304,7 +304,7 @@ impl LibraryPage {
                 .h(height)
                 .py_1()
                 .border_b_1()
-                .border_color(theme.white_05)
+                .border_color(theme.library_track_border)
                 .child(
                     div()
                         .id(format!("track_{:?}", track.id.0))
@@ -313,8 +313,8 @@ impl LibraryPage {
                         .items_center()
                         .rounded_md()
                         .cursor_pointer()
-                        .hover(|this| this.bg(theme.accent_10))
-                        .when(is_current, |this| this.bg(theme.accent_15))
+                        .hover(|this| this.bg(theme.library_track_bg_hover))
+                        .when(is_current, |this| this.bg(theme.library_track_bg_active))
                         .on_click({
                             let id = *id;
                             move |_, _, cx| {
@@ -333,7 +333,7 @@ impl LibraryPage {
                                 .px_6()
                                 .items_center()
                                 .justify_start()
-                                .child(format! {"{:02}", i}),
+                                .child(format! {"{i:02}"}),
                         )
                         .child(
                             div()
@@ -356,10 +356,10 @@ impl LibraryPage {
                                     None => div().size_11().flex_shrink_0(),
                                 })
                                 .when(is_current, |this| {
-                                    this.text_color(theme.accent)
+                                    this.text_color(theme.library_track_title_text_active)
                                         .font_weight(FontWeight::MEDIUM)
                                 })
-                                .child(track.title.to_string())
+                                .child(track.title.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -373,7 +373,7 @@ impl LibraryPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.artist.to_string())
+                                .child(track.artist.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -387,7 +387,7 @@ impl LibraryPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.album.to_string())
+                                .child(track.album.clone())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -422,20 +422,21 @@ impl LibraryPage {
 impl Render for LibraryPage {
     #[allow(clippy::too_many_lines)]
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
 
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
         let scroll_handle = self.scroll_handle.clone();
 
-        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().cloned());
-        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().cloned());
+        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
+        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
 
         let combined_fp = tracks_fp ^ playlists_fp;
 
         let width = window.bounds().size.width;
         let tile = 256.0;
 
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let cols = ((width.to_f64() / tile) as usize).max(1);
 
         if cols != self.grid_cols || combined_fp != self.last_fp {
@@ -454,8 +455,8 @@ impl Render for LibraryPage {
 
         div()
             .size_full()
-            .bg(theme.bg_main)
-            .text_color(theme.text_primary)
+            .bg(theme.library_bg)
+            .text_color(theme.library_text)
             .px_12()
             .py_10()
             .child(vlist(
@@ -502,7 +503,7 @@ impl Render for LibraryPage {
                                     .items_center()
                                     .justify_center()
                                     .text_lg()
-                                    .text_color(theme.text_muted)
+                                    .text_color(theme.library_empty_text)
                                     .child("No playlists loaded."),
                                 HeaderKind::Tracks => div()
                                     .w_full()
@@ -511,7 +512,7 @@ impl Render for LibraryPage {
                                     .items_center()
                                     .justify_center()
                                     .text_lg()
-                                    .text_color(theme.text_muted)
+                                    .text_color(theme.library_empty_text)
                                     .child("No tracks loaded."),
                                 HeaderKind::Albums => div()
                                     .w_full()
@@ -520,7 +521,7 @@ impl Render for LibraryPage {
                                     .items_center()
                                     .justify_center()
                                     .text_lg()
-                                    .text_color(theme.text_muted)
+                                    .text_color(theme.library_empty_text)
                                     .child("No albums loaded."),
                             },
                         })
@@ -534,7 +535,6 @@ impl Render for LibraryPage {
             ))
     }
 }
-
 fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();
@@ -542,7 +542,10 @@ fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixe
     rows.push(LibraryRow::Header(HeaderKind::Playlists));
     heights.push(px(60.0));
 
-    if !library.playlists.is_empty() {
+    if library.playlists.is_empty() {
+        rows.push(LibraryRow::Empty(HeaderKind::Playlists));
+        heights.push(px(192.0));
+    } else {
         let mut chunk = Vec::with_capacity(cols);
 
         for pid in library.playlists.keys() {
@@ -559,15 +562,14 @@ fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixe
             rows.push(LibraryRow::PlaylistGridRow(chunk));
             heights.push(px(280.0));
         }
-    } else {
-        rows.push(LibraryRow::Empty(HeaderKind::Playlists));
-        heights.push(px(192.0));
     }
-
     rows.push(LibraryRow::Header(HeaderKind::Tracks));
     heights.push(px(60.0));
 
-    if !library.tracks.is_empty() {
+    if library.tracks.is_empty() {
+        rows.push(LibraryRow::Empty(HeaderKind::Tracks));
+        heights.push(px(192.0));
+    } else {
         let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
 
         sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
@@ -579,10 +581,6 @@ fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixe
             rows.push(LibraryRow::TrackRow(i + 1, track.id));
             heights.push(px(60.0));
         }
-    } else {
-        rows.push(LibraryRow::Empty(HeaderKind::Tracks));
-        heights.push(px(192.0));
     }
-
     (rows, heights)
 }

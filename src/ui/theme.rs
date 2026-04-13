@@ -70,6 +70,32 @@ pub struct Theme {
     pub volume_slider_track: Rgba,
     pub volume_slider_fill: Rgba,
 
+    // Library
+    pub library_bg: Rgba,
+    pub library_text: Rgba,
+
+    pub library_header_text: Rgba,
+    pub library_header_button_border: Rgba,
+    pub library_header_button_text: Rgba,
+    pub library_header_button_bg_hover: Rgba,
+
+    pub library_playlist_bg: Rgba,
+    pub library_playlist_bg_hover: Rgba,
+    pub library_playlist_bg_active: Rgba,
+    pub library_playlist_text: Rgba,
+    pub library_playlist_title_text: Rgba,
+    pub library_playlist_meta_text: Rgba,
+
+    pub library_table_header_text: Rgba,
+    pub library_table_border: Rgba,
+
+    pub library_track_border: Rgba,
+    pub library_track_bg_hover: Rgba,
+    pub library_track_bg_active: Rgba,
+    pub library_track_title_text_active: Rgba,
+
+    pub library_empty_text: Rgba,
+
     // Common
     pub border: Rgba,
 }
@@ -140,6 +166,31 @@ impl Default for Theme {
             volume_icon: rgb(0x6B6B7B),
             volume_slider_track: rgba(0xFFFFFF1A),
             volume_slider_fill: rgb(0x8B7BF7),
+
+            library_bg: rgb(0x0A070F),
+            library_text: rgb(0xFFFFFF),
+
+            library_header_text: rgb(0xFFFFFF),
+            library_header_button_border: rgb(0x8B7BF7),
+            library_header_button_text: rgb(0x8B7BF7),
+            library_header_button_bg_hover: rgba(0x8B7BF726),
+
+            library_playlist_bg: rgb(0x0A070F),
+            library_playlist_bg_hover: rgba(0x8B7BF71A),
+            library_playlist_bg_active: rgba(0x8B7BF726),
+            library_playlist_text: rgb(0xFFFFFF),
+            library_playlist_title_text: rgb(0xFFFFFF),
+            library_playlist_meta_text: rgb(0x5A5A6B),
+
+            library_table_header_text: rgb(0x5A5A6B),
+            library_table_border: rgba(0xFFFFFF1A),
+
+            library_track_border: rgba(0xFFFFFF1A),
+            library_track_bg_hover: rgba(0x8B7BF71A),
+            library_track_bg_active: rgba(0x8B7BF726),
+            library_track_title_text_active: rgb(0x8B7BF7),
+
+            library_empty_text: rgb(0x5A5A6B),
 
             border: rgba(0xFFFFFF1A),
         }

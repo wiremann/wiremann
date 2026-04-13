@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use gpui::{AppContext, Bounds, Result, TitlebarOptions, WindowBounds, WindowOptions, px, size};
-use gpui_platform::application;
+use gpui_platform_gpui_unofficial::application;
 use std::{
     fs,
     path::PathBuf,
