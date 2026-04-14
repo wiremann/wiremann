@@ -1,11 +1,11 @@
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
-use crate::ui::components;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
+use crate::ui::{components, keybinds};
 use components::{
     Page,
     image_cache::ImageCache,
@@ -85,6 +85,8 @@ impl Wiremann {
         cx.set_global(Theme::default());
         cx.set_global(Page::Player);
         cx.set_global(ImageCache::default());
+
+        keybinds::register_keybinds(cx);
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));

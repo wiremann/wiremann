@@ -2,6 +2,7 @@ pub mod animations;
 pub mod assets;
 pub mod components;
 pub mod helpers;
+pub mod keybinds;
 pub mod res_handler;
 mod theme;
 pub mod wiremann;
