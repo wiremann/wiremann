@@ -2,7 +2,7 @@ use gpui::{App, AppContext, KeyBinding, actions};
 
 use crate::controller::{Controller, state::PlaybackStatus};
 
-actions!(player, [PlayPause, Next, Prev, Shuffle, Repeat]);
+actions!(player, [PlayPause, Next, Prev, Shuffle, Repeat, SeekBack, SeekForward]);
 
 pub fn register_keybinds(cx: &mut App) {
     cx.on_action(play_pause);
@@ -10,6 +10,8 @@ pub fn register_keybinds(cx: &mut App) {
     cx.on_action(prev);
     cx.on_action(shuffle);
     cx.on_action(repeat);
+    cx.on_action(seek_forward);
+    cx.on_action(seek_back);
 
     cx.bind_keys([KeyBinding::new("space", PlayPause, None)]);  
 
@@ -20,6 +22,9 @@ pub fn register_keybinds(cx: &mut App) {
         cx.bind_keys([KeyBinding::new("ctrl-left", Prev, None)]);
         cx.bind_keys([KeyBinding::new("ctrl-right", Next, None)]);
     }
+
+    cx.bind_keys([KeyBinding::new("left", SeekBack, None)]);
+    cx.bind_keys([KeyBinding::new("right", SeekForward, None)]);
 
     cx.bind_keys([KeyBinding::new("shift-s", Shuffle, None)]);
     cx.bind_keys([KeyBinding::new("shift-r", Repeat, None)]);
@@ -54,4 +59,16 @@ fn shuffle(_: &Shuffle, cx: &mut App) {
 fn repeat(_: &Repeat, cx: &mut App) {
     let controller = cx.global::<Controller>().clone();
     controller.set_repeat(cx);
+}
+
+fn seek_forward(_: &SeekForward, cx: &mut App) {
+    let controller = cx.global::<Controller>().clone();
+    let current = controller.state.read(cx).playback.position.clone();
+    controller.seek(current.saturating_add(5));
+}
+
+fn seek_back(_: &SeekBack, cx: &mut App) {
+    let controller = cx.global::<Controller>().clone();
+    let current = controller.state.read(cx).playback.position.clone();
+    controller.seek(current.saturating_sub(5));
 }
