@@ -23,7 +23,7 @@ pub fn register_keybinds(cx: &mut App) {
     cx.on_action(playlists);
 
     // Player binds
-    cx.bind_keys([KeyBinding::new("space", PlayPause, Some("!input")), KeyBinding::new("k", PlayPause, Some("!input"))]);  
+    cx.bind_keys([KeyBinding::new("space", PlayPause, None), KeyBinding::new("k", PlayPause, None)]);  
 
     if cfg!(target_os = "macos") {
         cx.bind_keys([KeyBinding::new("cmd-left", Prev, None)]);
