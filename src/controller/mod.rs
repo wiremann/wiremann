@@ -641,11 +641,36 @@ impl Controller {
                     self.pause();
                 }
             }
+            SystemIntegrationEvent::Play => {
+                self.play();
+            }
+            SystemIntegrationEvent::Pause => {
+                self.pause();
+            }
+            SystemIntegrationEvent::Stop => {
+                self.stop();
+            }
             SystemIntegrationEvent::Next => {
                 self.next(cx);
             }
             SystemIntegrationEvent::Prev => {
                 self.prev(cx);
+            }
+            SystemIntegrationEvent::SeekForward(duration) => {
+                let pos = self.state.read(cx).playback.position;
+
+                self.seek(pos.saturating_add(*duration));
+            }
+            SystemIntegrationEvent::SeekBackward(duration) => {
+                let pos = self.state.read(cx).playback.position;
+
+                self.seek(pos.saturating_sub(*duration));
+            }
+            SystemIntegrationEvent::Volume(vol) => {
+                self.set_volume(*vol as f32, cx);
+            }
+            SystemIntegrationEvent::Position(pos) => {
+                self.seek(*pos);
             }
         }
 
