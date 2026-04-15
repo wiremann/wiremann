@@ -37,6 +37,7 @@ rfd = "0.17.2"
 dashmap = "7.0.0-rc2"
 garb = "0.2.5"
 souvlaki = "0.8.3"
+raw-window-handle = "0.6.2"
 
 [build-dependencies]
 winres = "0.1.12"
