@@ -1,8 +1,22 @@
 use gpui::{App, KeyBinding, actions};
 
-use crate::{controller::{Controller, state::PlaybackStatus}, ui::components::Page};
+use crate::{
+    controller::{Controller, state::PlaybackStatus},
+    ui::components::Page,
+};
 
-actions!(player, [PlayPause, Next, Prev, Shuffle, Repeat, SeekBack, SeekForward]);
+actions!(
+    player,
+    [
+        PlayPause,
+        Next,
+        Prev,
+        Shuffle,
+        Repeat,
+        SeekBack,
+        SeekForward
+    ]
+);
 actions!(pages, [CycleNext, CyclePrev, Library, Player, Playlists]);
 
 pub fn register_keybinds(cx: &mut App) {
@@ -23,7 +37,10 @@ pub fn register_keybinds(cx: &mut App) {
     cx.on_action(playlists);
 
     // Player binds
-    cx.bind_keys([KeyBinding::new("space", PlayPause, None), KeyBinding::new("k", PlayPause, None)]);  
+    cx.bind_keys([
+        KeyBinding::new("space", PlayPause, None),
+        KeyBinding::new("k", PlayPause, None),
+    ]);
 
     if cfg!(target_os = "macos") {
         cx.bind_keys([KeyBinding::new("cmd-left", Prev, None)]);
@@ -104,7 +121,7 @@ fn cycle_next(_: &CycleNext, cx: &mut App) {
     let next = match current {
         Page::Library => Page::Player,
         Page::Player => Page::Playlists,
-        Page::Playlists => Page::Library
+        Page::Playlists => Page::Library,
     };
 
     *cx.global_mut::<Page>() = next;
@@ -116,7 +133,7 @@ fn cycle_prev(_: &CyclePrev, cx: &mut App) {
     let prev = match current {
         Page::Library => Page::Playlists,
         Page::Player => Page::Library,
-        Page::Playlists => Page::Player
+        Page::Playlists => Page::Player,
     };
 
     *cx.global_mut::<Page>() = prev;

@@ -115,10 +115,7 @@ impl SystemIntegration {
                         .as_millis();
                     let name = format!("current_album_art_{}.jpg", version);
 
-                    let path = self
-                        .app_paths
-                        .cache
-                        .join(&name);
+                    let path = self.app_paths.cache.join(&name);
 
                     if let Some((width, height, bytes)) = image {
                         let mut rgb = vec![0u8; (width * height * 3) as usize];
@@ -223,15 +220,16 @@ impl SystemIntegration {
     }
 
     fn cleanup_images(&self, current_name: &str) -> std::io::Result<()> {
-        let path = &self
-        .app_paths
-        .cache;
+        let path = &self.app_paths.cache;
         for entry in std::fs::read_dir(path)? {
             let entry = entry?;
             let path = entry.path();
 
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("current_album_art_") && name.ends_with(".jpg") && name != current_name {
+                if name.starts_with("current_album_art_")
+                    && name.ends_with(".jpg")
+                    && name != current_name
+                {
                     let _ = std::fs::remove_file(path);
                 }
             }

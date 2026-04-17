@@ -121,7 +121,7 @@ impl Default for Theme {
             titlebar_bg: rgb(0x0A070F),
             titlebar_window_icons_text: rgba(0xFFFFFFCC),
             titlebar_window_icons_bg_hover: rgba(0xFFFFFF29),
-            
+
             switcher_bg: rgba(0xFFFFFF0D),
             switcher_active: rgb(0x8B7BF7),
             switcher_text: rgba(0xFFFFFFCC),
