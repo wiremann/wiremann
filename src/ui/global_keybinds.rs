@@ -74,7 +74,7 @@ pub fn register_keybinds(cx: &mut App) {
 
 fn play_pause(_: &PlayPause, cx: &mut App) {
     let controller = cx.global::<Controller>();
-    let status = controller.state.read(cx).playback.status.clone();
+    let status = controller.state.read(cx).playback.status;
 
     if status == PlaybackStatus::Paused || status == PlaybackStatus::Stopped {
         controller.play();
@@ -105,18 +105,18 @@ fn repeat(_: &Repeat, cx: &mut App) {
 
 fn seek_forward(_: &SeekForward, cx: &mut App) {
     let controller = cx.global::<Controller>().clone();
-    let current = controller.state.read(cx).playback.position.clone();
+    let current = controller.state.read(cx).playback.position;
     controller.seek(current.saturating_add(5));
 }
 
 fn seek_back(_: &SeekBack, cx: &mut App) {
     let controller = cx.global::<Controller>().clone();
-    let current = controller.state.read(cx).playback.position.clone();
+    let current = controller.state.read(cx).playback.position;
     controller.seek(current.saturating_sub(5));
 }
 
 fn cycle_next(_: &CycleNext, cx: &mut App) {
-    let current = cx.global::<Page>().clone();
+    let current = *cx.global::<Page>();
 
     let next = match current {
         Page::Library => Page::Player,
@@ -128,7 +128,7 @@ fn cycle_next(_: &CycleNext, cx: &mut App) {
 }
 
 fn cycle_prev(_: &CyclePrev, cx: &mut App) {
-    let current = cx.global::<Page>().clone();
+    let current = *cx.global::<Page>();
 
     let prev = match current {
         Page::Library => Page::Playlists,

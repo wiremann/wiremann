@@ -30,6 +30,7 @@ pub struct SystemIntegration {
 
 impl SystemIntegration {
     #[allow(unused_variables)]
+    #[must_use]
     pub fn new(
         raw_window_handle: Option<RawWindowHandle>,
         app_paths: AppPaths,
@@ -113,7 +114,7 @@ impl SystemIntegration {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_millis();
-                    let name = format!("current_album_art_{}.jpg", version);
+                    let name = format!("current_album_art_{version}.jpg");
 
                     let path = self.app_paths.cache.join(&name);
 
@@ -225,14 +226,13 @@ impl SystemIntegration {
             let entry = entry?;
             let path = entry.path();
 
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("current_album_art_")
+            if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                && name.starts_with("current_album_art_")
                     && name.ends_with(".jpg")
                     && name != current_name
                 {
                     let _ = std::fs::remove_file(path);
                 }
-            }
         }
 
         Ok(())

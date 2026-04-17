@@ -77,8 +77,7 @@ pub fn run() -> Result<(), AppError> {
 
                 let raw_window_handle = window
                     .window_handle()
-                    .ok()
-                    .and_then(|this| Some(this.as_raw()));
+                    .ok().map(|this| this.as_raw());
                 let (mut system_integraton, system_integration_tx, system_integration_rx) =
                     SystemIntegration::new(raw_window_handle, app_paths);
 
