@@ -7,6 +7,7 @@ use crate::controller::events::{CacherEvent, ImageProcessorEvent, SystemIntegrat
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
+use crate::ui::components::toasts::{Toast, ToastKind};
 use crate::ui::helpers::{drop_image_from_app, secs_to_slider};
 use crate::ui::wiremann::Wiremann;
 use crate::{
@@ -19,6 +20,7 @@ use gpui::{App, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone)]
@@ -206,7 +208,7 @@ impl Controller {
         &mut self,
         cx: &mut App,
         event: &ScannerEvent,
-        _view: &Entity<Wiremann>,
+        view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::UpsertTracks(tracks) => {
@@ -331,6 +333,22 @@ impl Controller {
                 //         .collect::<Vec<PlaylistId>>(),
                 //     cx,
                 // );
+            }
+            ScannerEvent::ScanStarted => {
+                view.update(cx, |this, cx| {
+                    this.toast_manager.update(cx, |this, cx| {
+                        this.toasts.update(cx, |this, cx| {
+                            this.push(Toast {
+                                id: 02,
+                                kind: ToastKind::Message("Scanning started...".to_string()),
+                                created_at: Instant::now(),
+                                duration: None,
+                            });
+                            cx.notify();
+                        });
+                    });
+                    cx.notify();
+                });
             }
             &ScannerEvent::Discovered(_) | &ScannerEvent::Processed { .. } => todo!(),
         }

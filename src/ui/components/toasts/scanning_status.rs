@@ -51,4 +51,18 @@ impl ScanningStatusToast {
     }
 }
 
+impl ScanningStatus {
+    pub fn new(cx: &mut App) -> Self {
+        ScanningStatus {
+            is_scanning: cx.new(|_| false),
+            is_discovering: cx.new(|_| false),
+            is_processing: cx.new(|_| false),
+
+            discovered: cx.new(|_| 0),
+            total: cx.new(|_| 0),
+            processed: cx.new(|_| 0),
+        }
+    }
+}
+
 impl gpui::Global for ScanningStatus {}

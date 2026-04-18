@@ -4,6 +4,7 @@ use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
+use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use crate::ui::{components, global_keybinds};
@@ -87,6 +88,8 @@ impl Wiremann {
         cx.set_global(Theme::default());
         cx.set_global(Page::Player);
         cx.set_global(ImageCache::default());
+        let scanning_status = ScanningStatus::new(cx).clone();
+        cx.set_global(scanning_status);
 
         global_keybinds::register_keybinds(cx);
 

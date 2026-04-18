@@ -28,6 +28,7 @@ pub struct ToastManager {
 
 impl Render for ToastManager {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.global::<Theme>().clone();
         div()
             .id("toast_manager")
             .absolute()
