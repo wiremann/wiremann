@@ -75,9 +75,7 @@ pub fn run() -> Result<(), AppError> {
                 let (mut image_processor, image_processor_tx, image_processor_rx) =
                     ImageProcessor::new(app_paths.clone());
 
-                let raw_window_handle = window
-                    .window_handle()
-                    .ok().map(|this| this.as_raw());
+                let raw_window_handle = window.window_handle().ok().map(|this| this.as_raw());
                 let (mut system_integraton, system_integration_tx, system_integration_rx) =
                     SystemIntegration::new(raw_window_handle, app_paths);
 

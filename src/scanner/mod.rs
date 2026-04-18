@@ -178,6 +178,10 @@ impl Scanner {
                     tx.send(ScannerEvent::InsertTracksIntoPlaylist(pid, to_send))
                         .ok();
                 }
+
+                if scan_progress.processed.load(Ordering::Relaxed) % 16 == 0 {
+                    tx.send(ScannerEvent::Processed { processed: scan_progress.processed.load(Ordering::Relaxed), total: scan_progress.total.load(Ordering::Relaxed) }).ok();
+                }
             }
 
             return;
@@ -260,11 +264,14 @@ impl Scanner {
 
             let scan_progress = self.scan_progress.clone();
             let worker_tx = worker_tx.clone();
+            let tx = self.tx.clone();
 
             std::thread::spawn(move || {
+                let mut paths = Vec::with_capacity(1024);
+
                 for entry in WalkDir::new(&path)
                     .into_iter()
-                    .filter_map(std::result::Result::ok)
+                    .filter_map(Result::ok)
                     .filter(|e| {
                         e.path()
                             .extension()
@@ -272,9 +279,19 @@ impl Scanner {
                             .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
-                    scan_progress.total.fetch_add(1, Ordering::Relaxed);
+                    if paths.len() % 16 == 0 {
+                        tx.send(ScannerEvent::Discovered(paths.len()));
+                    }                    
+                    paths.push(entry.path().to_path_buf());
+                }
 
-                    let _ = worker_tx.send((entry.path().to_path_buf(), Some(playlist_id)));
+                let total = paths.len();
+                scan_progress.total.store(total, Ordering::Relaxed);
+
+                scan_progress.discovery_done.store(true, Ordering::Release);
+
+                for path in paths {
+                    let _ = worker_tx.send((path, Some(playlist_id)));
                 }
             });
         }

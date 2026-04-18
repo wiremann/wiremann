@@ -2,6 +2,7 @@ use crate::cacher::ImageKind;
 use crate::controller::state::{AppState, PlaybackStatus};
 use crate::library::playlists::{Playlist, PlaylistId};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
+use crate::scanner::ScanningTask;
 use gpui::RenderImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -25,6 +26,8 @@ pub enum ScannerEvent {
 
     InsertPlaylist(Playlist),
 
+    Discovered(usize),
+    Processed { processed: usize, total: usize },
     ScanFinished,
 }
 
