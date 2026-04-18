@@ -7,8 +7,8 @@ pub mod pages;
 pub mod queue;
 pub mod scrollbar;
 pub mod slider;
-pub mod toasts;
 pub mod titlebar;
+pub mod toasts;
 pub mod virtual_list;
 
 #[derive(Clone, Copy, PartialEq)]

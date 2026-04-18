@@ -107,6 +107,11 @@ pub struct Theme {
 
     pub playlist_empty_text: Rgba,
 
+    // Toasts
+    pub toast_bg: Rgba,
+    pub toast_border: Rgba,
+    pub toast_msg_text: Rgba,
+
     // Common
     pub border: Rgba,
     pub scrollbar_thumb: Rgba,
@@ -218,6 +223,10 @@ impl Default for Theme {
             playlist_sidebar_item_bg_current: rgba(0x8B7BF726),
 
             playlist_empty_text: rgb(0x5A5A6B),
+
+            toast_bg: rgb(0x0A070F),
+            toast_border: rgba(0xFFFFFF29),
+            toast_msg_text: rgba(0xFFFFFFCC),
 
             border: rgba(0xFFFFFF29),
             scrollbar_thumb: rgb(0x8B7BF7),

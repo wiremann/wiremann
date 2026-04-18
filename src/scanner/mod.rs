@@ -180,7 +180,11 @@ impl Scanner {
                 }
 
                 if scan_progress.processed.load(Ordering::Relaxed) % 16 == 0 {
-                    tx.send(ScannerEvent::Processed { processed: scan_progress.processed.load(Ordering::Relaxed), total: scan_progress.total.load(Ordering::Relaxed) }).ok();
+                    tx.send(ScannerEvent::Processed {
+                        processed: scan_progress.processed.load(Ordering::Relaxed),
+                        total: scan_progress.total.load(Ordering::Relaxed),
+                    })
+                    .ok();
                 }
             }
 
@@ -283,7 +287,7 @@ impl Scanner {
                 {
                     if paths.len() % 16 == 0 {
                         tx.send(ScannerEvent::Discovered(paths.len())).ok();
-                    }                    
+                    }
                     paths.push(entry.path().to_path_buf());
                 }
 

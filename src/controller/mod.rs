@@ -20,7 +20,7 @@ use gpui::{App, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone)]
@@ -342,7 +342,7 @@ impl Controller {
                                 id: 02,
                                 kind: ToastKind::Message("Scanning started...".to_string()),
                                 created_at: Instant::now(),
-                                duration: None,
+                                duration: Some(Duration::from_secs(2)),
                             });
                             cx.notify();
                         });
@@ -350,7 +350,7 @@ impl Controller {
                     cx.notify();
                 });
             }
-            &ScannerEvent::Discovered(_) | &ScannerEvent::Processed { .. } => todo!(),
+            &ScannerEvent::Discovered(_) | &ScannerEvent::Processed { .. } => {}
         }
         Ok(())
     }

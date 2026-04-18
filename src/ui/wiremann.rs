@@ -1,10 +1,12 @@
+use std::time::{Duration, Instant};
+
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
-use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
+use crate::ui::components::toasts::{Toast, ToastKind, ToastManager};
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use crate::ui::{components, global_keybinds};
@@ -99,6 +101,24 @@ impl Wiremann {
         let library_page = cx.new(|cx| LibraryPage::new(cx));
         let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
+
+        toast_manager.update(cx, |this, cx| {
+            this.toasts.update(cx, |this, cx| {
+                this.push(Toast {
+                    id: 02,
+                    kind: ToastKind::Message("Scanning started...".to_string()),
+                    created_at: Instant::now(),
+                    duration: Some(Duration::from_secs(2)),
+                });
+                this.push(Toast {
+                    id: 02,
+                    kind: ToastKind::ScanProgress,
+                    created_at: Instant::now(),
+                    duration: Some(Duration::from_secs(2)),
+                });
+                cx.notify();
+            });
+        });
 
         cx.global::<Controller>().load_cached_app_state();
 
