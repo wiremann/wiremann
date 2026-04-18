@@ -3,6 +3,7 @@ use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
+use crate::ui::components::toasts::ToastManager;
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use crate::ui::{components, global_keybinds};
@@ -23,6 +24,7 @@ pub struct Wiremann {
     pub player_page: Entity<PlayerPage>,
     pub library_page: Entity<LibraryPage>,
     pub playlists_page: Entity<PlaylistsPage>,
+    pub toast_manager: Entity<ToastManager>,
 }
 
 impl Wiremann {
@@ -93,6 +95,7 @@ impl Wiremann {
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
         let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
+        let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
 
@@ -101,6 +104,7 @@ impl Wiremann {
             player_page,
             library_page,
             playlists_page,
+            toast_manager,
         }
     }
 }
@@ -171,5 +175,6 @@ impl Render for Wiremann {
                         }
                     }),
             )
+            .child(self.statusbar.clone())
     }
 }

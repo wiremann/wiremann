@@ -7,6 +7,7 @@ pub mod pages;
 pub mod queue;
 pub mod scrollbar;
 pub mod slider;
+pub mod toasts;
 pub mod titlebar;
 pub mod virtual_list;
 

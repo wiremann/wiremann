@@ -332,6 +332,7 @@ impl Controller {
                 //     cx,
                 // );
             }
+            &ScannerEvent::Discovered(_) | &ScannerEvent::Processed { .. } => todo!(),
         }
         Ok(())
     }

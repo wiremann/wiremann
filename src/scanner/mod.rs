@@ -241,6 +241,8 @@ impl Scanner {
 
         self.read_scan_record();
 
+        self.tx.send(ScannerEvent::ScanStarted).ok();
+
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
@@ -280,7 +282,7 @@ impl Scanner {
                     })
                 {
                     if paths.len() % 16 == 0 {
-                        tx.send(ScannerEvent::Discovered(paths.len()));
+                        tx.send(ScannerEvent::Discovered(paths.len())).ok();
                     }                    
                     paths.push(entry.path().to_path_buf());
                 }
