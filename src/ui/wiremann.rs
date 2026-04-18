@@ -134,6 +134,7 @@ impl Render for Wiremann {
             .id("main_container")
             .size_full()
             .font_family("Space Grotesk")
+            .relative()
             .flex()
             .flex_col()
             .justify_center()
@@ -175,6 +176,6 @@ impl Render for Wiremann {
                         }
                     }),
             )
-            .child(self.statusbar.clone())
+            .child(self.toast_manager.clone())
     }
 }

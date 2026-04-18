@@ -23,16 +23,25 @@ impl Render for ScanningStatusToast {
     #[allow(clippy::unreadable_literal)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>();
+        let status = cx.global::<ScanningStatus>();
+        let discovered = *status.discovered.read(cx);
+        let processed = *status.processed.read(cx);
+        let total = *status.total.read(cx);
+
         div()
-            .id("titlebar")
-            .h_10()
-            .w_full()
-            .flex()
-            .items_center()
-            .justify_center()
-            .border_t_1()
-            .border_color(theme.border)
+            .px_4()
+            .py_3()
             .bg(theme.titlebar_bg)
+            .rounded_lg()
+            .border_1()
+            .border_color(theme.border)
+            .child({
+                if *status.is_discovering.read(cx) {
+                    format!("Discovering: {} files...", discovered)
+                } else {
+                    format!("Processing: {} / {}", processed, total)
+                }
+            })
     }
 }
 

@@ -1,9 +1,9 @@
 pub mod scanning_status;
 
-use crate::ui::theme::Theme;
+use crate::ui::{components::toasts::scanning_status::ScanningStatusToast, theme::Theme};
 use gpui::{
-    App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, WindowControlArea, div, transparent_black, white,
+    App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    Styled, Window, WindowControlArea, div, prelude::FluentBuilder, transparent_black, white,
 };
 use std::time::{Duration, Instant};
 
@@ -17,20 +17,8 @@ pub struct Toast {
 
 #[derive(Clone)]
 pub enum ToastKind {
-    ScanProgress {
-        discovered: usize,
-        processed: usize,
-        total: usize,
-        phase: ScanPhase,
-    },
+    ScanProgress,
     Message(String),
-}
-
-#[derive(Clone)]
-pub enum ScanPhase {
-    Discovering,
-    Processing,
-    Finished,
 }
 
 #[derive(Clone)]
@@ -40,7 +28,6 @@ pub struct ToastManager {
 
 impl Render for ToastManager {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>();
         div()
             .id("toast_manager")
             .absolute()
@@ -50,7 +37,31 @@ impl Render for ToastManager {
             .flex_col()
             .items_start()
             .justify_end()
-            .bg(transparent_black())
+            .children({
+                let toasts = self.toasts.read(cx);
+
+                let mut elements = Vec::new();
+
+                for toast in toasts.iter() {
+                    let el = match &toast.kind {
+                        ToastKind::ScanProgress => {
+                            div().child(cx.new(|_| ScanningStatusToast::new()))
+                        }
+
+                        ToastKind::Message(msg) => div()
+                            .px_4()
+                            .py_2()
+                            .bg(theme.titlebar_bg)
+                            .text_color(white())
+                            .rounded_md()
+                            .child(msg.clone()),
+                    };
+
+                    elements.push(el);
+                }
+
+                elements
+            })
     }
 }
 
