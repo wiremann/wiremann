@@ -344,6 +344,12 @@ impl Controller {
                                 created_at: Instant::now(),
                                 duration: Some(Duration::from_secs(2)),
                             });
+                            this.push(Toast {
+                                id: 02,
+                                kind: ToastKind::ScanProgress,
+                                created_at: Instant::now(),
+                                duration: Some(Duration::from_secs(2)),
+                            });
                             cx.notify();
                         });
                     });

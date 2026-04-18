@@ -102,24 +102,6 @@ impl Wiremann {
         let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
-        toast_manager.update(cx, |this, cx| {
-            this.toasts.update(cx, |this, cx| {
-                this.push(Toast {
-                    id: 02,
-                    kind: ToastKind::Message("Scanning started...".to_string()),
-                    created_at: Instant::now(),
-                    duration: Some(Duration::from_secs(2)),
-                });
-                this.push(Toast {
-                    id: 02,
-                    kind: ToastKind::ScanProgress,
-                    created_at: Instant::now(),
-                    duration: Some(Duration::from_secs(2)),
-                });
-                cx.notify();
-            });
-        });
-
         cx.global::<Controller>().load_cached_app_state();
 
         Self {

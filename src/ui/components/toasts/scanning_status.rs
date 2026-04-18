@@ -30,11 +30,18 @@ impl Render for ScanningStatusToast {
 
         div()
             .px_4()
-            .py_3()
-            .bg(theme.titlebar_bg)
-            .rounded_lg()
-            .border_1()
-            .border_color(theme.border)
+            .py_2()
+            .min_w_80()
+            .min_h_16()
+            .flex()
+            .items_center()
+            .justify_start()
+            .bg(theme.toast_bg)
+            .border_2()
+            .border_color(theme.toast_border)
+            .text_color(theme.toast_msg_text)
+            .rounded_xl()
+            .block_mouse_except_scroll()
             .child({
                 if *status.is_discovering.read(cx) {
                     format!("Discovering: {} files...", discovered)

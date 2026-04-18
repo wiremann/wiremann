@@ -3,7 +3,8 @@ pub mod scanning_status;
 use crate::ui::{components::toasts::scanning_status::ScanningStatusToast, theme::Theme};
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, WindowControlArea, div, prelude::FluentBuilder, transparent_black, white,
+    StatefulInteractiveElement, Styled, Window, WindowControlArea, div, prelude::FluentBuilder,
+    transparent_black, white,
 };
 use std::time::{Duration, Instant};
 
@@ -47,10 +48,18 @@ impl Render for ToastManager {
                 let mut elements = Vec::new();
 
                 for toast in toasts.iter() {
+                    let id = toast.id;
+                    let toasts = self.toasts.clone();
+
                     let el = match &toast.kind {
                         ToastKind::ScanProgress => div()
                             .id("toast_scan_progress")
-                            .child(cx.new(|_| ScanningStatusToast::new())),
+                            .child(cx.new(|_| ScanningStatusToast::new()))
+                            .on_click(move |_, _, cx| {
+                                toasts.update(cx, |list, _| {
+                                    list.retain(|t| t.id != id);
+                                });
+                            }),
 
                         ToastKind::Message(msg) => div()
                             .id(format!("toast_msg_{}", toast.id))
@@ -67,12 +76,16 @@ impl Render for ToastManager {
                             .text_color(theme.toast_msg_text)
                             .rounded_xl()
                             .child(msg.clone())
-                            .block_mouse_except_scroll(),
+                            .block_mouse_except_scroll()
+                            .on_click(move |_, _, cx| {
+                                toasts.update(cx, |list, _| {
+                                    list.retain(|t| t.id != id);
+                                });
+                            }),
                     };
 
                     elements.push(el);
                 }
-
                 elements
             })
     }
@@ -80,8 +93,31 @@ impl Render for ToastManager {
 
 impl ToastManager {
     pub fn new(cx: &mut App) -> Self {
-        ToastManager {
-            toasts: cx.new(|_| Vec::new()),
-        }
+        let toasts: Entity<Vec<Toast>> = cx.new(|_| Vec::new());
+
+        let toasts_clone = toasts.clone();
+
+        cx.spawn(async move |cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(256))
+                    .await;
+
+                toasts_clone.update(cx, |toasts, _| {
+                    let now = Instant::now();
+
+                    toasts.retain(|t| {
+                        if let Some(duration) = t.duration {
+                            now.duration_since(t.created_at) < duration
+                        } else {
+                            true
+                        }
+                    });
+                });
+            }
+        })
+        .detach();
+
+        ToastManager { toasts }
     }
 }
