@@ -7,6 +7,7 @@ use crate::controller::events::{CacherEvent, ImageProcessorEvent, SystemIntegrat
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
+use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{Toast, ToastKind};
 use crate::ui::helpers::{drop_image_from_app, secs_to_slider};
 use crate::ui::wiremann::Wiremann;
@@ -335,6 +336,15 @@ impl Controller {
                 // );
             }
             ScannerEvent::ScanStarted => {
+                let scanning_status = cx.global_mut::<ScanningStatus>().clone().0;
+
+                scanning_status.update(cx, |this, cx| {
+                    this.is_scanning = true;
+                    this.is_discovering = true;
+
+                    cx.notify()
+                });
+
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
                         this.toasts.update(cx, |this, cx| {
@@ -345,10 +355,10 @@ impl Controller {
                                 duration: Some(Duration::from_secs(2)),
                             });
                             this.push(Toast {
-                                id: 02,
+                                id: 00,
                                 kind: ToastKind::ScanProgress,
                                 created_at: Instant::now(),
-                                duration: Some(Duration::from_secs(2)),
+                                duration: None,
                             });
                             cx.notify();
                         });
@@ -356,7 +366,35 @@ impl Controller {
                     cx.notify();
                 });
             }
-            &ScannerEvent::Discovered(_) | &ScannerEvent::Processed { .. } => {}
+            ScannerEvent::Discovered(discovered) => {
+                let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
+
+                scanning_status.update(cx, |this, cx| {
+                    if !this.is_discovering {
+                        this.is_discovering = true
+                    }
+
+                    this.discovered = *discovered;
+
+                    cx.notify();
+                })
+            }
+            ScannerEvent::Processed { processed, total } => {
+                let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
+
+                scanning_status.update(cx, |this, cx| {
+                    if this.is_discovering {
+                        this.is_discovering = false
+                    }
+                    if !this.is_processing {
+                        this.is_processing = true
+                    }
+
+                    this.total = *total;
+                    this.processed = *processed;
+                    cx.notify();
+                })
+            }
         }
         Ok(())
     }

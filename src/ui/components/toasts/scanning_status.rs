@@ -6,15 +6,18 @@ use gpui::{
 };
 
 #[derive(Clone)]
-pub struct ScanningStatus {
-    pub is_scanning: Entity<bool>,
-    pub is_discovering: Entity<bool>,
-    pub is_processing: Entity<bool>,
+pub struct ScanningStatusInner {
+    pub is_scanning: bool,
+    pub is_discovering: bool,
+    pub is_processing: bool,
 
-    pub discovered: Entity<usize>,
-    pub total: Entity<usize>,
-    pub processed: Entity<usize>,
+    pub discovered: usize,
+    pub total: usize,
+    pub processed: usize,
 }
+
+#[derive(Clone)]
+pub struct ScanningStatus(pub Entity<ScanningStatusInner>);
 
 #[derive(Clone)]
 pub struct ScanningStatusToast;
@@ -23,10 +26,10 @@ impl Render for ScanningStatusToast {
     #[allow(clippy::unreadable_literal)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>();
-        let status = cx.global::<ScanningStatus>();
-        let discovered = *status.discovered.read(cx);
-        let processed = *status.processed.read(cx);
-        let total = *status.total.read(cx);
+        let status = cx.global::<ScanningStatus>().0.read(cx);
+        let discovered = status.discovered;
+        let processed = status.processed;
+        let total = status.total;
 
         div()
             .px_4()
@@ -43,8 +46,8 @@ impl Render for ScanningStatusToast {
             .rounded_xl()
             .block_mouse_except_scroll()
             .child({
-                if *status.is_discovering.read(cx) {
-                    format!("Discovering: {} files...", discovered)
+                if status.is_discovering {
+                    format!("Discovered: {} files...", discovered)
                 } else {
                     format!("Processing: {} / {}", processed, total)
                 }
@@ -60,15 +63,15 @@ impl ScanningStatusToast {
 
 impl ScanningStatus {
     pub fn new(cx: &mut App) -> Self {
-        ScanningStatus {
-            is_scanning: cx.new(|_| false),
-            is_discovering: cx.new(|_| false),
-            is_processing: cx.new(|_| false),
+        ScanningStatus(cx.new(|_| ScanningStatusInner {
+            is_scanning: false,
+            is_discovering: false,
+            is_processing: false,
 
-            discovered: cx.new(|_| 0),
-            total: cx.new(|_| 0),
-            processed: cx.new(|_| 0),
-        }
+            discovered: 0,
+            total: 0,
+            processed: 0,
+        }))
     }
 }
 
