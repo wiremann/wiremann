@@ -161,6 +161,8 @@ impl Scanner {
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
         new: &mut Vec<(Track, Option<PlaylistId>)>,
     ) {
+        let mut incremented = false;
+
         let Ok(ts) = TrackSource::generate(path) else {
             return;
         };
@@ -170,48 +172,37 @@ impl Scanner {
                 let batch = existing.entry(pid).or_default();
                 batch.push(*entry.value());
 
-                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-
                 if batch.len() >= 32 {
                     let to_send = std::mem::take(batch);
-
                     tx.send(ScannerEvent::InsertTracksIntoPlaylist(pid, to_send))
                         .ok();
                 }
 
-                if scan_progress.processed.load(Ordering::Relaxed) % 16 == 0 {
-                    tx.send(ScannerEvent::Processed {
-                        processed: scan_progress.processed.load(Ordering::Relaxed),
-                        total: scan_progress.total.load(Ordering::Relaxed),
-                    })
-                    .ok();
-                }
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+                incremented = true;
             }
-
-            return;
-        }
-
-        if let Ok(track) = metadata::read_metadata(ts.clone()) {
+        } else if let Ok(track) = metadata::read_metadata(ts.clone()) {
             let id = track.id;
             new.push((track, pid));
-            scan_progress.processed.fetch_add(1, Ordering::Relaxed);
 
             if new.len() >= 32 {
                 let to_send = std::mem::take(new);
-
                 tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
             }
 
             scan_record.insert(ts, id);
+
+            scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+            incremented = true;
         }
 
-        if scan_progress.discovery_done.load(Ordering::Acquire)
-            && scan_progress.processed.load(Ordering::Relaxed)
-                == scan_progress.total.load(Ordering::Relaxed)
-        {
-            Self::flush_batches(tx, existing, new);
+        if incremented {
+            let processed = scan_progress.processed.load(Ordering::Relaxed);
+            let total = scan_progress.total.load(Ordering::Relaxed);
 
-            tx.send(ScannerEvent::ScanFinished).ok();
+            if processed % 16 == 0 || processed == total {
+                tx.send(ScannerEvent::Processed { processed, total }).ok();
+            }
         }
     }
 
