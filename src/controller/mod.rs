@@ -354,6 +354,7 @@ impl Controller {
                                 created_at: Instant::now(),
                                 duration: Some(Duration::from_secs(2)),
                                 phase: ToastPhase::Entering,
+                                anim_phase: ToastPhase::Entering,
                             });
                             this.push(Toast {
                                 id: 00,
@@ -363,6 +364,7 @@ impl Controller {
                                 created_at: Instant::now(),
                                 duration: None,
                                 phase: ToastPhase::Entering,
+                                anim_phase: ToastPhase::Entering,
                             });
                             cx.notify();
                         });

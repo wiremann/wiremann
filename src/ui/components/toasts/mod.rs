@@ -15,6 +15,7 @@ pub struct Toast {
     pub created_at: Instant,
     pub duration: Option<Duration>,
     pub phase: ToastPhase,
+    pub anim_phase: ToastPhase,
 }
 
 #[derive(Clone)]
@@ -36,7 +37,7 @@ pub struct ToastManager {
 }
 
 impl Render for ToastManager {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>().clone();
         div()
             .id("toast_manager")
@@ -46,8 +47,8 @@ impl Render for ToastManager {
             .flex()
             .flex_col()
             .gap_4()
-            .pt_16()
-            .pr_4()
+            .pt_20()
+            .pr_8()
             .items_end()
             .justify_start()
             .children({
@@ -62,6 +63,7 @@ impl Render for ToastManager {
                     let base = match &toast.kind {
                         ToastKind::ScanProgress(el) => div()
                             .id(format!("toast_scan_{}", id))
+                            .relative()
                             .child(el.clone())
                             .on_click(move |_, _, cx| {
                                 toasts.update(cx, |list, _| {
@@ -75,6 +77,7 @@ impl Render for ToastManager {
 
                         ToastKind::Message(msg) => div()
                             .id(format!("toast_msg_{}", id))
+                            .relative()
                             .px_4()
                             .py_2()
                             .min_w_80()
@@ -102,28 +105,27 @@ impl Render for ToastManager {
 
                     let duration = Duration::from_millis(250);
 
-                    let state =
-                        window.use_keyed_state(format!("toast_anim_{}", id), cx, |_, _| phase);
-
-                    let prev_phase = *state.read(cx);
+                    let prev_phase = toast.anim_phase;
 
                     let el = base.map(|this| {
                         if prev_phase == phase {
                             match phase {
-                                ToastPhase::Entering | ToastPhase::Idle => {
-                                    this.left(px(0.0)).opacity(1.0).into_any_element()
-                                }
-                                ToastPhase::Exiting => {
-                                    this.left(px(80.0)).opacity(0.0).into_any_element()
-                                }
+                                ToastPhase::Entering => this.left(px(240.0)).opacity(0.0).into_any_element(),
+                                ToastPhase::Idle => this.left(px(0.0)).opacity(1.0).into_any_element(),
+                                ToastPhase::Exiting => this.left(px(240.0)).opacity(0.0).into_any_element(),
                             }
                         } else {
-                            // ✅ schedule ONCE like navbar
                             cx.spawn({
-                                let state = state.clone();
+                                let toasts = self.toasts.clone();
                                 async move |_, cx| {
                                     cx.background_executor().timer(duration).await;
-                                    let _ = state.update(cx, |s, _| *s = phase);
+                                    toasts.update(cx, |list, _| {
+                                        for t in list.iter_mut() {
+                                            if t.id == id {
+                                                t.anim_phase = t.phase;
+                                            }
+                                        }
+                                    });
                                 }
                             })
                             .detach();
@@ -172,9 +174,10 @@ impl ToastManager {
                         let now = Instant::now();
 
                         if t.phase == ToastPhase::Entering {
-                            t.phase = ToastPhase::Idle;
+                            if now.duration_since(t.created_at) > Duration::from_millis(250) {
+                                t.phase = ToastPhase::Idle;
+                            }
                         }
-
                         if let Some(duration) = t.duration {
                             if now.duration_since(t.created_at) >= duration {
                                 if t.phase == ToastPhase::Exiting {
