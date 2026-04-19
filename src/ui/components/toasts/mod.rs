@@ -2,9 +2,9 @@ pub mod scanning_status;
 
 use crate::ui::{components::toasts::scanning_status::ScanningStatusToast, theme::Theme};
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, Div, ElementId, Entity, InteractiveElement,
+    Animation, AnimationExt, App, AppContext, Context,ElementId, Entity, InteractiveElement,
     IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window,
-    WindowControlArea, div, prelude::FluentBuilder, px, transparent_black, white,
+     div, prelude::FluentBuilder, px,
 };
 use std::time::{Duration, Instant};
 

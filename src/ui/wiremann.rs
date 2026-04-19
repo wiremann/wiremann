@@ -102,31 +102,6 @@ impl Wiremann {
         let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
-        let toast_manager_test = toast_manager.clone();
-
-        cx.spawn(async move |_, cx| {
-            let mut test_no = 0;
-            // loop {
-            cx.background_executor().timer(Duration::from_secs(2)).await;
-            toast_manager_test.update(cx, |this, cx| {
-                this.toasts.update(cx, |this, cx| {
-                    this.push(Toast {
-                        id: test_no,
-                        kind: ToastKind::Message(format!("Test {}", test_no)),
-                        created_at: Instant::now(),
-                        duration: Some(Duration::from_secs(8)),
-                        phase: ToastPhase::Entering,
-                        anim_phase: ToastPhase::Entering,
-                    });
-                    cx.notify();
-                });
-            });
-            //     test_no += 1;
-            //     cx.background_executor().timer(Duration::from_secs(2)).await;
-            // }
-        })
-        .detach();
-
         cx.global::<Controller>().load_cached_app_state();
 
         Self {
