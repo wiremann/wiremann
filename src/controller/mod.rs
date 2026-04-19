@@ -7,8 +7,8 @@ use crate::controller::events::{CacherEvent, ImageProcessorEvent, SystemIntegrat
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
-use crate::ui::components::toasts::scanning_status::ScanningStatus;
-use crate::ui::components::toasts::{Toast, ToastKind};
+use crate::ui::components::toasts::scanning_status::{ScanningStatus, ScanningStatusToast};
+use crate::ui::components::toasts::{Toast, ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, secs_to_slider};
 use crate::ui::wiremann::Wiremann;
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
 use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
-use gpui::{App, Entity, Global};
+use gpui::{App, AppContext, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
@@ -353,12 +353,16 @@ impl Controller {
                                 kind: ToastKind::Message("Scanning started...".to_string()),
                                 created_at: Instant::now(),
                                 duration: Some(Duration::from_secs(2)),
+                                phase: ToastPhase::Entering,
                             });
                             this.push(Toast {
                                 id: 00,
-                                kind: ToastKind::ScanProgress,
+                                kind: ToastKind::ScanProgress(
+                                    cx.new(|_| ScanningStatusToast::new()),
+                                ),
                                 created_at: Instant::now(),
                                 duration: None,
+                                phase: ToastPhase::Entering,
                             });
                             cx.notify();
                         });
