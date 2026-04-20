@@ -49,6 +49,7 @@ pub struct ToastManager {
 }
 
 impl Render for ToastManager {
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         div()
@@ -99,7 +100,7 @@ impl Render for ToastManager {
                                 ToastKind::Error(_) => {
                                     (theme.toast_error_accent, Icon::new(Icons::ToastError))
                                 }
-                                _ => unreachable!(),
+                                ToastKind::ScanProgress(_) => unreachable!(),
                             };
 
                             div()
@@ -155,14 +156,11 @@ impl Render for ToastManager {
                     let el = base.map(|this| {
                         if prev_phase == phase {
                             match phase {
-                                ToastPhase::Entering => {
+                                ToastPhase::Entering | ToastPhase::Exiting => {
                                     this.left_72().opacity(0.0).into_any_element()
                                 }
                                 ToastPhase::Idle => {
                                     this.left(px(0.0)).opacity(1.0).into_any_element()
-                                }
-                                ToastPhase::Exiting => {
-                                    this.left_72().opacity(0.0).into_any_element()
                                 }
                             }
                         } else {
@@ -225,20 +223,23 @@ impl ToastManager {
                         let now = Instant::now();
 
                         if t.phase == ToastPhase::Entering
-                            && now.duration_since(t.created_at) > Duration::from_millis(250) {
-                                t.phase = ToastPhase::Idle;
-                            }
+                            && now.duration_since(t.created_at) > Duration::from_millis(250)
+                        {
+                            t.phase = ToastPhase::Idle;
+                        }
                         if let Some(duration) = t.duration
                             && now.duration_since(t.created_at) >= duration
-                                && t.phase != ToastPhase::Exiting {
-                                    t.phase = ToastPhase::Exiting;
-                                    t.exiting_at = Some(now);
-                                }
+                            && t.phase != ToastPhase::Exiting
+                        {
+                            t.phase = ToastPhase::Exiting;
+                            t.exiting_at = Some(now);
+                        }
 
                         if let Some(exit_time) = t.exiting_at
-                            && now.duration_since(exit_time) >= Duration::from_millis(250) {
-                                return false;
-                            }
+                            && now.duration_since(exit_time) >= Duration::from_millis(250)
+                        {
+                            return false;
+                        }
 
                         true
                     });

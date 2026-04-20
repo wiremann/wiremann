@@ -163,7 +163,7 @@ impl Scanner {
     ) {
         let mut incremented = false;
 
-        let ts = if let Ok(ts) = TrackSource::generate(path) { ts } else {
+        let Ok(ts) = TrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             return;
         };
@@ -202,10 +202,9 @@ impl Scanner {
         let processed = scan_progress.processed.load(Ordering::Relaxed);
         let total = scan_progress.total.load(Ordering::Relaxed);
 
-        if incremented
-            && (processed.is_multiple_of(16) || processed == total) {
-                tx.send(ScannerEvent::Processed { processed, total }).ok();
-            }
+        if incremented && (processed.is_multiple_of(16) || processed == total) {
+            tx.send(ScannerEvent::Processed { processed, total }).ok();
+        }
         if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
             tx.send(ScannerEvent::ScanFinished).ok();
         }

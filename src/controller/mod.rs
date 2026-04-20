@@ -17,7 +17,7 @@ use crate::{
 use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
-use gpui::{App, AppContext, Entity, Global};
+use gpui::{App, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
@@ -377,13 +377,14 @@ impl Controller {
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
                         this.toasts.update(cx, |list, _| {
-                            list.iter_mut().for_each(|t| {
+                            for t in list.iter_mut() {
                                 if matches!(t.kind, ToastKind::ScanProgress(_))
-                                    && t.phase != ToastPhase::Exiting {
-                                        t.phase = ToastPhase::Exiting;
-                                        t.exiting_at = Some(Instant::now());
-                                    }
-                            });
+                                    && t.phase != ToastPhase::Exiting
+                                {
+                                    t.phase = ToastPhase::Exiting;
+                                    t.exiting_at = Some(Instant::now());
+                                }
+                            }
                         });
                         this.success("Scan complete!", cx);
                     });

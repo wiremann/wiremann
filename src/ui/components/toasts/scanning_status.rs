@@ -28,6 +28,7 @@ impl Render for ScanningStatusToast {
         let theme = *cx.global::<Theme>();
         let status = cx.global::<ScanningStatus>().0.read(cx).clone();
 
+        #[allow(clippy::cast_precision_loss)]
         let progress = (if status.total > 0 {
             status.processed as f32 / status.total as f32
         } else {
