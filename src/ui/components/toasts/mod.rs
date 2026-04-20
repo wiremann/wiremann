@@ -113,18 +113,15 @@ impl Render for ToastManager {
                                 .rounded_2xl()
                                 .block_mouse_except_scroll()
                                 .child(
-                                    // 🔥 ICON BLOCK
                                     div()
                                         .size_8()
                                         .flex()
                                         .items_center()
                                         .justify_center()
-                                        .bg(accent.with_alpha(theme.toast_icon_bg_alpha))
                                         .rounded_lg()
-                                        .child(icon.size_4().color(accent)),
+                                        .child(icon.size_4().text_color(accent)),
                                 )
                                 .child(
-                                    // ⚓ MESSAGE
                                     div()
                                         .flex_1()
                                         .text_color(theme.toast_text)

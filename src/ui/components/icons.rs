@@ -182,6 +182,9 @@ pub enum Icons {
     VolumeMute,
     Menu,
     Search,
+    ToastInfo,
+    ToastSuccess,
+    ToastError,
 }
 
 impl IconNamed for Icons {
@@ -206,6 +209,9 @@ impl IconNamed for Icons {
             Icons::VolumeMute => "icons/volume-mute.svg",
             Icons::Menu => "icons/menu.svg",
             Icons::Search => "icons/search.svg",
+            Icons::ToastInfo => "icons/toast_info.svg",
+            Icons::ToastSuccess => "icons/toast_success.svg",
+            Icons::ToastError => "icons/toast_error.svg",
         }
         .into()
     }

@@ -116,8 +116,6 @@ pub struct Theme {
     pub toast_success_accent: Rgba,
     pub toast_error_accent: Rgba,
 
-    pub toast_icon_bg_alpha: f32,
-
     // Common
     pub border: Rgba,
     pub scrollbar_thumb: Rgba,
@@ -230,17 +228,12 @@ impl Default for Theme {
 
             playlist_empty_text: rgb(0x5A5A6B),
 
-            toast_bg: rgb(0x0A070F),
-            toast_border: rgb(0x8B7BF7),
             toast_bg: rgb(0x12101A),
             toast_border: rgba(0xFFFFFF14),
             toast_text: rgba(0xFFFFFFE6),
-
             toast_info_accent: rgb(0x8B7BF7),
             toast_success_accent: rgb(0x22C55E),
             toast_error_accent: rgb(0xEF4444),
-
-            toast_icon_bg_alpha: 0.16,
 
             border: rgba(0xFFFFFF29),
             scrollbar_thumb: rgb(0x8B7BF7),
