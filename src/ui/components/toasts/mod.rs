@@ -45,6 +45,7 @@ pub enum ToastPhase {
 #[derive(Clone)]
 pub struct ToastManager {
     pub toasts: Entity<Vec<Toast>>,
+    next_id: u64,
 }
 
 impl Render for ToastManager {
@@ -250,6 +251,55 @@ impl ToastManager {
         })
         .detach();
 
-        ToastManager { toasts }
+        ToastManager { toasts, next_id: 0 }
+    }
+
+    pub fn spawn(&mut self, kind: ToastKind, duration: Option<Duration>, cx: &mut Context<Self>) {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        self.toasts.update(cx, |toasts, _| {
+            toasts.push(Toast {
+                id,
+                kind,
+                created_at: Instant::now(),
+                duration,
+                phase: ToastPhase::Entering,
+                anim_phase: ToastPhase::Entering,
+                exiting_at: None,
+            });
+        });
+    }
+
+    pub fn info(&mut self, msg: impl Into<String>, cx: &mut Context<Self>) {
+        self.spawn(
+            ToastKind::Info(msg.into()),
+            Some(Duration::from_secs(4)),
+            cx,
+        );
+    }
+
+    pub fn success(&mut self, msg: impl Into<String>, cx: &mut Context<Self>) {
+        self.spawn(
+            ToastKind::Success(msg.into()),
+            Some(Duration::from_secs(4)),
+            cx,
+        );
+    }
+
+    pub fn error(&mut self, msg: impl Into<String>, cx: &mut Context<Self>) {
+        self.spawn(
+            ToastKind::Error(msg.into()),
+            Some(Duration::from_secs(6)),
+            cx,
+        );
+    }
+
+    pub fn scanning_status(&mut self, cx: &mut Context<Self>) {
+        self.spawn(
+            ToastKind::ScanProgress(cx.new(|_| ScanningStatusToast::new())),
+            None,
+            cx,
+        );
     }
 }
