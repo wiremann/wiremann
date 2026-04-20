@@ -306,35 +306,6 @@ impl Controller {
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
-            ScannerEvent::ScanFinished => {
-                self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
-                let tracks = self.state.read(cx).library.tracks.clone();
-
-                let to_request: HashSet<(TrackId, PathBuf)> = tracks
-                    .iter()
-                    .filter(|(_, track)| track.image_id.is_none())
-                    .filter_map(|(id, track)| {
-                        track
-                            .get_valid_source()
-                            .map(|src| src.path.clone())
-                            .map(|path| (*id, path))
-                    })
-                    .collect();
-                let _ = self
-                    .image_processor_tx
-                    .send(ImageProcessorCommand::GetThumbnails(
-                        to_request,
-                        ImageKind::ThumbnailSmall,
-                    ));
-
-                // self.request_playlist_thumbnails(
-                //     &modified_playlists
-                //         .iter()
-                //         .copied()
-                //         .collect::<Vec<PlaylistId>>(),
-                //     cx,
-                // );
-            }
             ScannerEvent::ScanStarted => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().clone().0;
 
@@ -381,6 +352,61 @@ impl Controller {
                     this.processed = *processed;
                     cx.notify();
                 })
+            }
+            ScannerEvent::ScanFinished => {
+                self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
+                let tracks = self.state.read(cx).library.tracks.clone();
+
+                let to_request: HashSet<(TrackId, PathBuf)> = tracks
+                    .iter()
+                    .filter(|(_, track)| track.image_id.is_none())
+                    .filter_map(|(id, track)| {
+                        track
+                            .get_valid_source()
+                            .map(|src| src.path.clone())
+                            .map(|path| (*id, path))
+                    })
+                    .collect();
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::GetThumbnails(
+                        to_request,
+                        ImageKind::ThumbnailSmall,
+                    ));
+
+                view.update(cx, |this, cx| {
+                    this.toast_manager.update(cx, |this, cx| {
+                        this.toasts.update(cx, |list, _| {
+                            list.retain(|t| !matches!(t.kind, ToastKind::ScanProgress(_)));
+                        });
+                        this.success("Scan complete!", cx);
+                    });
+                });
+
+                let status = cx.global::<ScanningStatus>().0.clone();
+                status.update(cx, |s, _| {
+                    s.is_scanning = false;
+                    s.is_discovering = false;
+                    s.is_processing = false;
+
+                    s.discovered = 0;
+                    s.total = 0;
+                    s.processed = 0;
+                });
+
+                let library = cx.global::<Controller>().state.read(cx).library.clone();
+                let missing: Vec<PlaylistId> = library
+                    .playlists
+                    .iter()
+                    .filter_map(|(id, playlist)| {
+                        if playlist.image_id.is_none() {
+                            Some(*id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                self.request_playlist_thumbnails(&missing, cx);
             }
         }
         Ok(())

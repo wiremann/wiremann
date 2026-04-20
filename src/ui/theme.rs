@@ -116,6 +116,7 @@ pub struct Theme {
     pub toast_success_accent: Rgba,
     pub toast_error_accent: Rgba,
     pub toast_progress_bg: Rgba,
+    pub toast_progress_fill: Rgba,
 
     // Common
     pub border: Rgba,
@@ -235,7 +236,8 @@ impl Default for Theme {
             toast_info_accent: rgb(0x8B7BF7),
             toast_success_accent: rgb(0x22C55E),
             toast_error_accent: rgb(0xEF4444),
-            toast_progress_bg: rgb(0x8B7BF7),
+            toast_progress_bg: rgba(0xFFFFFF1A),
+            toast_progress_fill: rgb(0x8B7BF7),
 
             border: rgba(0xFFFFFF29),
             scrollbar_thumb: rgb(0x8B7BF7),
