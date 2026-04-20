@@ -313,7 +313,7 @@ impl Controller {
                     this.is_scanning = true;
                     this.is_discovering = true;
 
-                    cx.notify()
+                    cx.notify();
                 });
 
                 view.update(cx, |this, cx| {
@@ -329,29 +329,29 @@ impl Controller {
 
                 scanning_status.update(cx, |this, cx| {
                     if !this.is_discovering {
-                        this.is_discovering = true
+                        this.is_discovering = true;
                     }
 
                     this.discovered = *discovered;
 
                     cx.notify();
-                })
+                });
             }
             ScannerEvent::Processed { processed, total } => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
                 scanning_status.update(cx, |this, cx| {
                     if this.is_discovering {
-                        this.is_discovering = false
+                        this.is_discovering = false;
                     }
                     if !this.is_processing {
-                        this.is_processing = true
+                        this.is_processing = true;
                     }
 
                     this.total = *total;
                     this.processed = *processed;
                     cx.notify();
-                })
+                });
             }
             ScannerEvent::ScanFinished => {
                 self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
@@ -378,12 +378,11 @@ impl Controller {
                     this.toast_manager.update(cx, |this, cx| {
                         this.toasts.update(cx, |list, _| {
                             list.iter_mut().for_each(|t| {
-                                if matches!(t.kind, ToastKind::ScanProgress(_)) {
-                                    if t.phase != ToastPhase::Exiting {
+                                if matches!(t.kind, ToastKind::ScanProgress(_))
+                                    && t.phase != ToastPhase::Exiting {
                                         t.phase = ToastPhase::Exiting;
                                         t.exiting_at = Some(Instant::now());
                                     }
-                                }
                             });
                         });
                         this.success("Scan complete!", cx);

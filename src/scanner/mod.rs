@@ -163,12 +163,9 @@ impl Scanner {
     ) {
         let mut incremented = false;
 
-        let ts = match TrackSource::generate(path) {
-            Ok(ts) => ts,
-            Err(_) => {
-                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-                return;
-            }
+        let ts = if let Ok(ts) = TrackSource::generate(path) { ts } else {
+            scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+            return;
         };
 
         if let Some(entry) = scan_record.get(&ts) {
@@ -186,19 +183,16 @@ impl Scanner {
                 incremented = true;
             }
         } else {
-            match metadata::read_metadata(ts.clone()) {
-                Ok(track) => {
-                    let id = track.id;
-                    new.push((track, pid));
+            if let Ok(track) = metadata::read_metadata(ts.clone()) {
+                let id = track.id;
+                new.push((track, pid));
 
-                    if new.len() >= 32 {
-                        let to_send = std::mem::take(new);
-                        tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
-                    }
-
-                    scan_record.insert(ts, id);
+                if new.len() >= 32 {
+                    let to_send = std::mem::take(new);
+                    tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
                 }
-                Err(_) => {}
+
+                scan_record.insert(ts, id);
             }
 
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
@@ -208,11 +202,10 @@ impl Scanner {
         let processed = scan_progress.processed.load(Ordering::Relaxed);
         let total = scan_progress.total.load(Ordering::Relaxed);
 
-        if incremented {
-            if processed % 16 == 0 || processed == total {
+        if incremented
+            && (processed.is_multiple_of(16) || processed == total) {
                 tx.send(ScannerEvent::Processed { processed, total }).ok();
             }
-        }
         if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
             tx.send(ScannerEvent::ScanFinished).ok();
         }

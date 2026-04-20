@@ -50,7 +50,7 @@ pub struct ToastManager {
 
 impl Render for ToastManager {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         div()
             .id("toast_manager")
             .absolute()
@@ -67,14 +67,14 @@ impl Render for ToastManager {
                 let toasts_vec = self.toasts.read(cx).clone();
                 let mut elements = Vec::new();
 
-                for toast in toasts_vec.iter() {
+                for toast in &toasts_vec {
                     let id = toast.id;
                     let phase = toast.phase;
                     let toasts = self.toasts.clone();
 
                     let base = match &toast.kind {
                         ToastKind::ScanProgress(el) => div()
-                            .id(format!("toast_scan_{}", id))
+                            .id(format!("toast_scan_{id}"))
                             .relative()
                             .child(el.clone())
                             .on_click(move |_, _, cx| {
@@ -103,7 +103,7 @@ impl Render for ToastManager {
                             };
 
                             div()
-                                .id(format!("toast_msg_{}", id))
+                                .id(format!("toast_msg_{id}"))
                                 .relative()
                                 .flex()
                                 .items_center()
@@ -224,25 +224,21 @@ impl ToastManager {
                     toasts.retain_mut(|t| {
                         let now = Instant::now();
 
-                        if t.phase == ToastPhase::Entering {
-                            if now.duration_since(t.created_at) > Duration::from_millis(250) {
+                        if t.phase == ToastPhase::Entering
+                            && now.duration_since(t.created_at) > Duration::from_millis(250) {
                                 t.phase = ToastPhase::Idle;
                             }
-                        }
-                        if let Some(duration) = t.duration {
-                            if now.duration_since(t.created_at) >= duration {
-                                if t.phase != ToastPhase::Exiting {
+                        if let Some(duration) = t.duration
+                            && now.duration_since(t.created_at) >= duration
+                                && t.phase != ToastPhase::Exiting {
                                     t.phase = ToastPhase::Exiting;
                                     t.exiting_at = Some(now);
                                 }
-                            }
-                        }
 
-                        if let Some(exit_time) = t.exiting_at {
-                            if now.duration_since(exit_time) >= Duration::from_millis(250) {
+                        if let Some(exit_time) = t.exiting_at
+                            && now.duration_since(exit_time) >= Duration::from_millis(250) {
                                 return false;
                             }
-                        }
 
                         true
                     });

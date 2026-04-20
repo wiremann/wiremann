@@ -25,7 +25,7 @@ pub struct ScanningStatusToast;
 impl Render for ScanningStatusToast {
     #[allow(clippy::unreadable_literal)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let status = cx.global::<ScanningStatus>().0.read(cx).clone();
 
         let progress = (if status.total > 0 {
@@ -101,7 +101,14 @@ impl Render for ScanningStatusToast {
     }
 }
 
+impl Default for ScanningStatusToast {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScanningStatusToast {
+    #[must_use]
     pub fn new() -> ScanningStatusToast {
         ScanningStatusToast {}
     }
