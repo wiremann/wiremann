@@ -185,6 +185,8 @@ pub enum Icons {
     ToastInfo,
     ToastSuccess,
     ToastError,
+    Loader,
+    Scan,
 }
 
 impl IconNamed for Icons {
@@ -212,6 +214,8 @@ impl IconNamed for Icons {
             Icons::ToastInfo => "icons/toast_info.svg",
             Icons::ToastSuccess => "icons/toast_success.svg",
             Icons::ToastError => "icons/toast_error.svg",
+            Icons::Loader => "icons/loader.svg",
+            Icons::Scan => "icons/scan.svg",
         }
         .into()
     }

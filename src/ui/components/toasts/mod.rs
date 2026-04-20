@@ -131,7 +131,6 @@ impl Render for ToastManager {
                                     div()
                                         .flex_1()
                                         .text_color(theme.toast_text)
-                                        .text_sm()
                                         .font_weight(gpui::FontWeight::MEDIUM)
                                         .child(msg.clone()),
                                 )

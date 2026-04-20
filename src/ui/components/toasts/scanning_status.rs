@@ -1,8 +1,8 @@
-use crate::ui::components::icons::Icons;
+use crate::ui::components::icons::{Icon, Icons};
 use crate::ui::theme::Theme;
 use gpui::{
     App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, WindowControlArea, div, white,
+    Styled, Window, WindowControlArea, div, px, white,
 };
 
 #[derive(Clone)]
@@ -20,72 +20,88 @@ pub struct ScanningStatusInner {
 pub struct ScanningStatus(pub Entity<ScanningStatusInner>);
 
 #[derive(Clone)]
-pub struct ScanningStatusToast {
-    display_processed: f32,
-    velocity: f32,
-}
+pub struct ScanningStatusToast;
 
 impl Render for ScanningStatusToast {
     #[allow(clippy::unreadable_literal)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>().clone();
         let status = cx.global::<ScanningStatus>().0.read(cx).clone();
-        let discovered = status.discovered;
-        let total = status.total;
-        let target = status.processed as f32;
 
-        if target == 0.0 && self.display_processed != 0.0 {
-            self.display_processed = 0.0;
-            self.velocity = 0.0;
-        }
-
-        let diff = target - self.display_processed;
-
-        self.velocity += diff * 0.15;
-        self.velocity *= 0.8;
-
-        self.velocity = self.velocity.clamp(-50.0, 50.0);
-
-        self.display_processed += self.velocity;
-
-        if diff.abs() < 0.5 && self.velocity.abs() < 0.5 {
-            self.display_processed = target;
-            self.velocity = 0.0;
+        let progress = if status.total > 0 {
+            status.processed as f32 / status.total as f32
         } else {
-            cx.notify();
-        }
+            0.0
+        };
 
-        let processed = self.display_processed as usize;
+        let message = if status.is_discovering {
+            format!("Scanning for files… ({} found)", status.discovered)
+        } else if status.is_processing {
+            format!("Processing {} of {} tracks", status.processed, status.total)
+        } else {
+            "Preparing scan…".to_string()
+        };
+
         div()
-            .px_4()
-            .py_2()
-            .min_w_80()
-            .min_h_16()
+            .relative()
             .flex()
-            .items_center()
-            .justify_start()
+            .flex_col()
+            .gap_2()
+            .px_4()
+            .py_3()
+            .min_w_80()
+            .max_w_128()
             .bg(theme.toast_bg)
-            .border_2()
-            .border_color(theme.toast_border)
-            .text_color(theme.toast_text)
+            .border_1()
+            .border_color(theme.toast_info_accent)
             .rounded_xl()
             .block_mouse_except_scroll()
-            .child({
-                if status.is_discovering {
-                    format!("Discovered: {} files...", discovered)
-                } else {
-                    format!("Processing: {} / {}", processed, total)
-                }
-            })
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_4()
+                    .child(
+                        div()
+                            .size_8()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded_lg()
+                            .child(
+                                Icon::new(Icons::Loader)
+                                    .size_8()
+                                    .text_color(theme.toast_info_accent),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .text_color(theme.toast_text)
+                            .font_weight(gpui::FontWeight::MEDIUM)
+                            .child(message),
+                    ),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .h_1()
+                    .bg(theme.toast_progress_bg)
+                    .rounded_full()
+                    .child(
+                        div()
+                            .h_full()
+                            .bg(theme.toast_info_accent)
+                            .rounded_full()
+                            .w(px(progress * 200.0)),
+                    ),
+            )
     }
 }
 
 impl ScanningStatusToast {
     pub fn new() -> ScanningStatusToast {
-        ScanningStatusToast {
-            display_processed: 0.0,
-            velocity: 0.0,
-        }
+        ScanningStatusToast {}
     }
 }
 

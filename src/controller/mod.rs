@@ -347,29 +347,8 @@ impl Controller {
 
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
-                        this.toasts.update(cx, |this, cx| {
-                            this.push(Toast {
-                                id: 02,
-                                kind: ToastKind::Info("Scanning started...".to_string()),
-                                created_at: Instant::now(),
-                                duration: Some(Duration::from_secs(2)),
-                                phase: ToastPhase::Entering,
-                                anim_phase: ToastPhase::Entering,
-                                exiting_at: None,
-                            });
-                            this.push(Toast {
-                                id: 00,
-                                kind: ToastKind::ScanProgress(
-                                    cx.new(|_| ScanningStatusToast::new()),
-                                ),
-                                created_at: Instant::now(),
-                                duration: None,
-                                phase: ToastPhase::Entering,
-                                anim_phase: ToastPhase::Entering,
-                                exiting_at: None,
-                            });
-                            cx.notify();
-                        });
+                        this.info("Scanning started...", cx);
+                        this.scanning_status(cx);
                     });
                     cx.notify();
                 });
