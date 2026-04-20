@@ -82,6 +82,7 @@ impl Render for ToastManager {
                                     for t in list.iter_mut() {
                                         if t.id == id {
                                             t.phase = ToastPhase::Exiting;
+                                            t.exiting_at = Some(Instant::now());
                                         }
                                     }
                                 });

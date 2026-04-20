@@ -163,8 +163,12 @@ impl Scanner {
     ) {
         let mut incremented = false;
 
-        let Ok(ts) = TrackSource::generate(path) else {
-            return;
+        let ts = match TrackSource::generate(path) {
+            Ok(ts) => ts,
+            Err(_) => {
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+                return;
+            }
         };
 
         if let Some(entry) = scan_record.get(&ts) {
@@ -181,28 +185,36 @@ impl Scanner {
                 scan_progress.processed.fetch_add(1, Ordering::Relaxed);
                 incremented = true;
             }
-        } else if let Ok(track) = metadata::read_metadata(ts.clone()) {
-            let id = track.id;
-            new.push((track, pid));
+        } else {
+            match metadata::read_metadata(ts.clone()) {
+                Ok(track) => {
+                    let id = track.id;
+                    new.push((track, pid));
 
-            if new.len() >= 32 {
-                let to_send = std::mem::take(new);
-                tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
+                    if new.len() >= 32 {
+                        let to_send = std::mem::take(new);
+                        tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
+                    }
+
+                    scan_record.insert(ts, id);
+                }
+                Err(_) => {}
             }
-
-            scan_record.insert(ts, id);
 
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             incremented = true;
         }
 
-        if incremented {
-            let processed = scan_progress.processed.load(Ordering::Relaxed);
-            let total = scan_progress.total.load(Ordering::Relaxed);
+        let processed = scan_progress.processed.load(Ordering::Relaxed);
+        let total = scan_progress.total.load(Ordering::Relaxed);
 
+        if incremented {
             if processed % 16 == 0 || processed == total {
                 tx.send(ScannerEvent::Processed { processed, total }).ok();
             }
+        }
+        if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
+            tx.send(ScannerEvent::ScanFinished).ok();
         }
     }
 

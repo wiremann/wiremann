@@ -377,7 +377,14 @@ impl Controller {
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
                         this.toasts.update(cx, |list, _| {
-                            list.retain(|t| !matches!(t.kind, ToastKind::ScanProgress(_)));
+                            list.iter_mut().for_each(|t| {
+                                if matches!(t.kind, ToastKind::ScanProgress(_)) {
+                                    if t.phase != ToastPhase::Exiting {
+                                        t.phase = ToastPhase::Exiting;
+                                        t.exiting_at = Some(Instant::now());
+                                    }
+                                }
+                            });
                         });
                         this.success("Scan complete!", cx);
                     });
