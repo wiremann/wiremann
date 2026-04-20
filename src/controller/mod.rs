@@ -7,8 +7,8 @@ use crate::controller::events::{CacherEvent, ImageProcessorEvent, SystemIntegrat
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
-use crate::ui::components::toasts::scanning_status::{ScanningStatus, ScanningStatusToast};
-use crate::ui::components::toasts::{Toast, ToastKind, ToastPhase};
+use crate::ui::components::toasts::scanning_status::ScanningStatus;
+use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, secs_to_slider};
 use crate::ui::wiremann::Wiremann;
 use crate::{
@@ -21,7 +21,7 @@ use gpui::{App, AppContext, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone)]

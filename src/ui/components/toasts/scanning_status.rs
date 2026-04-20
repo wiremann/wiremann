@@ -2,7 +2,7 @@ use crate::ui::components::icons::{Icon, Icons};
 use crate::ui::theme::Theme;
 use gpui::{
     App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, WindowControlArea, div, px, relative, white,
+    Styled, Window, div, px, relative,
 };
 
 #[derive(Clone)]

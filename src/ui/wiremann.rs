@@ -1,4 +1,3 @@
-use std::time::{Duration, Instant};
 
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
@@ -6,7 +5,7 @@ use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
-use crate::ui::components::toasts::{Toast, ToastKind, ToastManager, ToastPhase};
+use crate::ui::components::toasts::ToastManager;
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use crate::ui::{components, global_keybinds};
