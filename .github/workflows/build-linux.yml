@@ -61,7 +61,8 @@ jobs:
             libxcb-render0-dev \
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev
 
       - name: Build release (x86_64)
         run: cargo build --release --target ${{ matrix.target }}
