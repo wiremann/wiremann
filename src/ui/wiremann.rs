@@ -101,6 +101,38 @@ impl Wiremann {
         let library_page = cx.new(|cx| LibraryPage::new(cx));
         let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
+        toast_manager.update(cx, |this, cx| {
+            this.toasts.update(cx, |this, cx| {
+                this.push(Toast {
+                    id: 00,
+                    kind: ToastKind::Info("Info toast.".to_string()),
+                    created_at: Instant::now(),
+                    duration: Some(Duration::from_secs(10)),
+                    phase: ToastPhase::Entering,
+                    anim_phase: ToastPhase::Entering,
+                    exiting_at: None,
+                });
+                this.push(Toast {
+                    id: 01,
+                    kind: ToastKind::Success("Success toast.".to_string()),
+                    created_at: Instant::now(),
+                    duration: Some(Duration::from_secs(10)),
+                    phase: ToastPhase::Entering,
+                    anim_phase: ToastPhase::Entering,
+                    exiting_at: None,
+                });
+                this.push(Toast {
+                    id: 02,
+                    kind: ToastKind::Error("Error toast.".to_string()),
+                    created_at: Instant::now(),
+                    duration: Some(Duration::from_secs(10)),
+                    phase: ToastPhase::Entering,
+                    anim_phase: ToastPhase::Entering,
+                    exiting_at: None,
+                });
+                cx.notify();
+            });
+        });
 
         cx.global::<Controller>().load_cached_app_state();
 

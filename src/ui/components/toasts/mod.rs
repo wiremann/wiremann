@@ -21,7 +21,10 @@ pub struct Toast {
     pub created_at: Instant,
     pub duration: Option<Duration>,
     pub phase: ToastPhase,
+
+    // temp states
     pub anim_phase: ToastPhase,
+    pub exiting_at: Option<Instant>,
 }
 
 #[derive(Clone)]
@@ -103,14 +106,16 @@ impl Render for ToastManager {
                                 .flex()
                                 .items_center()
                                 .gap_4()
-                                .px_5()
+                                .px_3()
                                 .py_3()
                                 .min_w_80()
-                                .max_w_96()
+                                .max_w_128()
+                                .min_h_16()
+                                .max_h_32()
                                 .bg(theme.toast_bg)
                                 .border_1()
-                                .border_color(theme.toast_border)
-                                .rounded_2xl()
+                                .border_color(accent)
+                                .rounded_xl()
                                 .block_mouse_except_scroll()
                                 .child(
                                     div()
@@ -119,7 +124,7 @@ impl Render for ToastManager {
                                         .items_center()
                                         .justify_center()
                                         .rounded_lg()
-                                        .child(icon.size_4().text_color(accent)),
+                                        .child(icon.size_8().text_color(accent)),
                                 )
                                 .child(
                                     div()
@@ -134,6 +139,7 @@ impl Render for ToastManager {
                                         for t in list.iter_mut() {
                                             if t.id == id {
                                                 t.phase = ToastPhase::Exiting;
+                                                t.exiting_at = Some(Instant::now());
                                             }
                                         }
                                     });
@@ -210,7 +216,7 @@ impl ToastManager {
         cx.spawn(async move |cx| {
             loop {
                 cx.background_executor()
-                    .timer(Duration::from_millis(256))
+                    .timer(Duration::from_millis(128))
                     .await;
 
                 toasts_clone.update(cx, |toasts, _| {
@@ -224,10 +230,16 @@ impl ToastManager {
                         }
                         if let Some(duration) = t.duration {
                             if now.duration_since(t.created_at) >= duration {
-                                if t.phase == ToastPhase::Exiting {
-                                    return false;
+                                if t.phase != ToastPhase::Exiting {
+                                    t.phase = ToastPhase::Exiting;
+                                    t.exiting_at = Some(now);
                                 }
-                                t.phase = ToastPhase::Exiting;
+                            }
+                        }
+
+                        if let Some(exit_time) = t.exiting_at {
+                            if now.duration_since(exit_time) >= Duration::from_millis(250) {
+                                return false;
                             }
                         }
 

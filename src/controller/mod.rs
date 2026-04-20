@@ -350,11 +350,12 @@ impl Controller {
                         this.toasts.update(cx, |this, cx| {
                             this.push(Toast {
                                 id: 02,
-                                kind: ToastKind::Message("Scanning started...".to_string()),
+                                kind: ToastKind::Info("Scanning started...".to_string()),
                                 created_at: Instant::now(),
                                 duration: Some(Duration::from_secs(2)),
                                 phase: ToastPhase::Entering,
                                 anim_phase: ToastPhase::Entering,
+                                exiting_at: None,
                             });
                             this.push(Toast {
                                 id: 00,
@@ -365,6 +366,7 @@ impl Controller {
                                 duration: None,
                                 phase: ToastPhase::Entering,
                                 anim_phase: ToastPhase::Entering,
+                                exiting_at: None,
                             });
                             cx.notify();
                         });

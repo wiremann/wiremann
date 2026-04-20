@@ -67,7 +67,7 @@ impl Render for ScanningStatusToast {
             .bg(theme.toast_bg)
             .border_2()
             .border_color(theme.toast_border)
-            .text_color(theme.toast_msg_text)
+            .text_color(theme.toast_text)
             .rounded_xl()
             .block_mouse_except_scroll()
             .child({
