@@ -25,6 +25,9 @@ pub enum ScannerEvent {
 
     InsertPlaylist(Playlist),
 
+    ScanStarted,
+    Discovered(usize),
+    Processed { processed: usize, total: usize },
     ScanFinished,
 }
 

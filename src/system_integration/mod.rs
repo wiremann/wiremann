@@ -55,7 +55,7 @@ impl SystemIntegration {
         });
 
         let config = PlatformConfig {
-            hwnd,
+            hwnd: hwnd.map(|h: std::num::NonZeroIsize| h.get() as *mut std::ffi::c_void),
             dbus_name: "app.wiremann.wiremann",
             display_name: "Wiremann",
         };

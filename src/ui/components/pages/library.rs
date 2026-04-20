@@ -476,7 +476,7 @@ impl Render for LibraryPage {
             .bg(theme.library_bg)
             .text_color(theme.library_text)
             .px_12()
-            .py_10()
+            .pt_10()
             .child(vlist(
                 cx.entity(),
                 "library",
@@ -553,6 +553,7 @@ impl Render for LibraryPage {
             ))
     }
 }
+
 fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();

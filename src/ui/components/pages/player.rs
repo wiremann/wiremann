@@ -301,7 +301,6 @@ impl Render for PlayerPage {
                             .w_full()
                             .h_full()
                             .px_4()
-                            .pb_4()
                             .flex()
                             .relative()
                             .child(self.queue.clone())

@@ -161,7 +161,10 @@ impl Scanner {
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
         new: &mut Vec<(Track, Option<PlaylistId>)>,
     ) {
+        let mut incremented = false;
+
         let Ok(ts) = TrackSource::generate(path) else {
+            scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             return;
         };
 
@@ -170,39 +173,39 @@ impl Scanner {
                 let batch = existing.entry(pid).or_default();
                 batch.push(*entry.value());
 
-                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-
                 if batch.len() >= 32 {
                     let to_send = std::mem::take(batch);
-
                     tx.send(ScannerEvent::InsertTracksIntoPlaylist(pid, to_send))
                         .ok();
                 }
+
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+                incremented = true;
+            }
+        } else {
+            if let Ok(track) = metadata::read_metadata(ts.clone()) {
+                let id = track.id;
+                new.push((track, pid));
+
+                if new.len() >= 32 {
+                    let to_send = std::mem::take(new);
+                    tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
+                }
+
+                scan_record.insert(ts, id);
             }
 
-            return;
-        }
-
-        if let Ok(track) = metadata::read_metadata(ts.clone()) {
-            let id = track.id;
-            new.push((track, pid));
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-
-            if new.len() >= 32 {
-                let to_send = std::mem::take(new);
-
-                tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
-            }
-
-            scan_record.insert(ts, id);
+            incremented = true;
         }
 
-        if scan_progress.discovery_done.load(Ordering::Acquire)
-            && scan_progress.processed.load(Ordering::Relaxed)
-                == scan_progress.total.load(Ordering::Relaxed)
-        {
-            Self::flush_batches(tx, existing, new);
+        let processed = scan_progress.processed.load(Ordering::Relaxed);
+        let total = scan_progress.total.load(Ordering::Relaxed);
 
+        if incremented && (processed.is_multiple_of(16) || processed == total) {
+            tx.send(ScannerEvent::Processed { processed, total }).ok();
+        }
+        if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
             tx.send(ScannerEvent::ScanFinished).ok();
         }
     }
@@ -237,6 +240,8 @@ impl Scanner {
 
         self.read_scan_record();
 
+        self.tx.send(ScannerEvent::ScanStarted).ok();
+
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
@@ -260,11 +265,14 @@ impl Scanner {
 
             let scan_progress = self.scan_progress.clone();
             let worker_tx = worker_tx.clone();
+            let tx = self.tx.clone();
 
             std::thread::spawn(move || {
+                let mut paths = Vec::with_capacity(1024);
+
                 for entry in WalkDir::new(&path)
                     .into_iter()
-                    .filter_map(std::result::Result::ok)
+                    .filter_map(Result::ok)
                     .filter(|e| {
                         e.path()
                             .extension()
@@ -272,9 +280,19 @@ impl Scanner {
                             .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
-                    scan_progress.total.fetch_add(1, Ordering::Relaxed);
+                    if paths.len() % 16 == 0 {
+                        tx.send(ScannerEvent::Discovered(paths.len())).ok();
+                    }
+                    paths.push(entry.path().to_path_buf());
+                }
 
-                    let _ = worker_tx.send((entry.path().to_path_buf(), Some(playlist_id)));
+                let total = paths.len();
+                scan_progress.total.store(total, Ordering::Relaxed);
+
+                scan_progress.discovery_done.store(true, Ordering::Release);
+
+                for path in paths {
+                    let _ = worker_tx.send((path, Some(playlist_id)));
                 }
             });
         }
