@@ -1,10 +1,16 @@
 pub mod scanning_status;
 
-use crate::ui::{components::toasts::scanning_status::ScanningStatusToast, theme::Theme};
+use crate::ui::{
+    components::{
+        icons::{Icon, Icons},
+        toasts::scanning_status::ScanningStatusToast,
+    },
+    theme::Theme,
+};
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context,ElementId, Entity, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window,
-     div, prelude::FluentBuilder, px,
+    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
+    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use std::time::{Duration, Instant};
 
@@ -20,8 +26,10 @@ pub struct Toast {
 
 #[derive(Clone)]
 pub enum ToastKind {
+    Info(String),
+    Success(String),
+    Error(String),
     ScanProgress(Entity<ScanningStatusToast>),
-    Message(String),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -75,32 +83,65 @@ impl Render for ToastManager {
                                 });
                             }),
 
-                        ToastKind::Message(msg) => div()
-                            .id(format!("toast_msg_{}", id))
-                            .relative()
-                            .px_4()
-                            .py_2()
-                            .min_w_80()
-                            .min_h_16()
-                            .flex()
-                            .items_center()
-                            .justify_start()
-                            .bg(theme.toast_bg)
-                            .border_2()
-                            .border_color(theme.toast_border)
-                            .text_color(theme.toast_msg_text)
-                            .rounded_xl()
-                            .block_mouse_except_scroll()
-                            .child(msg.clone())
-                            .on_click(move |_, _, cx| {
-                                toasts.update(cx, |list, _| {
-                                    for t in list.iter_mut() {
-                                        if t.id == id {
-                                            t.phase = ToastPhase::Exiting;
+                        ToastKind::Info(msg) | ToastKind::Success(msg) | ToastKind::Error(msg) => {
+                            let (accent, icon) = match &toast.kind {
+                                ToastKind::Info(_) => {
+                                    (theme.toast_info_accent, Icon::new(Icons::ToastInfo))
+                                }
+                                ToastKind::Success(_) => {
+                                    (theme.toast_success_accent, Icon::new(Icons::ToastSuccess))
+                                }
+                                ToastKind::Error(_) => {
+                                    (theme.toast_error_accent, Icon::new(Icons::ToastError))
+                                }
+                                _ => unreachable!(),
+                            };
+
+                            div()
+                                .id(format!("toast_msg_{}", id))
+                                .relative()
+                                .flex()
+                                .items_center()
+                                .gap_4()
+                                .px_5()
+                                .py_3()
+                                .min_w_80()
+                                .max_w_96()
+                                .bg(theme.toast_bg)
+                                .border_1()
+                                .border_color(theme.toast_border)
+                                .rounded_2xl()
+                                .block_mouse_except_scroll()
+                                .child(
+                                    // 🔥 ICON BLOCK
+                                    div()
+                                        .size_8()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .bg(accent.with_alpha(theme.toast_icon_bg_alpha))
+                                        .rounded_lg()
+                                        .child(icon.size_4().color(accent)),
+                                )
+                                .child(
+                                    // ⚓ MESSAGE
+                                    div()
+                                        .flex_1()
+                                        .text_color(theme.toast_text)
+                                        .text_sm()
+                                        .font_weight(gpui::FontWeight::MEDIUM)
+                                        .child(msg.clone()),
+                                )
+                                .on_click(move |_, _, cx| {
+                                    toasts.update(cx, |list, _| {
+                                        for t in list.iter_mut() {
+                                            if t.id == id {
+                                                t.phase = ToastPhase::Exiting;
+                                            }
                                         }
-                                    }
-                                });
-                            }),
+                                    });
+                                })
+                        }
                     };
 
                     let duration = Duration::from_millis(250);
@@ -110,9 +151,15 @@ impl Render for ToastManager {
                     let el = base.map(|this| {
                         if prev_phase == phase {
                             match phase {
-                                ToastPhase::Entering => this.left(px(240.0)).opacity(0.0).into_any_element(),
-                                ToastPhase::Idle => this.left(px(0.0)).opacity(1.0).into_any_element(),
-                                ToastPhase::Exiting => this.left(px(240.0)).opacity(0.0).into_any_element(),
+                                ToastPhase::Entering => {
+                                    this.left_72().opacity(0.0).into_any_element()
+                                }
+                                ToastPhase::Idle => {
+                                    this.left(px(0.0)).opacity(1.0).into_any_element()
+                                }
+                                ToastPhase::Exiting => {
+                                    this.left_72().opacity(0.0).into_any_element()
+                                }
                             }
                         } else {
                             cx.spawn({
