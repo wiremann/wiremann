@@ -94,7 +94,7 @@ impl Cacher {
         }
     }
 
-    pub fn spawn_thumbnail_workers(&self, rx: &Receiver<CacheJob>, workers: usize) {
+    pub(super) fn spawn_thumbnail_workers(&self, rx: &Receiver<CacheJob>, workers: usize) {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
@@ -156,7 +156,7 @@ impl Cacher {
         }
     }
 
-    pub fn spawn_album_art_worker(&self, rx: Receiver<CacheJob>) {
+    pub(super) fn spawn_album_art_worker(&self, rx: Receiver<CacheJob>) {
         let cacher = Arc::new(self.clone());
 
         std::thread::spawn(move || {
@@ -201,7 +201,7 @@ impl Cacher {
         });
     }
 
-    pub fn spawn_playlist_thumbnail_worker(&self, rx: Receiver<CacheJob>) {
+    pub(super) fn spawn_playlist_thumbnail_worker(&self, rx: Receiver<CacheJob>) {
         let cacher = Arc::new(self.clone());
 
         std::thread::spawn(move || {

@@ -8,21 +8,17 @@ use crate::errors::CacherError;
 use crate::library::playlists::{Playlist, PlaylistId, PlaylistSource};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
 use bitcode::{Decode, Encode};
-use crossbeam_channel::{Receiver, Sender, select, tick};
-use gpui::RenderImage;
-use image::Frame;
+use crossbeam_channel::{Receiver, Sender};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{Cursor, Write};
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
-use walkdir::WalkDir;
 
 #[derive(Clone)]
 pub struct Cacher {
