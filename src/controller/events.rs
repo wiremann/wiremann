@@ -63,3 +63,8 @@ pub enum SystemIntegrationEvent {
     Position(u64),
     Volume(f64),
 }
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum LyricsEvent {
+    Lyrics,
+}

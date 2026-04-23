@@ -58,3 +58,12 @@ pub enum SystemIntegrationCommand {
     SetPosition(u64),
     SetPlaybackStatus(PlaybackStatus, u64),
 }
+
+pub enum LyricsCommand {
+    GetLyrics {
+        title: String,
+        artist: String,
+        album: String,
+        duration: u64,
+    },
+}

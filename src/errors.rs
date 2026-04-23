@@ -84,3 +84,6 @@ pub enum SystemIntegrationError {
     #[error("SystemTime Error occurred: `{0}`")]
     SystemTimeError(#[from] SystemTimeError),
 }
+
+#[derive(Error, Debug)]
+pub enum LyricsError {}
