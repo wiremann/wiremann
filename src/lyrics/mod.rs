@@ -32,20 +32,9 @@ impl Lyrics {
     #[allow(clippy::missing_errors_doc)]
     pub fn run(&mut self) -> Result<(), LyricsError> {
         loop {
-            select! {
-                recv(self.rx) -> msg => {
-                    if let Ok(cmd) = msg {self.handle_commands(cmd)?;}
-                }
+            match self.rx.recv()? {
+                _ => {}
             }
         }
-    }
-
-    #[allow(clippy::missing_errors_doc)]
-    pub fn handle_commands(&mut self, cmd: LyricsCommand) -> Result<(), LyricsError> {
-        match cmd {
-            _ => {}
-        }
-
-        Ok(())
     }
 }

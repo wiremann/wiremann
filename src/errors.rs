@@ -86,4 +86,7 @@ pub enum SystemIntegrationError {
 }
 
 #[derive(Error, Debug)]
-pub enum LyricsError {}
+pub enum LyricsError {
+    #[error("Recv Error occurred: `{0}`")]
+    RecvError(#[from] RecvError),
+}
