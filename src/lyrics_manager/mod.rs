@@ -5,6 +5,7 @@ use std::time::Duration;
 use crate::{
     controller::{commands::LyricsCommand, events::LyricsEvent},
     errors::LyricsError,
+    lyrics_manager::providers::{lrclib::LrcLib, youly::YouLY},
 };
 use crossbeam_channel::{Receiver, Sender};
 
@@ -60,11 +61,18 @@ impl LyricsManager {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
 
+        let youly: Box<dyn LyricsProvider> = Box::new(YouLY {});
+        let lrclib: Box<dyn LyricsProvider> = Box::new(LrcLib {});
+
+        let mut providers = vec![youly, lrclib];
+
+        providers.sort_by_key(|p| p.priority());
+
         (
             Self {
                 tx: event_tx,
                 rx: cmd_rx,
-                providers: Vec::new(),
+                providers,
             },
             cmd_tx,
             event_rx,
