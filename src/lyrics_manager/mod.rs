@@ -83,7 +83,13 @@ impl LyricsManager {
     pub fn run(&mut self) -> Result<(), LyricsError> {
         loop {
             match self.rx.recv()? {
-                _ => {}
+                LyricsCommand::GetLyrics {
+                    title, artist, album, duration
+                } => {
+                    if let Some(provider) = self.providers.first() {
+                        provider.get_lyrics(title.as_str(), artist.as_str(), album.as_str(), duration)?;
+                    }
+                }
             }
         }
     }
