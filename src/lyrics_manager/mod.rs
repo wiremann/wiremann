@@ -1,7 +1,8 @@
+pub mod providers;
+
 use std::time::Duration;
 
 use crate::{
-    app::AppPaths,
     controller::{commands::LyricsCommand, events::LyricsEvent},
     errors::LyricsError,
 };
