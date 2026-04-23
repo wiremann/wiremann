@@ -7,7 +7,6 @@ pub mod controller;
 pub mod errors;
 pub mod image_processor;
 pub mod library;
-mod queue;
 pub mod scanner;
 pub mod system_integration;
 pub mod ui;

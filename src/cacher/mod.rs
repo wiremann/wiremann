@@ -538,7 +538,6 @@ impl Cacher {
                                 let state = cacher.load_app_state()?;
                                 let _ = cacher.tx.send(CacherEvent::AppState(state));
                             }
-
                             _ => {}
                         }
 
@@ -552,7 +551,6 @@ impl Cacher {
             }
         });
     }
-
 }
 
 fn write_cache<T: Encode>(
