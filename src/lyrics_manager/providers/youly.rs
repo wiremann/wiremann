@@ -23,21 +23,51 @@ impl LyricsProvider for YouLY {
 
         let duration = duration.as_millis().to_string();
 
-        let query = vec![
-            ("title", title),
-            ("artist", artist),
-            ("album", album),
-            ("duration", duration.as_str()),
+        // TODO: streamline this, idk how
+        let attempts: Vec<Vec<(&str, &str)>> = vec![
+            vec![
+                ("title", title),
+                ("artist", artist),
+                ("album", album),
+                ("duration", duration.as_str()),
+            ],
+            vec![
+                ("title", title),
+                ("artist", artist),
+                ("duration", duration.as_str()),
+            ],
+            vec![("title", title), ("artist", artist), ("album", album)],
+            vec![("title", title), ("artist", artist)],
         ];
 
-        let resp = client
-            .get(endpoint)
-            .query(&query)
-            .timeout(Duration::from_secs(4))
-            .send()?;
+        for query in attempts {
+            let resp = match client
+                .get(endpoint)
+                .query(&query)
+                .timeout(Duration::from_secs(4))
+                .send()
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("YouLY request failed: {:?}", e);
+                    continue;
+                }
+            };
 
-        println!("url: {}", resp.url().to_string());
-        println!("got response: {resp:#?}");
+            if !resp.status().is_success() {
+                continue;
+            }
+
+            let text = match resp.text() {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Failed to read response: {:?}", e);
+                    continue;
+                }
+            };
+
+            println!("got response; {text:#?}");
+        }
 
         Ok(None)
     }
