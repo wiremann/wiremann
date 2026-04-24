@@ -41,7 +41,6 @@ impl LyricsProvider for YouLY {
             .user_agent(APP_USER_AGENT)
             .build()?;
 
-        // TODO: streamline this, idk how
         let query = vec![("title", title), ("artist", artist)];
 
         let resp = match client
@@ -87,13 +86,39 @@ impl LyricsProvider for YouLY {
 
 impl YouLY {
     fn parse(&self, data: String) -> Result<Option<Lyrics>, LyricsError> {
-        let json: Value = serde_json::from_str(&data)?;
+        let json: Value = match serde_json::from_str(&data) {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("YouLY JSON parse failed: {:?}", e);
+                return Ok(None);
+            }
+        };
 
-        let lines: Vec<YouLYLine> = serde_json::from_value(json["lyrics"].clone())?;
+        let lyrics_value = match json.get("lyrics") {
+            Some(v) => v.clone(),
+            None => {
+                eprintln!("YouLY missing 'lyrics' field");
+                return Ok(None);
+            }
+        };
+
+        let lines: Vec<YouLYLine> = match serde_json::from_value(lyrics_value) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("YouLY lyrics parse failed: {:?}", e);
+                return Ok(None);
+            }
+        };
+
+        let has_words = lines.iter().any(|l| !l.syllabus.is_empty());
 
         let lyrics = Lyrics {
-            lines: lines.into_iter().map(Into::into).collect::<Vec<_>>(),
-            sync_type: SyncType::Word,
+            lines: lines.into_iter().map(Into::into).collect(),
+            sync_type: if has_words {
+                SyncType::Word
+            } else {
+                SyncType::Line
+            },
         };
 
         Ok(Some(lyrics))
