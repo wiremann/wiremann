@@ -31,11 +31,13 @@ pub trait LyricsProvider: Send + Sync {
     fn priority(&self) -> u8;
 }
 
+#[derive(Debug)]
 pub struct Lyrics {
     pub lines: Vec<LyricLine>,
     pub sync_type: SyncType,
 }
 
+#[derive(Debug)]
 pub struct LyricLine {
     pub text: String,
     pub start: Option<Duration>,
@@ -43,12 +45,14 @@ pub struct LyricLine {
     pub words: Option<Vec<LyricWord>>,
 }
 
+#[derive(Debug)]
 pub struct LyricWord {
     pub start: Duration,
     pub end: Duration,
     pub text: String,
 }
 
+#[derive(Debug)]
 pub enum SyncType {
     Unsynced,
     Line,

@@ -1,22 +1,26 @@
 use std::time::Duration;
 
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{
     errors::LyricsError,
-    lyrics_manager::{APP_USER_AGENT, Lyrics, LyricsProvider},
+    lyrics_manager::{APP_USER_AGENT, LyricLine, LyricWord, Lyrics, LyricsProvider, SyncType},
 };
 
 pub struct YouLY;
 
 // Times are all in milliseconds
-struct YouLYLyric {
+#[derive(Deserialize, Debug)]
+struct YouLYLine {
     time: u64,
     duration: u64,
     text: String,
+    #[serde(default)]
     syllabus: Vec<YouLYWord>
 }
 
+#[derive(Deserialize, Debug)]
 struct YouLYWord {
     time: u64,
     duration: u64,
@@ -105,8 +109,48 @@ impl YouLY {
     fn parse(&self, data: String) -> Result<Option<Lyrics>, LyricsError> {
         let json: Value = serde_json::from_str(&data)?;
 
-        let lyrics = json["lyrics"];
+        let lines: Vec<YouLYLine> = serde_json::from_value(json["lyrics"].clone())?;
+
+        let lyrics = Lyrics {
+            lines: lines.into_iter().map(Into::into).collect::<Vec<_>>(),
+            sync_type: SyncType::Word
+        };
+
+        println!("Got lyrics: {lyrics:#?}");
 
         Ok(None)
+    }
+}
+
+impl From<YouLYLine> for LyricLine {
+    fn from(value: YouLYLine) -> Self {
+        let start = Duration::from_millis(value.time);
+        let end = start + Duration::from_millis(value.duration);
+
+        let words = if value.syllabus.is_empty() {
+            None
+        } else {
+            Some(
+                value.syllabus
+                    .into_iter()
+                    .map(|w| {
+                        let w_start = Duration::from_millis(w.time);
+                        let w_end = w_start + Duration::from_millis(w.duration);
+
+                        LyricWord {
+                            start: w_start,
+                            end: w_end,
+                            text: w.text,
+                        }
+                    })
+                    .collect()
+            )
+        };
+        LyricLine {
+            text: value.text,
+            start: Some(start),
+            end: Some(end),
+            words
+        }
     }
 }
