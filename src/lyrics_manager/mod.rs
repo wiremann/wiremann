@@ -1,6 +1,6 @@
 pub mod providers;
 
-use std::time::Duration;
+use std::{cmp::Reverse, time::Duration};
 
 use crate::{
     controller::{commands::LyricsCommand, events::LyricsEvent},
@@ -74,7 +74,7 @@ impl LyricsManager {
 
         let mut providers = vec![youly, lrclib];
 
-        providers.sort_by_key(|p| p.priority());
+        providers.sort_by_key(|p| Reverse(p.priority()));
 
         (
             Self {

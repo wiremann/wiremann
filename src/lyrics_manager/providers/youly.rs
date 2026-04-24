@@ -36,6 +36,7 @@ impl LyricsProvider for YouLY {
             .timeout(Duration::from_secs(4))
             .send()?;
 
+        println!("url: {}", resp.url().to_string());
         println!("got response: {resp:#?}");
 
         Ok(None)
