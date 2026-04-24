@@ -15,7 +15,7 @@ pub trait LyricsProvider: Send + Sync {
         title: &str,
         artist: &str,
         album: &str,
-        duration: u64,
+        duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError>;
 
     fn name(&self) -> &'static str;
@@ -86,10 +86,18 @@ impl LyricsManager {
         loop {
             match self.rx.recv()? {
                 LyricsCommand::GetLyrics {
-                    title, artist, album, duration
+                    title,
+                    artist,
+                    album,
+                    duration,
                 } => {
                     if let Some(provider) = self.providers.first() {
-                        provider.get_lyrics(title.as_str(), artist.as_str(), album.as_str(), duration)?;
+                        provider.get_lyrics(
+                            title.as_str(),
+                            artist.as_str(),
+                            album.as_str(),
+                            duration,
+                        )?;
                     }
                 }
             }

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::lyrics_manager::LyricsProvider;
 use crate::{errors::LyricsError, lyrics_manager::Lyrics};
 
@@ -9,7 +11,7 @@ impl LyricsProvider for LrcLib {
         title: &str,
         artist: &str,
         album: &str,
-        duration: u64,
+        duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
         Ok(None)
     }

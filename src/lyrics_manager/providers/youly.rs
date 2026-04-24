@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
     errors::LyricsError,
     lyrics_manager::{Lyrics, LyricsProvider},
@@ -11,8 +13,19 @@ impl LyricsProvider for YouLY {
         title: &str,
         artist: &str,
         album: &str,
-        duration: u64,
+        duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
+        let endpoint = self.endpoint();
+
+        let client = reqwest::blocking::Client::new();
+        
+        let query = vec![
+        ("title", title),
+        ("artist", artist),
+        ("album", album),
+        ("duration", &duration.as_millis().to_string())
+        ];
+
         Ok(None)
     }
 
@@ -25,6 +38,6 @@ impl LyricsProvider for YouLY {
     }
 
     fn priority(&self) -> u8 {
-        20
+        100
     }
 }
