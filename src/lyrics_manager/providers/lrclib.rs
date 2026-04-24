@@ -14,6 +14,10 @@ impl LyricsProvider for LrcLib {
         Ok(None)
     }
 
+    fn endpoint(&self) -> &'static str {
+        ""
+    }
+
     fn name(&self) -> &'static str {
         "LRCLIB"
     }

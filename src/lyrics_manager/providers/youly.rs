@@ -16,6 +16,10 @@ impl LyricsProvider for YouLY {
         Ok(None)
     }
 
+    fn endpoint(&self) -> &'static str {
+        "https://lyricsplus.prjktla.workers.dev/v2/lyrics/get"
+    }
+    
     fn name(&self) -> &'static str {
         "YouLY"
     }

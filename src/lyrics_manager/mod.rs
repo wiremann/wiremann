@@ -20,6 +20,8 @@ pub trait LyricsProvider: Send + Sync {
 
     fn name(&self) -> &'static str;
 
+    fn endpoint(&self) -> &'static str;
+
     fn priority(&self) -> u8;
 }
 
