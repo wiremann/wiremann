@@ -8215,6 +8215,7 @@ dependencies = [
  "ron",
  "rust-embed",
  "serde",
+ "serde_json",
  "smallvec",
  "souvlaki",
  "thiserror 2.0.18",

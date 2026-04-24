@@ -7,6 +7,20 @@ use crate::{
 
 pub struct YouLY;
 
+// Times are all in milliseconds
+struct YouLYLyric {
+    time: u64,
+    duration: u64,
+    text: String,
+    syllabus: Vec<YouLYWord>
+}
+
+struct YouLYWord {
+    time: u64,
+    duration: u64,
+    text: String
+}
+
 impl LyricsProvider for YouLY {
     fn get_lyrics(
         &self,
