@@ -104,12 +104,8 @@ impl Wiremann {
 
         cx.global::<Controller>().load_cached_app_state();
 
-        cx.global::<Controller>().get_lyrics(
-            "What Did I Miss?",
-            "Drake",
-            "Iceman",
-            Duration::from_secs(194),
-        );
+        cx.global::<Controller>()
+            .get_lyrics("Timeless", "The Weeknd", "", Duration::from_secs(0));
 
         Self {
             titlebar,

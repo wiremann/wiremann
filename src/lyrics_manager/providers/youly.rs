@@ -17,14 +17,14 @@ struct YouLYLine {
     duration: u64,
     text: String,
     #[serde(default)]
-    syllabus: Vec<YouLYWord>
+    syllabus: Vec<YouLYWord>,
 }
 
 #[derive(Deserialize, Debug)]
 struct YouLYWord {
     time: u64,
     duration: u64,
-    text: String
+    text: String,
 }
 
 impl LyricsProvider for YouLY {
@@ -32,8 +32,8 @@ impl LyricsProvider for YouLY {
         &self,
         title: &str,
         artist: &str,
-        album: &str,
-        duration: Duration,
+        _album: &str,
+        _duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
         let endpoint = self.endpoint();
 
@@ -41,55 +41,35 @@ impl LyricsProvider for YouLY {
             .user_agent(APP_USER_AGENT)
             .build()?;
 
-        let duration = duration.as_millis().to_string();
-
         // TODO: streamline this, idk how
-        let attempts: Vec<Vec<(&str, &str)>> = vec![
-            vec![
-                ("title", title),
-                ("artist", artist),
-                ("album", album),
-                ("duration", duration.as_str()),
-            ],
-            vec![
-                ("title", title),
-                ("artist", artist),
-                ("duration", duration.as_str()),
-            ],
-            vec![("title", title), ("artist", artist), ("album", album)],
-            vec![("title", title), ("artist", artist)],
-        ];
+        let query = vec![("title", title), ("artist", artist)];
 
-        for query in attempts {
-            let resp = match client
-                .get(endpoint)
-                .query(&query)
-                .timeout(Duration::from_secs(4))
-                .send()
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!("YouLY request failed: {:?}", e);
-                    continue;
-                }
-            };
-
-            if !resp.status().is_success() {
-                continue;
+        let resp = match client
+            .get(endpoint)
+            .query(&query)
+            .timeout(Duration::from_secs(4))
+            .send()
+        {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("YouLY request failed: {:?}", e);
+                return Ok(None);
             }
+        };
 
-            let text = match resp.text() {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("Failed to read response: {:?}", e);
-                    continue;
-                }
-            };
-
-            return self.parse(text);
+        if !resp.status().is_success() {
+            return Ok(None);
         }
 
-        Ok(None)
+        let text = match resp.text() {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Failed to read response: {:?}", e);
+                return Ok(None);
+            }
+        };
+
+        return self.parse(text);
     }
 
     fn endpoint(&self) -> &'static str {
@@ -113,12 +93,10 @@ impl YouLY {
 
         let lyrics = Lyrics {
             lines: lines.into_iter().map(Into::into).collect::<Vec<_>>(),
-            sync_type: SyncType::Word
+            sync_type: SyncType::Word,
         };
 
-        println!("Got lyrics: {lyrics:#?}");
-
-        Ok(None)
+        Ok(Some(lyrics))
     }
 }
 
@@ -131,7 +109,8 @@ impl From<YouLYLine> for LyricLine {
             None
         } else {
             Some(
-                value.syllabus
+                value
+                    .syllabus
                     .into_iter()
                     .map(|w| {
                         let w_start = Duration::from_millis(w.time);
@@ -143,14 +122,14 @@ impl From<YouLYLine> for LyricLine {
                             text: w.text,
                         }
                     })
-                    .collect()
+                    .collect(),
             )
         };
         LyricLine {
             text: value.text,
             start: Some(start),
             end: Some(end),
-            words
+            words,
         }
     }
 }
