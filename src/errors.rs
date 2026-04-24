@@ -91,4 +91,6 @@ pub enum LyricsError {
     RecvError(#[from] RecvError),
     #[error("Reqwest Error occurred: `{0}`")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Serde JSON Error occurred: `{0}`")]
+    SerdeJsonError(#[from] serde_json::Error),
 }

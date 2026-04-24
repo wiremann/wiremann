@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use serde_json::Value;
+
 use crate::{
     errors::LyricsError,
     lyrics_manager::{APP_USER_AGENT, Lyrics, LyricsProvider},
@@ -80,7 +82,7 @@ impl LyricsProvider for YouLY {
                 }
             };
 
-            println!("got response; {text:#?}");
+            return self.parse(text);
         }
 
         Ok(None)
@@ -96,5 +98,15 @@ impl LyricsProvider for YouLY {
 
     fn priority(&self) -> u8 {
         100
+    }
+}
+
+impl YouLY {
+    fn parse(&self, data: String) -> Result<Option<Lyrics>, LyricsError> {
+        let json: Value = serde_json::from_str(&data)?;
+
+        let lyrics = json["lyrics"];
+
+        Ok(None)
     }
 }
