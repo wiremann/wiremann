@@ -89,4 +89,6 @@ pub enum SystemIntegrationError {
 pub enum LyricsError {
     #[error("Recv Error occurred: `{0}`")]
     RecvError(#[from] RecvError),
+    #[error("Reqwest Error occurred: `{0}`")]
+    ReqwestError(#[from] reqwest::Error),
 }

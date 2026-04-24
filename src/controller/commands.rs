@@ -4,6 +4,7 @@ use crate::library::playlists::PlaylistId;
 use crate::library::{ImageId, TrackId};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Duration;
 
 pub enum AudioCommand {
     Load(TrackId, PathBuf),
@@ -64,6 +65,6 @@ pub enum LyricsCommand {
         title: String,
         artist: String,
         album: String,
-        duration: u64,
+        duration: Duration,
     },
 }

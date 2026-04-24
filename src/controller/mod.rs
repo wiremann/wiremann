@@ -2,8 +2,12 @@ pub mod commands;
 pub mod events;
 pub mod state;
 use crate::cacher::ImageKind;
-use crate::controller::commands::{CacherCommand, ImageProcessorCommand, SystemIntegrationCommand};
-use crate::controller::events::{CacherEvent, ImageProcessorEvent, SystemIntegrationEvent};
+use crate::controller::commands::{
+    CacherCommand, ImageProcessorCommand, LyricsCommand, SystemIntegrationCommand,
+};
+use crate::controller::events::{
+    CacherEvent, ImageProcessorEvent, LyricsEvent, SystemIntegrationEvent,
+};
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
@@ -21,7 +25,7 @@ use gpui::{App, Entity, Global};
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Clone)]
@@ -47,6 +51,10 @@ pub struct Controller {
     // System integration channel
     pub system_integration_tx: Sender<SystemIntegrationCommand>,
     pub system_integration_rx: Receiver<SystemIntegrationEvent>,
+
+    // Lyrics manager channel
+    pub lyrics_manager_tx: Sender<LyricsCommand>,
+    pub lyrics_manager_rx: Receiver<LyricsEvent>,
 }
 
 impl Controller {
@@ -64,6 +72,8 @@ impl Controller {
         image_processor_rx: Receiver<ImageProcessorEvent>,
         system_integration_tx: Sender<SystemIntegrationCommand>,
         system_integration_rx: Receiver<SystemIntegrationEvent>,
+        lyrics_manager_tx: Sender<LyricsCommand>,
+        lyrics_manager_rx: Receiver<LyricsEvent>,
     ) -> Self {
         Controller {
             state,
@@ -77,6 +87,8 @@ impl Controller {
             image_processor_rx,
             system_integration_tx,
             system_integration_rx,
+            lyrics_manager_tx,
+            lyrics_manager_rx,
         }
     }
 
@@ -793,6 +805,20 @@ impl Controller {
         Ok(())
     }
 
+    #[allow(clippy::missing_errors_doc, clippy::too_many_lines)]
+    pub fn handle_lyrics_event(
+        &mut self,
+        cx: &mut App,
+        event: &LyricsEvent,
+        _view: &Entity<Wiremann>,
+    ) -> Result<(), ControllerError> {
+        match event {
+            LyricsEvent::Lyrics => {}
+        }
+
+        Ok(())
+    }
+
     pub fn load_audio(&self, id: &TrackId, cx: &App) {
         let state = self.state.read(cx);
         if let Some(track) = state.library.tracks.get(id)
@@ -1093,6 +1119,17 @@ impl Controller {
 
         cx.global_mut::<ImageCache>()
             .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
+    }
+
+    pub fn get_lyrics(&self, title: &str, artist: &str, album: &str, duration: Duration) {
+        self.lyrics_manager_tx
+            .send(LyricsCommand::GetLyrics {
+                title: title.to_string(),
+                artist: artist.to_string(),
+                album: album.to_string(),
+                duration: duration,
+            })
+            .ok();
     }
 }
 

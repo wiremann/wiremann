@@ -1,11 +1,12 @@
+use std::time::Duration;
 
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::pages::playlists::PlaylistsPage;
 use crate::ui::components::slider::{SliderEvent, SliderState};
-use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::ToastManager;
+use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::helpers::slider_to_secs;
 use crate::ui::theme::Theme;
 use crate::ui::{components, global_keybinds};
@@ -102,6 +103,13 @@ impl Wiremann {
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
+
+        cx.global::<Controller>().get_lyrics(
+            "What Did I Miss?",
+            "Drake",
+            "Iceman",
+            Duration::from_secs(194),
+        );
 
         Self {
             titlebar,

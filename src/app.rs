@@ -1,5 +1,6 @@
 use crate::cacher::Cacher;
 use crate::image_processor::ImageProcessor;
+use crate::lyrics_manager::LyricsManager;
 use crate::system_integration::SystemIntegration;
 use crate::worker_config::{WorkerConfig, calculate_worker_config};
 use crate::{
@@ -79,6 +80,9 @@ pub fn run() -> Result<(), AppError> {
                 let (mut system_integraton, system_integration_tx, system_integration_rx) =
                     SystemIntegration::new(raw_window_handle, app_paths);
 
+                let (mut lyrics_manager, lyrics_manager_tx, lyrics_manager_rx) =
+                    LyricsManager::new();
+
                 let controller = Controller::new(
                     cx.new(|_| AppState::default()),
                     audio_tx,
@@ -91,6 +95,8 @@ pub fn run() -> Result<(), AppError> {
                     image_processor_rx,
                     system_integration_tx,
                     system_integration_rx,
+                    lyrics_manager_tx,
+                    lyrics_manager_rx,
                 );
 
                 thread::spawn(move || {
@@ -120,6 +126,12 @@ pub fn run() -> Result<(), AppError> {
                 thread::spawn(move || {
                     if let Err(e) = system_integraton.run() {
                         eprintln!("System integration thread crashed with error: {e:?}");
+                    }
+                });
+
+                thread::spawn(move || {
+                    if let Err(e) = lyrics_manager.run() {
+                        eprintln!("Lyrics manager thread crashed with error: {e:?}");
                     }
                 });
 
@@ -166,6 +178,12 @@ pub fn run() -> Result<(), AppError> {
                             });
                         }
 
+                        while let Ok(e) = controller.lyrics_manager_rx.try_recv() {
+                            arc_res.update(cx, |res_handler, cx| {
+                                res_handler.handle(cx, Event::LyricsEvent(e));
+                            });
+                        }
+
                         if last_pos_request.elapsed() >= Duration::from_millis(256) {
                             controller.get_pos();
 
@@ -203,6 +221,9 @@ pub fn run() -> Result<(), AppError> {
                                 .handle_image_processor_event(cx, event, &view_clone),
                             Event::SystemIntegration(event) => controller_clone
                                 .handle_system_integration_event(cx, event, &view_clone),
+                            Event::LyricsEvent(event) => {
+                                controller_clone.handle_lyrics_event(cx, event, &view_clone)
+                            }
                         }
                     {
                         eprintln!("controller error: {e:?}");

@@ -9,6 +9,12 @@ use crate::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
+pub static APP_USER_AGENT: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    " ",
+    env!("CARGO_PKG_VERSION"),
+    "(https://github.com/wiremann/wiremann)"
+);
 pub trait LyricsProvider: Send + Sync {
     fn get_lyrics(
         &self,

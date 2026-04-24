@@ -1,5 +1,5 @@
 use crate::controller::events::{
-    AudioEvent, CacherEvent, ImageProcessorEvent, ScannerEvent, SystemIntegrationEvent,
+    AudioEvent, CacherEvent, ImageProcessorEvent, LyricsEvent, ScannerEvent, SystemIntegrationEvent,
 };
 use gpui::{Context, EventEmitter};
 
@@ -9,6 +9,7 @@ pub enum Event {
     Cacher(CacherEvent),
     ImageProcessor(ImageProcessorEvent),
     SystemIntegration(SystemIntegrationEvent),
+    LyricsEvent(LyricsEvent),
 }
 
 #[derive(Clone, Copy)]
