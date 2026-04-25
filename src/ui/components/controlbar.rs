@@ -41,7 +41,7 @@ impl Render for ControlBar {
         };
 
         let duration = if let Some(track) = current {
-            track.duration
+            track.duration.as_secs()
         } else {
             0
         };

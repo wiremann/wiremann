@@ -142,7 +142,7 @@ impl From<&Track> for CachedTrack {
             title: track.title.clone(),
             artist: track.artist.clone(),
             album: track.album.clone(),
-            duration: track.duration,
+            duration: track.duration.as_millis() as u64,
             image_id: track.image_id.map(|id| id.0),
         }
     }
@@ -156,7 +156,7 @@ impl From<CachedTrack> for Track {
             title: c.title,
             artist: c.artist,
             album: c.album,
-            duration: c.duration,
+            duration: Duration::from_millis(c.duration),
             image_id: c.image_id.map(ImageId),
         }
     }

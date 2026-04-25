@@ -367,8 +367,8 @@ impl PlaylistsPage {
                                 .font_family("JetBrains Mono")
                                 .child(format!(
                                     "{:02}:{:02}",
-                                    track.duration / 60,
-                                    track.duration % 60
+                                    track.duration.as_secs() / 60,
+                                    track.duration.as_secs() % 60
                                 ))
                                 .overflow_hidden()
                                 .whitespace_nowrap()

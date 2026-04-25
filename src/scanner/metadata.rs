@@ -4,6 +4,7 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::read_from_path;
 use lofty::tag::ItemKey;
 use std::path::Path;
+use std::time::Duration;
 
 #[allow(clippy::missing_errors_doc)]
 pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
@@ -12,7 +13,7 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
     let file = read_from_path(path).ok();
 
     let (mut title, mut artist, mut album) = fallback_metadata(path);
-    let mut duration = 0;
+    let mut duration = Duration::from_millis(0);
 
     if let Some(tagged_file) = file {
         if let Some(tag) = tagged_file
@@ -41,7 +42,7 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
             }
         }
 
-        duration = tagged_file.properties().duration().as_secs();
+        duration = tagged_file.properties().duration();
     }
 
     let track_id = TrackId::generate(&title, &artist, &album)?;

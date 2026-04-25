@@ -37,7 +37,7 @@ pub struct Lyrics {
     pub sync_type: SyncType,
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct LyricLine {
     pub text: String,
     pub start: Option<Duration>,
@@ -45,14 +45,14 @@ pub struct LyricLine {
     pub words: Option<Vec<LyricWord>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct LyricWord {
     pub start: Duration,
     pub end: Duration,
     pub text: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum SyncType {
     Unsynced,
     Line,
@@ -96,6 +96,7 @@ impl LyricsManager {
         loop {
             match self.rx.recv()? {
                 LyricsCommand::GetLyrics {
+                    id,
                     title,
                     artist,
                     album,
@@ -108,7 +109,7 @@ impl LyricsManager {
                             album.as_str(),
                             duration,
                         ) {
-                            self.tx.send(LyricsEvent::Lyrics(lyrics)).ok();
+                            self.tx.send(LyricsEvent::Lyrics(id, lyrics)).ok();
                         }
                     }
                 }

@@ -116,7 +116,7 @@ impl Controller {
                                     };
 
                                     let duration = if let Some(track) = current {
-                                        track.duration
+                                        track.duration.as_millis() as u64
                                     } else {
                                         0
                                     };
@@ -168,7 +168,7 @@ impl Controller {
                             artist: track.artist.clone(),
                             album: track.album.clone(),
                             image: None,
-                            duration: track.duration,
+                            duration: track.duration.as_secs(),
                         })
                         .ok();
                 }
@@ -465,7 +465,7 @@ impl Controller {
                                 artist: track.artist.clone(),
                                 album: track.album.clone(),
                                 image: Some((width, height, image)),
-                                duration: track.duration,
+                                duration: track.duration.as_secs(),
                             })
                             .ok();
                     }
@@ -591,8 +591,9 @@ impl Controller {
                             });
                             this.playback_slider_state.update(cx, |this, cx| {
                                 if let Some(duration) = duration {
+                                    // TODO: maybe use millis for slider?
                                     this.set_value(
-                                        secs_to_slider(playback_state.position, duration),
+                                        secs_to_slider(playback_state.position, duration.as_secs()),
                                         cx,
                                     );
                                 }
@@ -635,7 +636,7 @@ impl Controller {
                                 artist: track.artist.clone(),
                                 album: track.album.clone(),
                                 image: Some((width, height, image)),
-                                duration: track.duration,
+                                duration: track.duration.as_secs() as u64,
                             })
                             .ok();
                     }
@@ -833,7 +834,13 @@ impl Controller {
                     source.path.clone(),
                 ))
                 .ok();
-            self.get_lyrics(&track.title, &track.artist, &track.album, track.duration);
+            self.get_lyrics(
+                *id,
+                &track.title,
+                &track.artist,
+                &track.album,
+                track.duration,
+            );
         }
     }
 
@@ -1122,9 +1129,17 @@ impl Controller {
             .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
     }
 
-    pub fn get_lyrics(&self, title: &str, artist: &str, album: &str, duration: Duration) {
+    pub fn get_lyrics(
+        &self,
+        id: TrackId,
+        title: &str,
+        artist: &str,
+        album: &str,
+        duration: Duration,
+    ) {
         self.lyrics_manager_tx
             .send(LyricsCommand::GetLyrics {
+                id,
                 title: title.to_string(),
                 artist: artist.to_string(),
                 album: album.to_string(),
