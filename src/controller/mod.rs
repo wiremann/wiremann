@@ -117,7 +117,7 @@ impl Controller {
                                     };
 
                                     let duration = if let Some(track) = current {
-                                        track.duration.as_millis() as u64
+                                        track.duration.as_secs()
                                     } else {
                                         0
                                     };
