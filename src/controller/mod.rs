@@ -172,6 +172,14 @@ impl Controller {
                             duration: track.duration.as_secs(),
                         })
                         .ok();
+
+                    self.get_lyrics(
+                        *track_id,
+                        &track.title,
+                        &track.artist,
+                        &track.album,
+                        track.duration,
+                    );
                 }
                 self.state.update(cx, |this, cx| {
                     this.playback.current = Some(*track_id);
@@ -816,6 +824,7 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             LyricsEvent::Lyrics(id, lyrics) => {
+                println!("got lyrics: {lyrics:#?}");
                 let current = cx
                     .global::<Controller>()
                     .state
@@ -857,13 +866,6 @@ impl Controller {
                     source.path.clone(),
                 ))
                 .ok();
-            self.get_lyrics(
-                *id,
-                &track.title,
-                &track.artist,
-                &track.album,
-                track.duration,
-            );
         }
     }
 

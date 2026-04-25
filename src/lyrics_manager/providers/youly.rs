@@ -36,7 +36,6 @@ impl LyricsProvider for YouLY {
         _duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
         let endpoint = self.endpoint();
-
         let client = reqwest::blocking::Client::builder()
             .user_agent(APP_USER_AGENT)
             .build()?;
@@ -46,7 +45,7 @@ impl LyricsProvider for YouLY {
         let resp = match client
             .get(endpoint)
             .query(&query)
-            .timeout(Duration::from_secs(4))
+            .timeout(Duration::from_secs(32))
             .send()
         {
             Ok(r) => r,
