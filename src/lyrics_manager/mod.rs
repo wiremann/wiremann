@@ -102,12 +102,14 @@ impl LyricsManager {
                     duration,
                 } => {
                     if let Some(provider) = self.providers.first() {
-                        provider.get_lyrics(
+                        if let Ok(Some(lyrics)) = provider.get_lyrics(
                             title.as_str(),
                             artist.as_str(),
                             album.as_str(),
                             duration,
-                        )?;
+                        ) {
+                            self.tx.send(LyricsEvent::Lyrics(lyrics)).ok();
+                        }
                     }
                 }
             }

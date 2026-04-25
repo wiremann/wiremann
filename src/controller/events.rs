@@ -2,6 +2,7 @@ use crate::cacher::ImageKind;
 use crate::controller::state::{AppState, PlaybackStatus};
 use crate::library::playlists::{Playlist, PlaylistId};
 use crate::library::{ImageId, Track, TrackId, TrackSource};
+use crate::lyrics_manager::Lyrics;
 use gpui::RenderImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -66,5 +67,5 @@ pub enum SystemIntegrationEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LyricsEvent {
-    Lyrics,
+    Lyrics(Lyrics),
 }
