@@ -31,7 +31,7 @@ pub trait LyricsProvider: Send + Sync {
     fn priority(&self) -> u8;
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Lyrics {
     pub lines: Vec<LyricLine>,
     pub sync_type: SyncType,

@@ -813,7 +813,7 @@ impl Controller {
         _view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
-            LyricsEvent::Lyrics => {}
+            LyricsEvent::Lyrics(id, lyrics) => {}
         }
 
         Ok(())
@@ -824,15 +824,16 @@ impl Controller {
         if let Some(track) = state.library.tracks.get(id)
             && let Some(source) = track.get_valid_source()
         {
-            let _ = self
-                .audio_tx
-                .send(AudioCommand::Load(*id, source.path.clone()));
+            self.audio_tx
+                .send(AudioCommand::Load(*id, source.path.clone()))
+                .ok();
             self.image_processor_tx
                 .send(ImageProcessorCommand::GetCurrentAlbumArt(
                     *id,
                     source.path.clone(),
                 ))
                 .ok();
+            self.get_lyrics(&track.title, &track.artist, &track.album, track.duration);
         }
     }
 

@@ -62,6 +62,7 @@ pub enum SystemIntegrationCommand {
 
 pub enum LyricsCommand {
     GetLyrics {
+        id: TrackId,
         title: String,
         artist: String,
         album: String,
