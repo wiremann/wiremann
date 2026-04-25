@@ -824,7 +824,6 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             LyricsEvent::Lyrics(id, lyrics) => {
-                println!("got lyrics: {lyrics:#?}");
                 let current = cx
                     .global::<Controller>()
                     .state
