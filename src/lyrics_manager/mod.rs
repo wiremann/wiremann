@@ -102,7 +102,7 @@ impl LyricsManager {
                     album,
                     duration,
                 } => {
-                    if let Some(provider) = self.providers.first() {
+                    if let Some(provider) = self.providers.last() {
                         if let Ok(lyrics) = provider.get_lyrics(
                             title.as_str(),
                             artist.as_str(),

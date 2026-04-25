@@ -172,7 +172,6 @@ impl Controller {
                             duration: track.duration.as_secs(),
                         })
                         .ok();
-
                     self.get_lyrics(
                         *track_id,
                         &track.title,
