@@ -11,6 +11,7 @@ use crate::controller::events::{
 use crate::controller::state::PlaybackStatus;
 use crate::library::playlists::PlaylistId;
 use crate::library::{Track, TrackId};
+use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, secs_to_slider};
@@ -814,7 +815,29 @@ impl Controller {
         _view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
-            LyricsEvent::Lyrics(id, lyrics) => {}
+            LyricsEvent::Lyrics(id, lyrics) => {
+                let current = cx
+                    .global::<Controller>()
+                    .state
+                    .read(cx)
+                    .playback
+                    .current
+                    .clone();
+
+                if let Some(current) = current
+                    && current == *id
+                {
+                    let lyrics_state = cx.global::<LyricsState>().0.clone();
+
+                    lyrics_state.update(cx, |this, cx| {
+                        this.lyrics = lyrics.clone();
+                        if lyrics.is_some() {
+                            this.status = LyricsStatus::Available;
+                        }
+                        cx.notify();
+                    })
+                }
+            }
         }
 
         Ok(())

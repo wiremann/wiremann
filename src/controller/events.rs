@@ -67,5 +67,5 @@ pub enum SystemIntegrationEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LyricsEvent {
-    Lyrics(TrackId, Lyrics),
+    Lyrics(TrackId, Option<Lyrics>),
 }
