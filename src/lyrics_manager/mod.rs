@@ -102,7 +102,6 @@ impl LyricsManager {
                     album,
                     duration,
                 } => {
-                    println!("got requeust");
                     let providers = self.providers.clone();
                     let tx = self.tx.clone();
 
