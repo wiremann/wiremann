@@ -10,7 +10,7 @@ impl LyricsProvider for LrcLib {
         &self,
         title: &str,
         artist: &str,
-        album: &str,
+        _album: &str,
         duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
         let endpoint = self.endpoint();
@@ -21,7 +21,11 @@ impl LyricsProvider for LrcLib {
         let query = vec![
             ("track_name", title),
             ("artist_name", artist),
-            ("album_name", album),
+            // lrclib allows filtering by album, but doing so can be too restrictive.
+            // In practice, specifying an album may exclude valid synced lyrics
+            // if they are indexed under a different or missing album entry.
+            // We intentionally pass an empty string to broaden the search.
+            ("album_name", ""),
             ("duration", duration.as_str()),
         ];
 
