@@ -22,18 +22,27 @@ pub struct PlayerPage {
     pub queue: Entity<Queue>,
     queue_scroll_handle: UniformListScrollHandle,
     pub controlbar: Entity<ControlBar>,
-    show_queue: Entity<bool>,
+    show_panel: Entity<bool>,
+    current_panel: Entity<Panel>,
+}
+
+enum Panel {
+    Lyrics,
+    Queue,
 }
 
 impl PlayerPage {
     pub fn new(cx: &mut App, controlbar: Entity<ControlBar>) -> Self {
         let queue_scroll_handle = UniformListScrollHandle::new();
-        let show_queue = cx.new(|_| true);
+        let show_panel = cx.new(|_| true);
+        let current_panel = cx.new(|_| Panel::Queue);
+
         PlayerPage {
             queue: Queue::new(cx, queue_scroll_handle.clone()),
             queue_scroll_handle,
             controlbar,
-            show_queue,
+            show_panel,
+            current_panel,
         }
     }
 }
@@ -47,7 +56,7 @@ impl Render for PlayerPage {
         let state = controller.state.read(cx);
         let thumbnail = cx.global::<ImageCache>().current.clone();
         let scroll_handle = self.queue_scroll_handle.clone();
-        let show_queue = self.show_queue.clone();
+        let show_panel = self.show_queue.clone();
 
         let current = if let Some(id) = state.playback.current {
             state.library.tracks.get(&id)
@@ -270,7 +279,7 @@ impl Render for PlayerPage {
                     .child(self.controlbar.clone()),
             )
             .child(div().w(px(1.0)).h_full().bg(theme.border))
-            .child(if *show_queue.read(cx) {
+            .child(if *show_panel.read(cx) {
                 div()
                     .h_full()
                     .w_1_4()
@@ -283,16 +292,33 @@ impl Render for PlayerPage {
                     .child(
                         div()
                             .w_full()
+                            .h_12()
                             .flex()
                             .items_center()
                             .justify_start()
-                            .p_4()
                             .child(
                                 div()
+                                    .w_full()
+                                    .h_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
                                     .text_base()
                                     .text_color(theme.queue_heading_text)
                                     .font_weight(FontWeight(500.0))
                                     .child("Queue"),
+                            )
+                            .child(
+                                div()
+                                    .w_full()
+                                    .h_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .text_base()
+                                    .text_color(theme.queue_heading_text)
+                                    .font_weight(FontWeight(500.0))
+                                    .child("Lyrics"),
                             ),
                     )
                     .child(
@@ -331,8 +357,8 @@ impl Render for PlayerPage {
                         this.bg(theme.queue_show_hide_bg_hover)
                             .text_color(theme.queue_show_hide_text_hover)
                     })
-                    .on_click(move |_, _, cx| show_queue.update(cx, |this, _| *this = !*this))
-                    .child(if *self.show_queue.read(cx) {
+                    .on_click(move |_, _, cx| show_panel.update(cx, |this, _| *this = !*this))
+                    .child(if *self.show_panel.read(cx) {
                         "Hide"
                     } else {
                         "Show Queue"
