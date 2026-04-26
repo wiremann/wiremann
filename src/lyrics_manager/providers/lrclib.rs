@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use crate::lyrics_manager::{APP_USER_AGENT, LyricsProvider};
+use serde_json::Value;
+
+use crate::lyrics_manager::{APP_USER_AGENT, LyricLine, LyricsProvider, SyncType};
 use crate::{errors::LyricsError, lyrics_manager::Lyrics};
 
 pub struct LrcLib;
@@ -42,8 +44,6 @@ impl LyricsProvider for LrcLib {
             }
         };
 
-        println!("sent request: {}", resp.url().as_str());
-
         if !resp.status().is_success() {
             return Ok(None);
         }
@@ -56,7 +56,7 @@ impl LyricsProvider for LrcLib {
             }
         };
 
-        println!("{text}");
+        self.parse(text);
         Ok(None)
     }
 
@@ -70,5 +70,59 @@ impl LyricsProvider for LrcLib {
 
     fn priority(&self) -> u8 {
         20
+    }
+}
+
+impl LrcLib {
+    pub fn parse(&self, data: String) -> Result<Option<Lyrics>, LyricsError> {
+        let json: Value = match serde_json::from_str(&data) {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("LRCLIB JSON parse failed: {:?}", e);
+                return Ok(None);
+            }
+        };
+
+        match json.get("syncedLyrics") {
+            Some(v) => {
+                return Self::parse_lrc(v.to_string());
+            }
+            None => match json.get("plainLyrics") {
+                Some(v) => {
+                    let mut lyrics = Lyrics {
+                        lines: Vec::new(),
+                        sync_type: SyncType::Unsynced,
+                    };
+
+                    for line in v.to_string().lines() {
+                        lyrics.lines.push(LyricLine {
+                            text: line.to_string(),
+                            start: None,
+                            end: None,
+                            words: None,
+                        });
+                    }
+
+                    return Ok(Some(lyrics));
+                }
+                None => {
+                    eprintln!("LRCLIB no lyrics found");
+                    return Ok(None);
+                }
+            },
+        };
+    }
+
+    pub fn parse_lrc(data: String) -> Result<Option<Lyrics>, LyricsError> {
+        let mut lyrics = Lyrics {
+            lines: Vec::new(),
+            sync_type: SyncType::Unsynced,
+        };
+
+        for line in data.to_string().lines() {
+            println!("line: {line}");
+        }
+
+        Ok(None)
     }
 }
