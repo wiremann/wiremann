@@ -165,7 +165,7 @@ impl Default for Theme {
             player_panel_bg: rgb(0x0A070F),
             player_panel_tab_bg: rgb(0x0A070F),
             player_panel_tab_bg_hover: rgba(0xFFFFFF14),
-            player_panel_tab_bg_active: rgba(0xFFFFFFE6),
+            player_panel_tab_bg_active: rgba(0xFFFFFFCC),
             player_panel_tab_text: rgba(0xFFFFFFCC),
             player_panel_tab_text_hover: rgb(0xFFFFFF),
             player_panel_tab_text_active: rgb(0xFFFFFF),
