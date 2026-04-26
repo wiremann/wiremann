@@ -1,6 +1,6 @@
 pub mod providers;
 
-use std::{cmp::Reverse, time::Duration};
+use std::{cmp::Reverse, sync::Arc, time::Duration};
 
 use crate::{
     controller::{commands::LyricsCommand, events::LyricsEvent},
@@ -63,7 +63,7 @@ pub struct LyricsManager {
     pub tx: Sender<LyricsEvent>,
     pub rx: Receiver<LyricsCommand>,
 
-    pub providers: Vec<Box<dyn LyricsProvider>>,
+    pub providers: Arc<Vec<Box<dyn LyricsProvider>>>,
 }
 
 impl LyricsManager {
@@ -84,7 +84,7 @@ impl LyricsManager {
             Self {
                 tx: event_tx,
                 rx: cmd_rx,
-                providers,
+                providers: Arc::new(providers),
             },
             cmd_tx,
             event_rx,
@@ -102,27 +102,35 @@ impl LyricsManager {
                     album,
                     duration,
                 } => {
-                    for provider in &self.providers {
-                        match provider.get_lyrics(
-                            title.as_str(),
-                            artist.as_str(),
-                            album.as_str(),
-                            duration,
-                        ) {
-                            Ok(Some(lyrics)) => {
-                                self.tx.send(LyricsEvent::Lyrics(id, Some(lyrics))).ok();
-                                return Ok(());
-                            }
-                            Ok(None) => {
-                                eprintln!("{} returned no lyrics", provider.name());
-                            }
-                            Err(e) => {
-                                eprintln!("{} failed: {:?}", provider.name(), e);
+                    println!("got requeust");
+                    let providers = self.providers.clone();
+                    let tx = self.tx.clone();
+
+                    std::thread::spawn(move || {
+                        let mut found = None;
+
+                        for provider in &*providers {
+                            match provider.get_lyrics(
+                                title.as_str(),
+                                artist.as_str(),
+                                album.as_str(),
+                                duration,
+                            ) {
+                                Ok(Some(lyrics)) => {
+                                    found = Some(lyrics);
+                                    break;
+                                }
+                                Ok(None) => {
+                                    eprintln!("{} returned no lyrics", provider.name());
+                                }
+                                Err(e) => {
+                                    eprintln!("{} failed: {:?}", provider.name(), e);
+                                }
                             }
                         }
-                    }
 
-                    self.tx.send(LyricsEvent::Lyrics(id, None)).ok();
+                        tx.send(LyricsEvent::Lyrics(id, found)).ok();
+                    });
                 }
             }
         }
