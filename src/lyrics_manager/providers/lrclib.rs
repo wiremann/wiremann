@@ -83,26 +83,37 @@ impl LrcLib {
         };
 
         match json.get("syncedLyrics") {
-            Some(v) => {
-                return Self::parse_lrc(v.as_str().unwrap_or_default());
-            }
+            Some(v) => match v.as_str() {
+                Some(s) => return Self::parse_lrc(s),
+                None => {
+                    eprintln!("LRCLIB syncedLyrics not a string");
+                    return Ok(None);
+                }
+            },
             None => match json.get("plainLyrics") {
                 Some(v) => {
                     let mut lyrics = Lyrics {
                         lines: Vec::new(),
                         sync_type: SyncType::Unsynced,
                     };
+                    match v.as_str() {
+                        Some(s) => {
+                            for line in s.lines() {
+                                lyrics.lines.push(LyricLine {
+                                    text: line.to_string(),
+                                    start: None,
+                                    end: None,
+                                    words: None,
+                                });
+                            }
 
-                    for line in v.as_str().unwrap_or_default().lines() {
-                        lyrics.lines.push(LyricLine {
-                            text: line.to_string(),
-                            start: None,
-                            end: None,
-                            words: None,
-                        });
+                            return Ok(Some(lyrics));
+                        }
+                        None => {
+                            eprintln!("LRCLIB syncedLyrics not a string");
+                            return Ok(None);
+                        }
                     }
-
-                    return Ok(Some(lyrics));
                 }
                 None => {
                     eprintln!("LRCLIB no lyrics found");
@@ -115,7 +126,7 @@ impl LrcLib {
     pub fn parse_lrc(data: &str) -> Result<Option<Lyrics>, LyricsError> {
         let mut lyrics = Lyrics {
             lines: Vec::new(),
-            sync_type: SyncType::Unsynced,
+            sync_type: SyncType::Line,
         };
 
         let data = data.replace("\\n", "\n");
@@ -162,6 +173,6 @@ impl LrcLib {
             }
         }
 
-        Ok(None)
+        Ok(Some(lyrics))
     }
 }

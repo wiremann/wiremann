@@ -102,16 +102,27 @@ impl LyricsManager {
                     album,
                     duration,
                 } => {
-                    if let Some(provider) = self.providers.last() {
-                        if let Ok(lyrics) = provider.get_lyrics(
+                    for provider in &self.providers {
+                        match provider.get_lyrics(
                             title.as_str(),
                             artist.as_str(),
                             album.as_str(),
                             duration,
                         ) {
-                            self.tx.send(LyricsEvent::Lyrics(id, lyrics)).ok();
+                            Ok(Some(lyrics)) => {
+                                self.tx.send(LyricsEvent::Lyrics(id, Some(lyrics))).ok();
+                                return Ok(());
+                            }
+                            Ok(None) => {
+                                eprintln!("{} returned no lyrics", provider.name());
+                            }
+                            Err(e) => {
+                                eprintln!("{} failed: {:?}", provider.name(), e);
+                            }
                         }
                     }
+
+                    self.tx.send(LyricsEvent::Lyrics(id, None)).ok();
                 }
             }
         }
