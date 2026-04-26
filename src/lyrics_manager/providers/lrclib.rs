@@ -120,21 +120,46 @@ impl LrcLib {
 
         let data = data.replace("\\n", "\n");
 
-        for line in data.to_string().lines() {
-            let parts = line.split("] ").collect::<Vec<_>>();
-            let timestamp = parts[0].replace("[", "");
-            let text = parts[1];
+        for line in data.lines() {
+            if let Some((time_part, text)) = line.split_once("] ") {
+                let timestamp = time_part.trim_start_matches('[');
 
-            let timestamp_parts = timestamp.split(":").collect::<Vec<_>>();
-            let timestamps_secs_subparts = timestamp_parts[1].split(".").collect::<Vec<_>>();
+                let mut parts = timestamp.split(':');
+                let minutes = parts.next().and_then(|m| m.parse::<u64>().ok());
+                let rest = parts.next();
 
-            let minutes = timestamp_parts[0].parse::<u64>();
-            let seconds = timestamps_secs_subparts[0].parse::<u64>();
-            let millis = timestamps_secs_subparts[1].parse::<u64>();
+                if let (Some(min), Some(rest)) = (minutes, rest) {
+                    let mut sec_parts = rest.split('.');
+                    let seconds = sec_parts.next().and_then(|s| s.parse::<u64>().ok());
+                    let centis = sec_parts.next().and_then(|ms| ms.parse::<u64>().ok());
 
-            let total = (minutes * 60_000) + (seconds * 1000) + millis;
+                    if let (Some(sec), Some(cs)) = (seconds, centis) {
+                        let millis = cs * 10;
+                        let total = min * 60_000 + sec * 1_000 + millis;
 
-            let start = Duration::from_millis(total);
+                        let start = Duration::from_millis(total);
+
+                        lyrics.lines.push(LyricLine {
+                            text: text.to_string(),
+                            start: Some(start),
+                            end: None,
+                            words: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        for i in 0..lyrics.lines.len().saturating_sub(1) {
+            if lyrics.lines[i].end.is_none() {
+                lyrics.lines[i].end = lyrics.lines[i + 1].start;
+            }
+        }
+
+        if let Some(last) = lyrics.lines.last_mut() {
+            if last.end.is_none() {
+                last.end = last.start;
+            }
         }
 
         Ok(None)
