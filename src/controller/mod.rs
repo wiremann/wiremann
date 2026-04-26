@@ -172,13 +172,9 @@ impl Controller {
                             duration: track.duration.as_secs(),
                         })
                         .ok();
-                    self.get_lyrics(
-                        *track_id,
-                        &track.title,
-                        &track.artist,
-                        &track.album,
-                        track.duration,
-                    );
+                    self.cacher_tx
+                        .send(CacherCommand::GetLyrics(*track_id))
+                        .ok();
                 }
                 self.state.update(cx, |this, cx| {
                     this.playback.current = Some(*track_id);
@@ -756,6 +752,40 @@ impl Controller {
                             });
                 }
             }
+            CacherEvent::Lyrics(id, lyrics) => {
+                let current = cx
+                    .global::<Controller>()
+                    .state
+                    .read(cx)
+                    .playback
+                    .current
+                    .clone();
+
+                if let Some(current) = current
+                    && current == *id
+                {
+                    let lyrics_state = cx.global::<LyricsState>().0.clone();
+
+                    lyrics_state.update(cx, |this, cx| {
+                        this.lyrics = lyrics.clone();
+                        if lyrics.is_some() {
+                            this.status = LyricsStatus::Available;
+                        }
+                        cx.notify();
+                    })
+                }
+            }
+            CacherEvent::MissingLyrics(id) => {
+                if let Some(track) = self.state.read(cx).library.tracks.get(id) {
+                    self.get_lyrics(
+                        *id,
+                        &track.title,
+                        &track.artist,
+                        &track.album,
+                        track.duration,
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -843,6 +873,11 @@ impl Controller {
                         }
                         cx.notify();
                     })
+                }
+                if let Some(lyrics) = lyrics {
+                    self.cacher_tx
+                        .send(CacherCommand::WriteLyrics(*id, lyrics.clone()))
+                        .ok();
                 }
             }
         }

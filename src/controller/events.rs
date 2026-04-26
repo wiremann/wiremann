@@ -48,7 +48,7 @@ pub enum CacherEvent {
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
     PlaylistThumbnail(ImageId, Arc<RenderImage>),
 
-    Lyrics(TrackId, Lyrics),
+    Lyrics(TrackId, Option<Lyrics>),
 
     MissingThumbnails(Vec<ImageId>),
     MissingAlbumArt(ImageId),
