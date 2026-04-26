@@ -56,8 +56,7 @@ impl LyricsProvider for LrcLib {
             }
         };
 
-        self.parse(text);
-        Ok(None)
+        return self.parse(text);
     }
 
     fn endpoint(&self) -> &'static str {
@@ -85,7 +84,7 @@ impl LrcLib {
 
         match json.get("syncedLyrics") {
             Some(v) => {
-                return Self::parse_lrc(v.to_string());
+                return Self::parse_lrc(v.as_str().unwrap_or_default());
             }
             None => match json.get("plainLyrics") {
                 Some(v) => {
@@ -94,7 +93,7 @@ impl LrcLib {
                         sync_type: SyncType::Unsynced,
                     };
 
-                    for line in v.to_string().lines() {
+                    for line in v.as_str().unwrap_or_default().lines() {
                         lyrics.lines.push(LyricLine {
                             text: line.to_string(),
                             start: None,
@@ -113,11 +112,14 @@ impl LrcLib {
         };
     }
 
-    pub fn parse_lrc(data: String) -> Result<Option<Lyrics>, LyricsError> {
+    pub fn parse_lrc(data: &str) -> Result<Option<Lyrics>, LyricsError> {
         let mut lyrics = Lyrics {
             lines: Vec::new(),
             sync_type: SyncType::Unsynced,
         };
+
+        // Replace escaped new lines with proper new lines
+        let data = data.replace("\\n", "\n");
 
         for line in data.to_string().lines() {
             println!("line: {line}");
