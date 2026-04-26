@@ -14,8 +14,7 @@ impl Cacher {
             .cache
             .join("lyrics")
             .join(folder)
-            .join(hex)
-            .join(".wml")
+            .join(format!("{hex}.lyrics.zstd"))
     }
 
     pub(super) fn write_cached_lyrics(
