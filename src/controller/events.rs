@@ -43,12 +43,18 @@ pub enum ImageProcessorEvent {
 #[derive(Clone, PartialEq, Debug)]
 pub enum CacherEvent {
     AppState(AppState),
+
     AlbumArt(Arc<RenderImage>),
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
     PlaylistThumbnail(ImageId, Arc<RenderImage>),
+
+    Lyrics(TrackId, Lyrics),
+
     MissingThumbnails(Vec<ImageId>),
     MissingAlbumArt(ImageId),
     MissingPlaylistThumbnail(ImageId),
+
+    MissingLyrics(TrackId),
 }
 
 #[derive(Clone, PartialEq, Debug)]

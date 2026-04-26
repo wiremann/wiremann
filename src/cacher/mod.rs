@@ -1,4 +1,5 @@
 pub mod images;
+pub mod lyrics;
 
 use crate::app::AppPaths;
 use crate::controller::commands::CacherCommand;
@@ -421,6 +422,16 @@ impl Cacher {
                         }
                     }
                 },
+                CacherCommand::GetLyrics(id) => {
+                    if let Ok(Some(lyrics)) = self.read_cached_lyrics(id) {
+                        self.tx.send(CacherEvent::Lyrics(id, lyrics)).ok();
+                    }
+                }
+                CacherCommand::WriteLyrics(id, lyrics) => {
+                    if let Err(e) = self.write_cached_lyrics(id, &lyrics) {
+                        eprintln!("Error occured while writing cached lyrics: {e:#?}");
+                    }
+                }
             }
         }
     }

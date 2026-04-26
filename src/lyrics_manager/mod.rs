@@ -7,6 +7,7 @@ use crate::{
     errors::LyricsError,
     lyrics_manager::providers::{lrclib::LrcLib, youly::YouLY},
 };
+use bitcode::{Decode, Encode};
 use crossbeam_channel::{Receiver, Sender};
 
 pub static APP_USER_AGENT: &str = concat!(
@@ -31,13 +32,13 @@ pub trait LyricsProvider: Send + Sync {
     fn priority(&self) -> u8;
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Encode, Decode)]
 pub struct Lyrics {
     pub lines: Vec<LyricLine>,
     pub sync_type: SyncType,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Encode, Decode)]
 pub struct LyricLine {
     pub text: String,
     pub start: Option<Duration>,
@@ -45,14 +46,14 @@ pub struct LyricLine {
     pub words: Option<Vec<LyricWord>>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Encode, Decode)]
 pub struct LyricWord {
     pub start: Duration,
     pub end: Duration,
     pub text: String,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Encode, Decode)]
 pub enum SyncType {
     Unsynced,
     Line,
