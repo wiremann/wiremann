@@ -425,6 +425,8 @@ impl Cacher {
                 CacherCommand::GetLyrics(id) => {
                     if let Ok(lyrics) = self.read_cached_lyrics(id) {
                         self.tx.send(CacherEvent::Lyrics(id, lyrics)).ok();
+                    } else {
+                        self.tx.send(CacherEvent::MissingLyrics(id)).ok();
                     }
                 }
                 CacherCommand::WriteLyrics(id, lyrics) => {

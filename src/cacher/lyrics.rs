@@ -10,7 +10,12 @@ impl Cacher {
         let hex = hex::encode(id.0);
         let folder = &hex[0..2];
 
-        self.app_paths.cache.join("lyrics").join(folder).join(hex)
+        self.app_paths
+            .cache
+            .join("lyrics")
+            .join(folder)
+            .join(hex)
+            .join(".wml")
     }
 
     pub(super) fn write_cached_lyrics(
