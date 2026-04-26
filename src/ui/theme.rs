@@ -32,12 +32,19 @@ pub struct Theme {
     pub player_play_pause_hover: Rgba,
     pub player_play_pause_text: Rgba,
 
+    // Player panel
+    pub player_panel_bg: Rgba,
+    pub player_panel_tab_bg: Rgba,
+    pub player_panel_tab_bg_hover: Rgba,
+    pub player_panel_tab_bg_active: Rgba,
+    pub player_panel_tab_text: Rgba,
+    pub player_panel_tab_text_hover: Rgba,
+    pub player_panel_tab_text_active: Rgba,
+    pub player_panel_show_hide_text: Rgba,
+    pub player_panel_show_hide_text_hover: Rgba,
+    pub player_panel_show_hide_bg_hover: Rgba,
+
     // Queue
-    pub queue_bg: Rgba,
-    pub queue_heading_text: Rgba,
-    pub queue_show_hide_text: Rgba,
-    pub queue_show_hide_text_hover: Rgba,
-    pub queue_show_hide_bg_hover: Rgba,
     pub queue_item_title: Rgba,
     pub queue_item_title_current: Rgba,
     pub queue_item_artist: Rgba,
@@ -155,12 +162,17 @@ impl Default for Theme {
             player_play_pause_hover: rgba(0x8B7BF7E6),
             player_play_pause_text: rgb(0x0A070F),
 
-            queue_bg: rgb(0x0A070F),
-            queue_heading_text: rgb(0xFFFFFF),
+            player_panel_bg: rgb(0x0A070F),
+            player_panel_tab_bg: rgb(0x0A070F),
+            player_panel_tab_bg_hover: rgba(0xFFFFFF14),
+            player_panel_tab_bg_active: rgba(0xFFFFFFE6),
+            player_panel_tab_text: rgba(0xFFFFFFCC),
+            player_panel_tab_text_hover: rgb(0xFFFFFF),
+            player_panel_tab_text_active: rgb(0xFFFFFF),
 
-            queue_show_hide_text: rgb(0x6B6B7B),
-            queue_show_hide_text_hover: rgb(0xFFFFFF),
-            queue_show_hide_bg_hover: rgba(0xFFFFFF14),
+            player_panel_show_hide_text: rgb(0x6B6B7B),
+            player_panel_show_hide_text_hover: rgb(0xFFFFFF),
+            player_panel_show_hide_bg_hover: rgba(0xFFFFFF14),
 
             queue_item_title: rgb(0xFFFFFF),
             queue_item_title_current: rgb(0x8B7BF7),

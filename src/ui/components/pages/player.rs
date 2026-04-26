@@ -56,7 +56,7 @@ impl Render for PlayerPage {
         let state = controller.state.read(cx);
         let thumbnail = cx.global::<ImageCache>().current.clone();
         let scroll_handle = self.queue_scroll_handle.clone();
-        let show_panel = self.show_queue.clone();
+        let show_panel = self.show_panel.clone();
 
         let current = if let Some(id) = state.playback.current {
             state.library.tracks.get(&id)
@@ -286,7 +286,7 @@ impl Render for PlayerPage {
                     .flex_shrink_0()
                     .flex()
                     .flex_col()
-                    .bg(theme.queue_bg)
+                    .bg(theme.player_panel_bg)
                     .border_l_1()
                     .border_color(theme.border)
                     .child(
@@ -304,7 +304,7 @@ impl Render for PlayerPage {
                                     .items_center()
                                     .justify_center()
                                     .text_base()
-                                    .text_color(theme.queue_heading_text)
+                                    .text_color(theme.player_panel_heading_text)
                                     .font_weight(FontWeight(500.0))
                                     .child("Queue"),
                             )
@@ -316,7 +316,7 @@ impl Render for PlayerPage {
                                     .items_center()
                                     .justify_center()
                                     .text_base()
-                                    .text_color(theme.queue_heading_text)
+                                    .text_color(theme.player_panel_heading_text)
                                     .font_weight(FontWeight(500.0))
                                     .child("Lyrics"),
                             ),
@@ -351,11 +351,11 @@ impl Render for PlayerPage {
                     .rounded_md()
                     .text_sm()
                     .font_weight(FontWeight(400.0))
-                    .text_color(theme.queue_show_hide_text)
+                    .text_color(theme.player_panel_show_hide_text)
                     .cursor_pointer()
                     .hover(|this| {
-                        this.bg(theme.queue_show_hide_bg_hover)
-                            .text_color(theme.queue_show_hide_text_hover)
+                        this.bg(theme.player_panel_show_hide_bg_hover)
+                            .text_color(theme.player_panel_show_hide_text_hover)
                     })
                     .on_click(move |_, _, cx| show_panel.update(cx, |this, _| *this = !*this))
                     .child(if *self.show_panel.read(cx) {
