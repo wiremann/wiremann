@@ -118,11 +118,23 @@ impl LrcLib {
             sync_type: SyncType::Unsynced,
         };
 
-        // Replace escaped new lines with proper new lines
         let data = data.replace("\\n", "\n");
 
         for line in data.to_string().lines() {
-            println!("line: {line}");
+            let parts = line.split("] ").collect::<Vec<_>>();
+            let timestamp = parts[0].replace("[", "");
+            let text = parts[1];
+
+            let timestamp_parts = timestamp.split(":").collect::<Vec<_>>();
+            let timestamps_secs_subparts = timestamp_parts[1].split(".").collect::<Vec<_>>();
+
+            let minutes = timestamp_parts[0].parse::<u64>();
+            let seconds = timestamps_secs_subparts[0].parse::<u64>();
+            let millis = timestamps_secs_subparts[1].parse::<u64>();
+
+            let total = (minutes * 60_000) + (seconds * 1000) + millis;
+
+            let start = Duration::from_millis(total);
         }
 
         Ok(None)
