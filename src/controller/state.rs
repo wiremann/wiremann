@@ -7,6 +7,8 @@ use uuid::Uuid;
 
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
 const IMAGE_HASH_SEED: u64 = 0x2718_2818_2845_9045;
+const ALBUM_HASH_SEED: u64 = 0x1618_0339_8874_9894;
+const ARTIST_HASH_SEED: u64 = 0x1414_2135_6237_3095;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AppState {
@@ -29,6 +31,12 @@ pub struct ImageId(pub [u8; 16]);
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct PlaylistId(pub Uuid);
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
+pub struct AlbumId(pub [u8; 16]);
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
+pub struct ArtistId(pub [u8; 16]);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Track {
@@ -101,6 +109,29 @@ pub struct Playlist {
     pub image_id: Option<ImageId>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Album {
+    pub id: AlbumId,
+    pub name: String,
+    pub artists: Vec<ArtistId>,
+
+    pub duration: Duration,
+
+    pub tracks: Vec<TrackId>,
+    pub image_id: Option<ImageId>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Artist {
+    pub id: ArtistId,
+    pub name: String,
+
+    pub tracks: Vec<TrackId>,
+    pub albums: Vec<AlbumId>,
+
+    pub image_id: Option<ImageId>,
+}
+
 impl TrackId {
     pub fn generate(name: &str, artist: &str, album: &str) -> Result<Self, io::Error> {
         let mut hasher = XxHash3_128::with_seed(AUDIO_HASH_SEED);
@@ -116,6 +147,30 @@ impl TrackId {
         hasher.write(album.as_bytes());
 
         Ok(TrackId(hasher.finish_128().to_le_bytes()))
+    }
+}
+
+impl AlbumId {
+    pub fn generate(album: &str) -> Result<Self, io::Error> {
+        let mut hasher = XxHash3_128::with_seed(ALBUM_HASH_SEED);
+
+        let album = album.trim().to_lowercase();
+
+        hasher.write(album.as_bytes());
+
+        Ok(AlbumId(hasher.finish_128().to_le_bytes()))
+    }
+}
+
+impl ArtistId {
+    pub fn generate(artist: &str) -> Result<Self, io::Error> {
+        let mut hasher = XxHash3_128::with_seed(ARTIST_HASH_SEED);
+
+        let artist = artist.trim().to_lowercase();
+
+        hasher.write(artist.as_bytes());
+
+        Ok(ArtistId(hasher.finish_128().to_le_bytes()))
     }
 }
 
