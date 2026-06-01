@@ -46,6 +46,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tracing-appender = "0.2.5"
 tracing-error = "0.2.1"
 color-eyre = "0.6.5"
+rusqlite = { version = "0.40.0", features = ["bundled"] }
+sea-query = { version = "1.0.1", features = ["derive", "backend-sqlite", "with-chrono", "with-time", "with-rust_decimal", "with-uuid"] }
 
 [build-dependencies]
 winres = "0.1.12"
