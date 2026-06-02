@@ -98,6 +98,10 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
 
                 cx.set_global(controller.clone());
 
+                let db = Database::open("wiremann.db")?;
+
+                cx.set_global(db);
+
                 let view = cx.new(Wiremann::new);
 
                 let res_handler = cx.new(|_| ResHandler {});

@@ -91,6 +91,13 @@ impl Wiremann {
         let lyrics_state = LyricsState(cx.new(|_| LyricsStateInner::new()));
         cx.set_global(lyrics_state);
 
+        let db = cx.global::<Database>().clone();
+
+        cx.spawn(async move |_this, _cx| {
+            smol::unblock(move || db.test()).await.unwrap().unwrap();
+        })
+        .detach();
+
         global_keybinds::register_keybinds(cx);
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));

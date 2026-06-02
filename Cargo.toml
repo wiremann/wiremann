@@ -46,11 +46,9 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tracing-appender = "0.2.5"
 tracing-error = "0.2.1"
 color-eyre = "0.6.5"
-deadpool-sqlite = { version = "0.13.0", features = [
-    "bundled",
-    "rt_async-std_1",
-    "tracing",
-] }
+rusqlite = { version = "0.39", features = ["bundled"] }
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.34"
 sea-query = { version = "1.0.1", features = [
     "derive",
     "backend-sqlite",
