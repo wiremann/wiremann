@@ -19,7 +19,7 @@ impl Database {
             conn.pragma_update(None, "journal_mode", "WAL")?;
             conn.pragma_update(None, "foreign_keys", "ON")?;
 
-            crate::db::migrations::m0001_init::run(&conn)?;
+            crate::db::migrations::run(&conn)?;
         }
 
         Ok(Self { pool })
