@@ -31,13 +31,15 @@ impl Assets {
     #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
     pub fn load_fonts(&self, cx: &App) -> Result<()> {
         let font_paths = self.list("fonts")?;
+
         let mut embedded_fonts = Vec::new();
+
         for font_path in font_paths {
             if font_path.ends_with(".ttf") {
-                let font_bytes = cx
-                    .asset_source()
-                    .load(&font_path)?
-                    .expect("Assets should never return None");
+                let font_bytes = Self::get(font_path.as_ref())
+                    .expect("font should exist")
+                    .data;
+
                 embedded_fonts.push(font_bytes);
             }
         }

@@ -1,4 +1,5 @@
 use crate::controller::Controller;
+use crate::db::Database;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::lyrics::{LyricsState, LyricsStateInner};
@@ -94,7 +95,7 @@ impl Wiremann {
         let db = cx.global::<Database>().clone();
 
         cx.spawn(async move |_this, _cx| {
-            smol::unblock(move || db.test()).await.unwrap().unwrap();
+            smol::unblock(move || db.test()).await.unwrap();
         })
         .detach();
 

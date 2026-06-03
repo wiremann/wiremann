@@ -4,6 +4,7 @@ mod window;
 mod workers;
 
 use crate::cacher::Cacher;
+use crate::db::Database;
 use crate::image_processor::ImageProcessor;
 use crate::lyrics_manager::LyricsManager;
 use crate::system_integration::SystemIntegration;
@@ -98,7 +99,7 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
 
                 cx.set_global(controller.clone());
 
-                let db = Database::open("wiremann.db")?;
+                let db = Database::open("wiremann.db").unwrap();
 
                 cx.set_global(db);
 
