@@ -1,1 +1,1 @@
-pub mod 0001_init;
+pub mod m0001_init;
