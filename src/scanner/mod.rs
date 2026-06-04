@@ -32,6 +32,24 @@ pub struct Scanner {
     scan_record: ScanRecord,
 }
 
+pub struct ScannedTrack {
+    pub source: ScannedTrackSource,
+
+    pub title: String,
+    pub artists: Vec<String>,
+    pub album: Option<String>,
+
+    pub duration: Duration,
+
+    pub image: Option<Box<[u8]>>,
+}
+
+pub struct ScannedTrackSource {
+    pub path: PathBuf,
+    pub size: u64,
+    pub modified: u64,
+}
+
 #[derive(PartialEq)]
 enum State {
     Idle,
