@@ -1,6 +1,7 @@
 use crate::controller::state::{ImageId, Track, TrackId, TrackSource};
 use crate::controller::state::{PlaybackState, PlaybackStatus, QueueState};
 use crate::controller::state::{Playlist, PlaylistId, PlaylistSource};
+use crate::scanner::ScannedTrackSource;
 use bitcode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -146,6 +147,26 @@ impl From<&TrackSource> for CachedTrackSource {
 impl From<&CachedTrackSource> for TrackSource {
     fn from(c: &CachedTrackSource) -> Self {
         TrackSource {
+            path: PathBuf::from(c.path.clone()),
+            size: c.size,
+            modified: c.modified,
+        }
+    }
+}
+
+impl From<&ScannedTrackSource> for CachedTrackSource {
+    fn from(c: &ScannedTrackSource) -> Self {
+        CachedTrackSource {
+            path: c.path.to_string_lossy().to_string(),
+            size: c.size,
+            modified: c.modified,
+        }
+    }
+}
+
+impl From<&CachedTrackSource> for ScannedTrackSource {
+    fn from(c: &CachedTrackSource) -> Self {
+        ScannedTrackSource {
             path: PathBuf::from(c.path.clone()),
             size: c.size,
             modified: c.modified,

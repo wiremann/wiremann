@@ -8,7 +8,6 @@ use lofty::tag::ItemKey;
 use std::path::Path;
 use std::time::Duration;
 
-#[allow(clippy::missing_errors_doc)]
 pub fn read_metadata(track_source: ScannedTrackSource) -> Result<ScannedTrack, ScannerError> {
     let path = track_source.path.as_path();
 
@@ -55,6 +54,18 @@ pub fn read_metadata(track_source: ScannedTrackSource) -> Result<ScannedTrack, S
         duration,
         image,
     })
+}
+
+pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
+    let file = read_from_path(path).ok();
+    if let Some(tagged_file) = file
+        && let Some(tag) = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag())
+    {
+        return Ok(tag.pictures().first().map(|data| Box::from(data.data())));
+    }
+    Ok(None)
 }
 
 fn fallback_metadata(path: &Path) -> (String, Vec<String>, Option<String>) {

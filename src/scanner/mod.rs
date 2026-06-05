@@ -14,6 +14,7 @@ use crossbeam_channel::{Receiver, Sender, select, tick};
 
 use dashmap::DashMap;
 
+use std::io;
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -37,6 +38,7 @@ pub struct Scanner {
     scan_record: ScanRecord,
 }
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct ScannedTrack {
     pub source: ScannedTrackSource,
 
@@ -49,7 +51,7 @@ pub struct ScannedTrack {
     pub image: Option<Box<[u8]>>,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct ScannedTrackSource {
     pub path: PathBuf,
     pub size: u64,
@@ -64,6 +66,26 @@ struct ScanProgress {
 }
 
 type ScanRecord = Arc<DashMap<ScannedTrackSource, TrackId>>;
+
+impl ScannedTrackSource {
+    #[allow(clippy::missing_errors_doc)]
+    pub fn generate(path: &Path) -> Result<Self, io::Error> {
+        let meta = std::fs::metadata(path)?;
+        let modified = meta
+            .modified()?
+            .elapsed()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+            .as_secs();
+
+        let size = meta.len();
+
+        Ok(ScannedTrackSource {
+            path: path.to_path_buf(),
+            modified,
+            size,
+        })
+    }
+}
 
 impl Scanner {
     #[must_use]
@@ -168,7 +190,7 @@ impl Scanner {
         existing_tracks: &mut HashMap<PlaylistId, Vec<TrackId>>,
         new_tracks: &mut Vec<(ScannedTrack, u64)>,
     ) {
-        let Ok(source) = metadata::generate_source(path) else {
+        let Ok(source) = ScannedTrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             return;
         };

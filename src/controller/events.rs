@@ -1,8 +1,9 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::{AppState, PlaybackStatus};
-use crate::controller::state::{ImageId, Track, TrackId, TrackSource};
+use crate::controller::state::{ImageId, TrackId, TrackSource};
 use crate::controller::state::{Playlist, PlaylistId};
 use crate::lyrics_manager::Lyrics;
+use crate::scanner::ScannedTrack;
 use gpui::RenderImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ pub enum AudioEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ScannerEvent {
-    UpsertTracks(Vec<(Track, u64)>),
+    UpsertTracks(Vec<(ScannedTrack, u64)>),
     InsertTracksIntoPlaylist(PlaylistId, Vec<TrackId>),
 
     AddTrackSource(TrackId, TrackSource),
