@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod events;
 pub mod handlers;
+pub mod scan_manager;
 pub mod state;
 use crate::cacher::ImageKind;
 use crate::controller::commands::{
@@ -9,8 +10,9 @@ use crate::controller::commands::{
 use crate::controller::events::{
     CacherEvent, ImageProcessorEvent, LyricsEvent, SystemIntegrationEvent,
 };
-use crate::controller::state::PlaybackStatus;
+use crate::controller::scan_manager::{ScanJob, ScanManager};
 use crate::controller::state::PlaylistId;
+use crate::controller::state::{PlaybackStatus, Playlist, PlaylistSource};
 use crate::controller::state::{Track, TrackId};
 use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
@@ -31,6 +33,7 @@ use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct Controller {
@@ -59,6 +62,8 @@ pub struct Controller {
     // Lyrics manager channel
     pub lyrics_manager_tx: Sender<LyricsCommand>,
     pub lyrics_manager_rx: Receiver<LyricsEvent>,
+
+    pub scan_manager: ScanManager,
 }
 
 impl Controller {
@@ -93,6 +98,7 @@ impl Controller {
             system_integration_rx,
             lyrics_manager_tx,
             lyrics_manager_rx,
+            scan_manager: ScanManager::default(),
         }
     }
 
@@ -137,7 +143,40 @@ impl Controller {
     }
 
     pub fn scan_dir(&self, path: PathBuf) {
-        let _ = self.scanner_tx.send(ScannerCommand::ScanDir(path));
+        if path.is_dir() {
+            let playlist_id = PlaylistId(Uuid::new_v4());
+
+            let playlist = Playlist {
+                id: playlist_id,
+                name: path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unnamed Playlist")
+                    .to_string(),
+                source: PlaylistSource::Folder,
+                folder_path: Some(path.clone()),
+                tracks: Vec::new(),
+                duration: Duration::from_secs(0),
+                image_id: None,
+            };
+            self.enqueue_scan(path, Some(playlist_id));
+        }
+    }
+
+    pub fn enqueue_scan(&mut self, path: PathBuf, playlist_id: Option<PlaylistId>) {
+        let id = self.scan_manager.next_job_id();
+
+        let job = ScanJob {
+            id,
+            path,
+            playlist_id,
+        };
+
+        self.scan_manager.enqueue(job);
+
+        if self.scan_manager.is_idle() {
+            self.start_next_scan();
+        }
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
