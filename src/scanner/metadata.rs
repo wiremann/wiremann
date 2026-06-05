@@ -1,19 +1,23 @@
-use crate::controller::state::{Track, TrackId, TrackSource};
 use crate::errors::ScannerError;
+use crate::scanner::{ScannedTrack, ScannedTrackSource};
+
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::read_from_path;
 use lofty::tag::ItemKey;
+
 use std::path::Path;
 use std::time::Duration;
 
 #[allow(clippy::missing_errors_doc)]
-pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
+pub fn read_metadata(track_source: ScannedTrackSource) -> Result<ScannedTrack, ScannerError> {
     let path = track_source.path.as_path();
 
     let file = read_from_path(path).ok();
 
-    let (mut title, mut artist, mut album) = fallback_metadata(path);
+    let (mut title, mut artists, mut album) = fallback_metadata(path);
+
     let mut duration = Duration::from_millis(0);
+    let mut image = None;
 
     if let Some(tagged_file) = file {
         if let Some(tag) = tagged_file
@@ -24,55 +28,36 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
                 title = t.to_string();
             }
 
-            let mut iter = tag.get_strings(ItemKey::TrackArtist);
-            artist = match iter.next() {
-                None => "Unknown Artist".to_string(),
-                Some(first) => {
-                    let mut result = first.to_string();
-                    for a in iter {
-                        result.push_str(", ");
-                        result.push_str(a);
-                    }
-                    result
-                }
-            };
+            let collected: Vec<String> = tag
+                .get_strings(ItemKey::TrackArtist)
+                .map(ToString::to_string)
+                .collect();
+
+            if !collected.is_empty() {
+                artists = collected;
+            }
 
             if let Some(a) = tag.get_string(ItemKey::AlbumTitle) {
-                album = a.to_string();
+                album = Some(a.to_string());
             }
+
+            image = tag.pictures().first().map(|pic| Box::from(pic.data()));
         }
 
         duration = tagged_file.properties().duration();
     }
 
-    let track_id = TrackId::generate(&title, &artist, &album)?;
-
-    Ok(Track {
-        sources: vec![track_source],
-        id: track_id,
+    Ok(ScannedTrack {
+        source: track_source,
         title,
-        artist,
+        artists,
         album,
         duration,
-        image_id: None,
+        image,
     })
 }
 
-#[allow(clippy::missing_errors_doc)]
-pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
-    let file = read_from_path(path).ok();
-
-    if let Some(tagged_file) = file
-        && let Some(tag) = tagged_file
-            .primary_tag()
-            .or_else(|| tagged_file.first_tag())
-    {
-        return Ok(tag.pictures().first().map(|data| Box::from(data.data())));
-    }
-    Ok(None)
-}
-
-fn fallback_metadata(path: &Path) -> (String, String, String) {
+fn fallback_metadata(path: &Path) -> (String, Vec<String>, Option<String>) {
     let title = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -81,7 +66,7 @@ fn fallback_metadata(path: &Path) -> (String, String, String) {
 
     (
         title,
-        "Unknown Artist".to_string(),
-        "Unknown Album".to_string(),
+        vec!["Unknown Artist".to_string()],
+        Some("Unknown Album".to_string()),
     )
 }
