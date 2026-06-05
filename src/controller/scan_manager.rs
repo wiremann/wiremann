@@ -5,7 +5,7 @@ use crate::controller::state::PlaylistId;
 #[derive(PartialEq, Default, Clone)]
 pub struct ScanManager {
     pub next_job_id: u64,
-    pub current_job: Option<ScanJob>,
+    pub current_job: Option<u64>,
     pub queue: VecDeque<ScanJob>,
     pub state: State,
 }
@@ -43,9 +43,9 @@ impl ScanManager {
         self.state == State::Idle
     }
 
-    pub fn start_job(&mut self, job: ScanJob) {
+    pub fn start_job(&mut self, id: u64) {
         self.state = State::Scanning;
-        self.current_job = Some(job);
+        self.current_job = Some(id);
     }
 
     pub fn finish_job(&mut self) {
@@ -54,5 +54,9 @@ impl ScanManager {
         if self.queue.is_empty() {
             self.state = State::Idle;
         }
+    }
+
+    pub fn set_idle(&mut self) {
+        self.state = State::Idle;
     }
 }

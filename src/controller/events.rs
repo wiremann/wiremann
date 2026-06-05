@@ -19,7 +19,7 @@ pub enum AudioEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ScannerEvent {
-    UpsertTracks(Vec<(Track, Option<PlaylistId>)>),
+    UpsertTracks(Vec<(Track, u64)>),
     InsertTracksIntoPlaylist(PlaylistId, Vec<TrackId>),
 
     AddTrackSource(TrackId, TrackSource),
@@ -27,10 +27,10 @@ pub enum ScannerEvent {
 
     InsertPlaylist(Playlist),
 
-    ScanStarted,
+    ScanStarted(u64),
     Discovered(usize),
     Processed { processed: usize, total: usize },
-    ScanFinished,
+    ScanFinished(u64),
 }
 
 #[derive(Clone, PartialEq, Debug)]

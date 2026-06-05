@@ -142,7 +142,7 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
 
-    pub fn scan_dir(&self, path: PathBuf) {
+    pub fn scan_dir(&mut self, cx: &mut App, path: PathBuf) {
         if path.is_dir() {
             let playlist_id = PlaylistId(Uuid::new_v4());
 
@@ -159,6 +159,15 @@ impl Controller {
                 duration: Duration::from_secs(0),
                 image_id: None,
             };
+            self.state.update(cx, |this, cx| {
+                this.library.playlists.insert(playlist.id, playlist.clone());
+
+                cx.notify();
+            });
+
+            let state = self.state.read(cx).library.clone();
+            let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+
             self.enqueue_scan(path, Some(playlist_id));
         }
     }
@@ -177,6 +186,20 @@ impl Controller {
         if self.scan_manager.is_idle() {
             self.start_next_scan();
         }
+    }
+
+    fn start_next_scan(&mut self) {
+        let job = match self.scan_manager.dequeue() {
+            Some(job) => job,
+            None => {
+                self.scan_manager.set_idle();
+                return;
+            }
+        };
+
+        self.scan_manager.start_job(job.id);
+
+        let _ = self.scanner_tx.send(ScannerCommand::ScanDir(job));
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
