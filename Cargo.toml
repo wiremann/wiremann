@@ -48,7 +48,7 @@ tracing-error = "0.2.1"
 color-eyre = "0.6.5"
 rusqlite = { version = "0.38", features = ["bundled"] }
 r2d2 = "0.8.10"
-r2d2_sqlite = "0.34"
+r2d2_sqlite = "0.32"
 sea-query = { version = "1.0.1", features = [
     "derive",
     "backend-sqlite",
@@ -57,7 +57,12 @@ sea-query = { version = "1.0.1", features = [
     "with-rust_decimal",
     "with-uuid",
 ] }
-sea-query-rusqlite = "0.8.0"
+sea-query-rusqlite = { version = "0.8.0", features = [
+    "with-chrono",
+    "with-time",
+    "with-rust_decimal",
+    "with-uuid",
+] }
 
 [build-dependencies]
 winres = "0.1.12"
