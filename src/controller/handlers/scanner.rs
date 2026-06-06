@@ -1,6 +1,6 @@
 use super::{
-    App, Controller, ControllerError, Entity, HashSet, ImageKind, ImageProcessorCommand, Instant,
-    PathBuf, PlaylistId, ScannerEvent, ScanningStatus, ToastKind, ToastPhase, TrackId, Wiremann,
+    App, Controller, ControllerError, Entity, ImageKind, ImageProcessorCommand, Instant,
+    ScannerEvent, ScanningStatus, ToastKind, ToastPhase, Wiremann,
 };
 
 use crate::db::Database;
@@ -136,18 +136,25 @@ impl Controller {
                 .detach();
 
                 let db = cx.global::<Database>().clone();
+                let image_tx = self.image_processor_tx.clone();
 
                 cx.spawn(async move |_cx| {
-                    smol::unblock(move || {
+                    let playlists = smol::unblock(move || {
                         let conn = db.pool().get()?;
 
-                        let missing: Vec<PlaylistId> =
-                            crate::db::queries::images::get_playlists_missing_thumbnails(&conn)?;
-
-                        anyhow::Ok(missing)
+                        crate::db::queries::images::get_playlist_thumbnail_jobs(&conn)
                     })
                     .await
-                    .unwrap()
+                    .unwrap();
+
+                    for (playlist_id, paths) in playlists {
+                        image_tx
+                            .send(ImageProcessorCommand::PlaylistThumbnail {
+                                id: playlist_id,
+                                tracks: paths,
+                            })
+                            .ok();
+                    }
                 })
                 .detach();
             }

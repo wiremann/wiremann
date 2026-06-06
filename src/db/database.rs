@@ -25,10 +25,6 @@ impl Database {
         Ok(Self { pool })
     }
 
-    pub fn test(&self) -> Result<()> {
-        crate::db::queries::test(&self.pool)
-    }
-
     pub fn pool(&self) -> &Pool<SqliteConnectionManager> {
         &self.pool
     }
