@@ -1,4 +1,9 @@
-use super::{Controller, App, ScannerEvent, Entity, Wiremann, ControllerError, HashSet, Arc, CacherCommand, ScanningStatus, ScannerCommand, TrackId, PathBuf, ImageProcessorCommand, ImageKind, ToastKind, ToastPhase, Instant, PlaylistId};
+use super::{
+    App, Controller, ControllerError, Entity, HashSet, ImageKind, ImageProcessorCommand, Instant,
+    PathBuf, PlaylistId, ScannerEvent, ScanningStatus, ToastKind, ToastPhase, TrackId, Wiremann,
+};
+
+use crate::db::Database;
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -9,100 +14,30 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             ScannerEvent::UpsertTracks(tracks) => {
-                let mut modified_playlists = HashSet::new();
-                self.state.update(cx, |this, cx| {
-                    this.library.tracks.reserve(tracks.len());
-                    for (track, playlist_id) in tracks {
-                        let id = track.id;
+                let db = cx.global::<Database>().clone();
+                let tracks = tracks.clone();
 
-                        if let Some(existing) = this.library.tracks.get_mut(&id) {
-                            let existing = Arc::make_mut(existing);
+                cx.spawn(async move |_cx| {
+                    smol::unblock(move || {
+                        let conn = db.pool().get()?;
 
-                            for src in &track.sources {
-                                if !existing.sources.iter().any(|s| s.path == src.path) {
-                                    existing.sources.push(src.clone());
-                                }
-                            }
-
-                            if existing.title.is_empty() && !track.title.is_empty() {
-                                existing.title.clone_from(&track.title);
-                            }
-
-                            if existing.artist.is_empty() && !track.artist.is_empty() {
-                                existing.artist.clone_from(&track.artist);
-                            }
-
-                            if existing.album.is_empty() && !track.album.is_empty() {
-                                existing.album.clone_from(&track.album);
-                            }
-                        } else {
-                            this.library.tracks.insert(id, Arc::new(track.clone()));
+                        for (track, playlist_id) in tracks {
+                            crate::db::queries::scanner::upsert_scanned_track(
+                                &conn,
+                                &track,
+                                playlist_id,
+                            )?;
                         }
 
-                        if let Some(pid) = playlist_id
-                            && let Some(playlist) = this.library.playlists.get_mut(pid)
-                        {
-                            if !playlist.tracks.contains(&id) {
-                                playlist.tracks.push(id);
-                            }
-                            modified_playlists.insert(*pid);
-                        }
-                    }
-                    cx.notify();
-                });
-                let state = self.state.read(cx).library.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+                        anyhow::Ok(())
+                    })
+                    .await
+                    .unwrap();
+                })
+                .detach();
             }
-            ScannerEvent::InsertTracksIntoPlaylist(pid, tids) => {
-                self.state.update(cx, |this, cx| {
-                    if let Some(playlist) = this.library.playlists.get_mut(pid) {
-                        for tid in tids {
-                            if !playlist.tracks.contains(tid) {
-                                playlist.tracks.push(*tid);
-                            }
-                        }
-                    }
-                    cx.notify();
-                });
-                let state = self.state.read(cx).library.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            }
-            ScannerEvent::AddTrackSource(id, source) => {
-                self.state.update(cx, |this, cx| {
-                    if let Some(track) = this.library.tracks.get_mut(id) {
-                        Arc::make_mut(track).sources.push(source.clone());
-                    }
 
-                    cx.notify();
-                });
-                let state = self.state.read(cx).library.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            }
-            ScannerEvent::RemoveTrackSource(id, path) => {
-                self.state.update(cx, |this, cx| {
-                    if let Some(track) = this.library.tracks.get_mut(id)
-                        && let Some(source) =
-                            track.sources.iter().position(|this| this.path == *path)
-                    {
-                        Arc::make_mut(track).sources.remove(source);
-                    }
-
-                    cx.notify();
-                });
-                let state = self.state.read(cx).library.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            }
-            ScannerEvent::InsertPlaylist(playlist) => {
-                self.state.update(cx, |this, cx| {
-                    this.library.playlists.insert(playlist.id, playlist.clone());
-
-                    cx.notify();
-                });
-
-                let state = self.state.read(cx).library.clone();
-                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-            }
-            ScannerEvent::ScanStarted => {
+            ScannerEvent::ScanStarted(_) => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().clone().0;
 
                 scanning_status.update(cx, |this, cx| {
@@ -117,58 +52,38 @@ impl Controller {
                         this.info("Scanning started...", cx);
                         this.scanning_status(cx);
                     });
+
                     cx.notify();
                 });
             }
+
             ScannerEvent::Discovered(discovered) => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
                 scanning_status.update(cx, |this, cx| {
-                    if !this.is_discovering {
-                        this.is_discovering = true;
-                    }
-
+                    this.is_discovering = true;
                     this.discovered = *discovered;
 
                     cx.notify();
                 });
             }
+
             ScannerEvent::Processed { processed, total } => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
                 scanning_status.update(cx, |this, cx| {
-                    if this.is_discovering {
-                        this.is_discovering = false;
-                    }
-                    if !this.is_processing {
-                        this.is_processing = true;
-                    }
+                    this.is_discovering = false;
+                    this.is_processing = true;
 
                     this.total = *total;
                     this.processed = *processed;
+
                     cx.notify();
                 });
             }
-            ScannerEvent::ScanFinished => {
-                self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
-                let tracks = self.state.read(cx).library.tracks.clone();
 
-                let to_request: HashSet<(TrackId, PathBuf)> = tracks
-                    .iter()
-                    .filter(|(_, track)| track.image_id.is_none())
-                    .filter_map(|(id, track)| {
-                        track
-                            .get_valid_source()
-                            .map(|src| src.path.clone())
-                            .map(|path| (*id, path))
-                    })
-                    .collect();
-                let _ = self
-                    .image_processor_tx
-                    .send(ImageProcessorCommand::GetThumbnails(
-                        to_request,
-                        ImageKind::ThumbnailSmall,
-                    ));
+            ScannerEvent::ScanFinished(_) => {
+                self.start_next_scan();
 
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
@@ -182,11 +97,13 @@ impl Controller {
                                 }
                             }
                         });
+
                         this.success("Scan complete!", cx);
                     });
                 });
 
                 let status = cx.global::<ScanningStatus>().0.clone();
+
                 status.update(cx, |s, _| {
                     s.is_scanning = false;
                     s.is_discovering = false;
@@ -197,21 +114,45 @@ impl Controller {
                     s.processed = 0;
                 });
 
-                let library = cx.global::<Controller>().state.read(cx).library.clone();
-                let missing: Vec<PlaylistId> = library
-                    .playlists
-                    .iter()
-                    .filter_map(|(id, playlist)| {
-                        if playlist.image_id.is_none() {
-                            Some(*id)
-                        } else {
-                            None
-                        }
+                let db = cx.global::<Database>().clone();
+                let image_tx = self.image_processor_tx.clone();
+
+                cx.spawn(async move |_cx| {
+                    let missing = smol::unblock(move || {
+                        let conn = db.pool().get()?;
+
+                        crate::db::queries::images::get_tracks_missing_thumbnails(&conn)
                     })
-                    .collect();
-                self.request_playlist_thumbnails(&missing, cx);
+                    .await
+                    .unwrap();
+
+                    image_tx
+                        .send(ImageProcessorCommand::GetThumbnails(
+                            missing,
+                            ImageKind::ThumbnailSmall,
+                        ))
+                        .ok();
+                })
+                .detach();
+
+                let db = cx.global::<Database>().clone();
+
+                cx.spawn(async move |_cx| {
+                    smol::unblock(move || {
+                        let conn = db.pool().get()?;
+
+                        let missing: Vec<PlaylistId> =
+                            crate::db::queries::images::get_playlists_missing_thumbnails(&conn)?;
+
+                        anyhow::Ok(missing)
+                    })
+                    .await
+                    .unwrap()
+                })
+                .detach();
             }
         }
+
         Ok(())
     }
 }
