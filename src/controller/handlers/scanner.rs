@@ -21,7 +21,8 @@ impl Controller {
                     smol::unblock(move || {
                         let conn = db.pool().get()?;
 
-                        for (track, playlist_id) in tracks {
+                        for (track, job_id) in tracks {
+                            let playlist_id = job_id.and_then(|id| id.try_into().ok());
                             crate::db::queries::scanner::upsert_scanned_track(
                                 &conn,
                                 &track,
