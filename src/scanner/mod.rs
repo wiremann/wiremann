@@ -147,10 +147,7 @@ impl Scanner {
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
-                let mut new_tracks: Vec<(ScannedTrack, u64)> = Vec::with_capacity(32);
-
-                let mut existing_tracks: HashMap<PlaylistId, Vec<TrackId>> =
-                    HashMap::with_capacity(32);
+                let mut new_tracks: Vec<ScannedTrack> = Vec::with_capacity(32);
 
                 loop {
                     select! {
@@ -162,18 +159,13 @@ impl Scanner {
                                     &scan_record,
                                     &scan_progress,
                                     &tx,
-                                    &mut existing_tracks,
                                     &mut new_tracks,
                                 );
                             }
                         }
 
                         recv(ticker) -> _ => {
-                            Self::flush_batches(
-                                &tx,
-                                &mut existing_tracks,
-                                &mut new_tracks,
-                            );
+                            Self::flush_batches(&tx, &mut new_tracks);
                         }
                     }
                 }
@@ -182,27 +174,19 @@ impl Scanner {
     }
 
     fn handle_job(
-        job: &ScanJob,
+        _job: &ScanJob,
         path: &Path,
         scan_record: &ScanRecord,
         scan_progress: &ScanProgress,
         tx: &Sender<ScannerEvent>,
-        existing_tracks: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new_tracks: &mut Vec<(ScannedTrack, u64)>,
+        new_tracks: &mut Vec<ScannedTrack>,
     ) {
         let Ok(source) = ScannedTrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             return;
         };
 
-        if let Some(existing) = scan_record.get(&source) {
-            if let Some(pid) = job.playlist_id {
-                existing_tracks
-                    .entry(pid)
-                    .or_default()
-                    .push(*existing.value());
-            }
-        } else {
+        if scan_record.get(&source).is_none() {
             if let Ok(track) = metadata::read_metadata(source.clone()) {
                 let track_id = TrackId::generate(
                     &track.title,
@@ -213,7 +197,7 @@ impl Scanner {
 
                 scan_record.insert(source, track_id);
 
-                new_tracks.push((track, job.id));
+                new_tracks.push(track);
 
                 if new_tracks.len() >= 32 {
                     let batch = std::mem::take(new_tracks);
@@ -235,26 +219,13 @@ impl Scanner {
             && scan_progress.discovery_done.load(Ordering::Acquire)
             && !scan_progress.finished_sent.swap(true, Ordering::AcqRel)
         {
-            Self::flush_batches(tx, existing_tracks, new_tracks);
+            Self::flush_batches(tx, new_tracks);
 
-            tx.send(ScannerEvent::ScanFinished(job.id)).ok();
+            tx.send(ScannerEvent::ScanFinished(_job.id)).ok();
         }
     }
 
-    fn flush_batches(
-        tx: &Sender<ScannerEvent>,
-        existing_tracks: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new_tracks: &mut Vec<(ScannedTrack, u64)>,
-    ) {
-        for (playlist_id, tracks) in existing_tracks.iter_mut() {
-            if !tracks.is_empty() {
-                let batch = std::mem::take(tracks);
-
-                tx.send(ScannerEvent::InsertTracksIntoPlaylist(*playlist_id, batch))
-                    .ok();
-            }
-        }
-
+    fn flush_batches(tx: &Sender<ScannerEvent>, new_tracks: &mut Vec<ScannedTrack>) {
         if !new_tracks.is_empty() {
             let batch = std::mem::take(new_tracks);
 
@@ -275,7 +246,10 @@ impl Scanner {
             .finished_sent
             .store(false, Ordering::Release);
 
-        self.read_scan_record();
+        // Do not load the old on-disk scan record: it may contain stale
+        // entries from the previous in-memory system and prevent new files
+        // from being discovered. Start each scan with a fresh record.
+        self.scan_record.clear();
 
         self.tx.send(ScannerEvent::ScanStarted(job.id)).ok();
 

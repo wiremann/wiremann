@@ -65,9 +65,10 @@ pub(super) fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div 
                 .hover(|this| this.bg(theme.library_header_button_bg_hover))
                 .on_click(move |_, _, cx| {
                     let controller = cx.global::<Controller>().clone();
-                    cx.spawn(async move |_| {
+                    cx.spawn(async move |cx| {
+                        let mut controller = controller;
                         if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
-                            controller.scan_dir(folder.path().into());
+                            cx.update(|app| controller.scan_dir(app, folder.path().into()));
                         }
                     })
                     .detach();

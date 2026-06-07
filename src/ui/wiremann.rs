@@ -95,7 +95,17 @@ impl Wiremann {
         let db = cx.global::<Database>().clone();
 
         cx.spawn(async move |_this, _cx| {
-            smol::unblock(move || db.test()).await.unwrap();
+            let tracks = smol::unblock(move || {
+                let conn = db.pool().get()?;
+                crate::db::queries::scanner::get_all_tracks(&conn)
+            })
+            .await
+            .unwrap();
+
+            println!("Loaded {} track(s) from database", tracks.len());
+            for track in tracks.iter().take(16) {
+                println!("track {}: {}", track.id, track.name);
+            }
         })
         .detach();
 

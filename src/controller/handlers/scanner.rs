@@ -19,18 +19,9 @@ impl Controller {
 
                 cx.spawn(async move |_cx| {
                     smol::unblock(move || {
-                        let conn = db.pool().get()?;
+                        let mut conn = db.pool().get()?;
 
-                        for (track, job_id) in tracks {
-                            let playlist_id = job_id.and_then(|id| id.try_into().ok());
-                            crate::db::queries::scanner::upsert_scanned_track(
-                                &conn,
-                                &track,
-                                playlist_id,
-                            )?;
-                        }
-
-                        anyhow::Ok(())
+                        crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks)
                     })
                     .await
                     .unwrap();
