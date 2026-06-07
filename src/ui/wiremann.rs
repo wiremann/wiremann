@@ -105,8 +105,6 @@ impl Wiremann {
 
             println!("Loaded {} track(s) from database", rows.len());
 
-            // Populate in-memory library state as a safe transitional step so
-            // other subsystems depending on `state.library` continue to work.
             cx.update(|app| {
                 controller.state.update(app, |state, _cx| {
                     use crate::controller::state::{ImageId, Track, TrackId, TrackSource};
@@ -154,10 +152,17 @@ impl Wiremann {
                         }
                     }
 
-                    // Store DB rows for UI to consume directly
                     state.library.db_tracks = rows.clone();
+                    let mut idx = std::collections::HashMap::new();
+                    for r in &rows {
+                        if r.track_hash.len() == 16 {
+                            let mut hash = [0u8; 16];
+                            hash.copy_from_slice(&r.track_hash[..16]);
+                            idx.insert(TrackId(hash), r.clone());
+                        }
+                    }
+                    state.library.db_index = idx;
 
-                    // Notify UI of state change
                     _cx.notify();
                 });
             });

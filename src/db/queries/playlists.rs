@@ -55,8 +55,7 @@ pub fn insert_playlist_track(
 
 pub fn get_playlist_next_position(tx: &Transaction, playlist_id: &Uuid) -> Result<i64> {
     // MAX(position) will always return one row; its value may be NULL when
-    // there are no tracks for the playlist. Read it as Option<i64> to handle
-    // the NULL case gracefully.
+    // there are no tracks for the playlist.
     let query = Query::select()
         .expr(Func::max(Expr::col(PlaylistTracks::Position)))
         .from(PlaylistTracks::Table)

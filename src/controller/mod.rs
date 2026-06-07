@@ -431,6 +431,24 @@ impl Controller {
                 } else if let Some(source) = track.get_valid_source() {
                     scan_jobs.insert((track.id, source.path.clone()));
                 }
+            } else {
+                // Fallback to DB-backed rows if in-memory track is not present
+                if let Some(row) = state
+                    .library
+                    .db_tracks
+                    .iter()
+                    .find(|r| r.track_hash.len() == 16 && &r.track_hash[..] == &tid.0)
+                {
+                    if let Some(img) = row.image_hash.as_deref() {
+                        if img.len() == 16 {
+                            let mut ih = [0u8; 16];
+                            ih.copy_from_slice(&img[..16]);
+                            cache_ids.push(crate::controller::state::ImageId(ih));
+                        }
+                    } else if let Some(path) = row.path.as_ref() {
+                        scan_jobs.insert((*tid, std::path::PathBuf::from(path)));
+                    }
+                }
             }
         }
 
