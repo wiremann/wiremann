@@ -254,7 +254,7 @@ impl From<CachedLibraryState> for LibraryState {
             })
             .collect();
 
-        Self { tracks, playlists }
+        Self { tracks, playlists, db_tracks: Vec::new() }
     }
 }
 

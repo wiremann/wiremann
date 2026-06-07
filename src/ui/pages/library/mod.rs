@@ -13,7 +13,7 @@ use gpui::{
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
     VirtualListScrollController, Window, div, img, vlist,
 };
-use helpers::{LibraryRow, build_rows, render_header, render_playlist_grid, render_track_table_header, HeaderKind};
+use helpers::{LibraryRow, build_rows, build_rows_from_db, render_header, render_playlist_grid, render_track_table_header, HeaderKind};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -36,7 +36,12 @@ impl LibraryPage {
 
         let cols = 4;
 
-        let (rows, heights) = build_rows(library, cols);
+        // Prefer DB-backed rows when available; fall back to in-memory library.
+        let (rows, heights) = if !library.db_tracks.is_empty() {
+            build_rows_from_db(&library.db_tracks, &library.playlists, cols)
+        } else {
+            build_rows(library, cols)
+        };
 
         LibraryPage {
             scroll_handle,

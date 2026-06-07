@@ -93,19 +93,74 @@ impl Wiremann {
         cx.set_global(lyrics_state);
 
         let db = cx.global::<Database>().clone();
+        let controller = cx.global::<Controller>().clone();
 
-        cx.spawn(async move |_this, _cx| {
-            let tracks = smol::unblock(move || {
+        cx.spawn(async move |_this, cx| {
+            let rows = smol::unblock(move || {
                 let conn = db.pool().get()?;
-                crate::db::queries::scanner::get_all_tracks(&conn)
+                crate::db::queries::library::load_library_tracks(&conn)
             })
             .await
-            .unwrap();
+            .unwrap_or_default();
 
-            println!("Loaded {} track(s) from database", tracks.len());
-            for track in tracks.iter().take(16) {
-                println!("track {}: {}", track.id, track.name);
-            }
+            println!("Loaded {} track(s) from database", rows.len());
+
+            // Populate in-memory library state as a safe transitional step so
+            // other subsystems depending on `state.library` continue to work.
+            cx.update(|app| {
+                controller.state.update(app, |state, _cx| {
+                    use crate::controller::state::{ImageId, Track, TrackId, TrackSource};
+                    use std::sync::Arc;
+
+                    for r in &rows {
+                        if r.track_hash.len() == 16 {
+                            let mut hash = [0u8; 16];
+                            hash.copy_from_slice(&r.track_hash[..16]);
+                            let tid = TrackId(hash);
+
+                            let image_id = r.image_hash.as_deref().and_then(|b| {
+                                if b.len() == 16 {
+                                    let mut h = [0u8; 16];
+                                    h.copy_from_slice(&b[..16]);
+                                    Some(ImageId(h))
+                                } else {
+                                    None
+                                }
+                            });
+
+                            let sources = r
+                                .path
+                                .as_ref()
+                                .map(|p| {
+                                    vec![TrackSource {
+                                        path: std::path::PathBuf::from(p.clone()),
+                                        size: r.size.unwrap_or(0) as u64,
+                                        modified: r.modified.unwrap_or(0) as u64,
+                                    }]
+                                })
+                                .unwrap_or_default();
+
+                            let track = Track {
+                                id: tid,
+                                sources,
+                                title: r.name.clone(),
+                                artist: r.artists.clone(),
+                                album: r.album.clone().unwrap_or_default(),
+                                duration: std::time::Duration::from_millis(r.duration_ms as u64),
+                                image_id,
+                            };
+
+                            state.library.tracks.insert(tid, Arc::new(track));
+                        }
+                    }
+
+                    // Store DB rows for UI to consume directly
+                    state.library.db_tracks = rows.clone();
+
+                    // Notify UI of state change
+                    _cx.notify();
+                });
+            });
         })
         .detach();
 

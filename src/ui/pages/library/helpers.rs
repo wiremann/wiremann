@@ -307,3 +307,71 @@ pub(super) fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow
     }
     (rows, heights)
 }
+
+pub(super) fn build_rows_from_db(
+    db_rows: &[crate::db::queries::library::LibraryRow],
+    playlists: &std::collections::HashMap<
+        crate::controller::state::PlaylistId,
+        crate::controller::state::Playlist,
+    >,
+    cols: usize,
+) -> (Vec<LibraryRow>, Vec<Pixels>) {
+    use crate::controller::state::TrackId;
+    let mut rows = Vec::new();
+    let mut heights = Vec::new();
+
+    // Playlists section (re-use same logic)
+    rows.push(LibraryRow::Header(HeaderKind::Playlists));
+    heights.push(px(60.0));
+
+    if playlists.is_empty() {
+        rows.push(LibraryRow::Empty(HeaderKind::Playlists));
+        heights.push(px(192.0));
+    } else {
+        let mut chunk = Vec::with_capacity(cols);
+
+        for pid in playlists.keys() {
+            chunk.push(*pid);
+
+            if chunk.len() == cols {
+                rows.push(LibraryRow::PlaylistGridRow(chunk));
+                heights.push(px(280.0));
+                chunk = Vec::with_capacity(cols);
+            }
+        }
+
+        if !chunk.is_empty() {
+            rows.push(LibraryRow::PlaylistGridRow(chunk));
+            heights.push(px(280.0));
+        }
+    }
+
+    // Tracks header
+    rows.push(LibraryRow::Header(HeaderKind::Tracks));
+    heights.push(px(60.0));
+
+    if db_rows.is_empty() {
+        rows.push(LibraryRow::Empty(HeaderKind::Tracks));
+        heights.push(px(192.0));
+    } else {
+        // Sort db rows by name
+        let mut sorted: Vec<_> = db_rows.iter().collect();
+        sorted.sort_by(|a, b| a.name.cmp(&b.name));
+
+        rows.push(LibraryRow::TrackTableHeader);
+        heights.push(px(40.0));
+
+        for (i, row) in sorted.iter().enumerate() {
+            if row.track_hash.len() == 16 {
+                let mut hash = [0u8; 16];
+                hash.copy_from_slice(&row.track_hash[..16]);
+                let tid = TrackId(hash);
+
+                rows.push(LibraryRow::TrackRow(i + 1, tid));
+                heights.push(px(60.0));
+            }
+        }
+    }
+
+    (rows, heights)
+}
