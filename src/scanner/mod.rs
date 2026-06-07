@@ -148,11 +148,15 @@ impl Scanner {
 
             std::thread::spawn(move || {
                 let mut new_tracks: Vec<ScannedTrack> = Vec::with_capacity(32);
+                let mut current_playlist: Option<PlaylistId> = None;
 
                 loop {
                     select! {
                         recv(worker_rx) -> msg => {
                             if let Ok((job, path)) = msg {
+                                // update current playlist context for this worker
+                                current_playlist = job.playlist_id;
+
                                 Self::handle_job(
                                     &job,
                                     path.as_path(),
@@ -165,7 +169,7 @@ impl Scanner {
                         }
 
                         recv(ticker) -> _ => {
-                            Self::flush_batches(&tx, &mut new_tracks);
+                            Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
                         }
                     }
                 }
@@ -202,7 +206,7 @@ impl Scanner {
                 if new_tracks.len() >= 32 {
                     let batch = std::mem::take(new_tracks);
 
-                    tx.send(ScannerEvent::UpsertTracks(batch)).ok();
+                    tx.send(ScannerEvent::UpsertTracks(batch, _job.playlist_id)).ok();
                 }
             }
         }
@@ -219,17 +223,17 @@ impl Scanner {
             && scan_progress.discovery_done.load(Ordering::Acquire)
             && !scan_progress.finished_sent.swap(true, Ordering::AcqRel)
         {
-            Self::flush_batches(tx, new_tracks);
+            Self::flush_batches(tx, new_tracks, _job.playlist_id);
 
             tx.send(ScannerEvent::ScanFinished(_job.id)).ok();
         }
     }
 
-    fn flush_batches(tx: &Sender<ScannerEvent>, new_tracks: &mut Vec<ScannedTrack>) {
+    fn flush_batches(tx: &Sender<ScannerEvent>, new_tracks: &mut Vec<ScannedTrack>, playlist_id: Option<PlaylistId>) {
         if !new_tracks.is_empty() {
             let batch = std::mem::take(new_tracks);
 
-            tx.send(ScannerEvent::UpsertTracks(batch)).ok();
+            tx.send(ScannerEvent::UpsertTracks(batch, playlist_id)).ok();
         }
     }
 

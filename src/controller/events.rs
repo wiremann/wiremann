@@ -20,7 +20,7 @@ pub enum AudioEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ScannerEvent {
-    UpsertTracks(Vec<ScannedTrack>),
+    UpsertTracks(Vec<ScannedTrack>, Option<PlaylistId>),
 
     ScanStarted(u64),
     Discovered(usize),

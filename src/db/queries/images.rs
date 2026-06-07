@@ -1,18 +1,31 @@
 use anyhow::Result;
-use rusqlite::{Connection, Error as RusqliteError, types::Type};
+use rusqlite::{types::Type, Connection, Error as RusqliteError};
+use sea_query::{Expr, ExprTrait, Order, Query, SqliteQueryBuilder};
+use sea_query_rusqlite::RusqliteBinder;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::controller::state::{PlaylistId, TrackId};
+use crate::db::tables::{PlaylistTracks, Playlists, TrackSources, Tracks};
 use uuid::Uuid;
 
 pub fn get_tracks_missing_thumbnails(conn: &Connection) -> Result<HashSet<(TrackId, PathBuf)>> {
-    let mut stmt = conn.prepare(
-        "SELECT t.track_hash, s.path FROM track_sources s
-         JOIN tracks t ON s.track_id = t.id",
-    )?;
+    let query = Query::select()
+        .expr(Expr::col((Tracks::Table, Tracks::TrackHash)))
+        .expr(Expr::col((TrackSources::Table, TrackSources::Path)))
+        .from(TrackSources::Table)
+        .inner_join(
+            Tracks::Table,
+            Expr::col((TrackSources::Table, TrackSources::TrackId))
+                .equals((Tracks::Table, Tracks::Id)),
+        )
+        .to_owned();
 
-    let rows = stmt.query_map([], |row| {
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    let mut stmt = conn.prepare(&sql)?;
+
+    let rows = stmt.query_map(params.as_slice(), |row| {
         let hash: Vec<u8> = row.get(0)?;
         let path: String = row.get(1)?;
         let hash: [u8; 16] = hash.try_into().map_err(|_| {
@@ -38,14 +51,31 @@ pub fn get_tracks_missing_thumbnails(conn: &Connection) -> Result<HashSet<(Track
 }
 
 pub fn get_playlist_thumbnail_jobs(conn: &Connection) -> Result<Vec<(PlaylistId, Vec<PathBuf>)>> {
-    let mut stmt = conn.prepare(
-        "SELECT p.id, s.path FROM playlist_tracks pt
-         JOIN playlists p ON pt.playlist_id = p.id
-         JOIN track_sources s ON pt.track_id = s.track_id
-         ORDER BY pt.position",
-    )?;
+    let query = Query::select()
+        .expr(Expr::col((Playlists::Table, Playlists::Id)))
+        .expr(Expr::col((TrackSources::Table, TrackSources::Path)))
+        .from(PlaylistTracks::Table)
+        .inner_join(
+            Playlists::Table,
+            Expr::col((PlaylistTracks::Table, PlaylistTracks::PlaylistId))
+                .equals((Playlists::Table, Playlists::Id)),
+        )
+        .inner_join(
+            TrackSources::Table,
+            Expr::col((PlaylistTracks::Table, PlaylistTracks::TrackId))
+                .equals((TrackSources::Table, TrackSources::TrackId)),
+        )
+        .order_by(
+            (PlaylistTracks::Table, PlaylistTracks::Position),
+            Order::Asc,
+        )
+        .to_owned();
 
-    let rows = stmt.query_map([], |row| {
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    let mut stmt = conn.prepare(&sql)?;
+
+    let rows = stmt.query_map(params.as_slice(), |row| {
         let playlist_id: String = row.get(0)?;
         let path: String = row.get(1)?;
 

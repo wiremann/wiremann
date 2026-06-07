@@ -13,15 +13,16 @@ impl Controller {
         view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
-            ScannerEvent::UpsertTracks(tracks) => {
+            ScannerEvent::UpsertTracks(tracks, playlist_id) => {
                 let db = cx.global::<Database>().clone();
                 let tracks = tracks.clone();
+                let playlist_id = playlist_id.clone();
 
                 cx.spawn(async move |_cx| {
                     smol::unblock(move || {
                         let mut conn = db.pool().get()?;
 
-                        crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks)
+                        crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks, playlist_id)
                     })
                     .await
                     .unwrap();

@@ -168,6 +168,28 @@ impl Controller {
             let state = self.state.read(cx).library.clone();
             let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
 
+            // Persist playlist to database asynchronously
+            let db = cx.global::<crate::db::Database>().clone();
+            let pid = playlist.id;
+            let pname = playlist.name.clone();
+
+            cx.spawn(async move |_cx| {
+                smol::unblock(move || {
+                    let mut conn = db.pool().get()?;
+
+                    let tx = conn.transaction()?;
+
+                    crate::db::queries::playlists::insert_playlist(&tx, &pid.0, &pname, "folder")?;
+
+                    tx.commit()?;
+
+                    Ok::<(), anyhow::Error>(())
+                })
+                .await
+                .unwrap();
+            })
+            .detach();
+
             self.enqueue_scan(path, Some(playlist_id));
         }
     }

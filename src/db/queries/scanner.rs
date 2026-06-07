@@ -1,23 +1,39 @@
 use anyhow::Result;
-use rusqlite::{Connection, Transaction, params};
+use rusqlite::{Connection, Transaction};
+use sea_query::{Expr, ExprTrait, OnConflict, Order, Query, SelectStatement, SqliteQueryBuilder};
+use sea_query_rusqlite::RusqliteBinder;
 use std::time::Duration;
 
-use crate::controller::state::{ImageId, TrackId};
+use crate::controller::state::{ImageId, PlaylistId, TrackId};
+use crate::db::models::DbTrackSummary;
+use crate::db::tables::{AlbumArtists, Albums, Artists, TrackArtists, TrackSources, Tracks};
 use crate::scanner::{ScannedTrack, ScannedTrackSource};
 
-pub struct DbTrackSummary {
-    pub id: i64,
-    pub track_hash: Vec<u8>,
-    pub name: String,
-    pub album_id: Option<i64>,
-    pub duration_ms: i64,
-}
-
-pub fn upsert_scanned_tracks(conn: &mut Connection, tracks: &[ScannedTrack]) -> Result<()> {
+pub fn upsert_scanned_tracks(
+    conn: &mut Connection,
+    tracks: &[ScannedTrack],
+    playlist_id: Option<PlaylistId>,
+) -> Result<()> {
     let tx = conn.transaction()?;
 
+    // If persisting into a playlist, determine starting position once.
+    let mut position = None;
+    if let Some(pid) = &playlist_id {
+        position = Some(crate::db::queries::playlists::get_playlist_next_position(
+            &tx, &pid.0,
+        )?);
+    }
+
     for track in tracks {
-        upsert_scanned_track(&tx, track)?;
+        let db_track_id = upsert_scanned_track(&tx, track)?;
+
+        if let Some(pid) = &playlist_id {
+            let pos = position.unwrap_or(0);
+            crate::db::queries::playlists::insert_playlist_track(&tx, &pid.0, db_track_id, pos)?;
+            if let Some(ref mut p) = position {
+                *p += 1;
+            }
+        }
     }
 
     tx.commit()?;
@@ -56,6 +72,10 @@ fn upsert_scanned_track(tx: &Transaction, track: &ScannedTrack) -> Result<i64> {
 
     for artist_name in &track.artists {
         let artist_id = upsert_artist(tx, artist_name)?;
+        // ensure album_artist relation if we have an album
+        if let Some(aid) = album_id {
+            insert_album_artist(tx, aid, artist_id)?;
+        }
         insert_track_artist(tx, db_track_id, artist_id)?;
     }
 
@@ -63,29 +83,41 @@ fn upsert_scanned_track(tx: &Transaction, track: &ScannedTrack) -> Result<i64> {
 }
 
 fn upsert_album(tx: &Transaction, name: &str) -> Result<i64> {
-    tx.execute(
-        "INSERT OR IGNORE INTO albums (name) VALUES (?1)",
-        params![name],
-    )?;
+    let insert = Query::insert()
+        .into_table(Albums::Table)
+        .columns([Albums::Name])
+        .values_panic([Expr::val(name)])
+        .on_conflict(OnConflict::column(Albums::Name).do_nothing().to_owned())
+        .to_owned();
 
-    Ok(tx.query_row(
-        "SELECT id FROM albums WHERE name = ?1",
-        params![name],
-        |row| row.get(0),
-    )?)
+    execute_tx(tx, &insert)?;
+
+    let select = Query::select()
+        .column(Albums::Id)
+        .from(Albums::Table)
+        .and_where(Expr::col(Albums::Name).eq(name))
+        .to_owned();
+
+    query_i64_tx(tx, &select)
 }
 
 fn upsert_artist(tx: &Transaction, name: &str) -> Result<i64> {
-    tx.execute(
-        "INSERT OR IGNORE INTO artists (name) VALUES (?1)",
-        params![name],
-    )?;
+    let insert = Query::insert()
+        .into_table(Artists::Table)
+        .columns([Artists::Name])
+        .values_panic([Expr::val(name)])
+        .on_conflict(OnConflict::column(Artists::Name).do_nothing().to_owned())
+        .to_owned();
 
-    Ok(tx.query_row(
-        "SELECT id FROM artists WHERE name = ?1",
-        params![name],
-        |row| row.get(0),
-    )?)
+    execute_tx(tx, &insert)?;
+
+    let select = Query::select()
+        .column(Artists::Id)
+        .from(Artists::Table)
+        .and_where(Expr::col(Artists::Name).eq(name))
+        .to_owned();
+
+    query_i64_tx(tx, &select)
 }
 
 fn upsert_track(
@@ -98,65 +130,128 @@ fn upsert_track(
 ) -> Result<i64> {
     let duration_ms = duration.as_millis() as i64;
 
-    tx.execute(
-        "INSERT INTO tracks (track_hash, name, album_id, duration, image_hash)
-         VALUES (?1, ?2, ?3, ?4, ?5)
-         ON CONFLICT(track_hash) DO UPDATE SET
-             name = excluded.name,
-             album_id = excluded.album_id,
-             duration = excluded.duration,
-             image_hash = excluded.image_hash",
-        params![track_hash, name, album_id, duration_ms, image_hash],
-    )?;
+    let insert = Query::insert()
+        .into_table(Tracks::Table)
+        .columns([
+            Tracks::TrackHash,
+            Tracks::Name,
+            Tracks::AlbumId,
+            Tracks::Duration,
+            Tracks::ImageHash,
+        ])
+        .values_panic([
+            Expr::val(track_hash),
+            Expr::val(name),
+            Expr::val(album_id),
+            Expr::val(duration_ms),
+            Expr::val(image_hash.map(|hash| hash.to_vec())),
+        ])
+        .on_conflict(
+            OnConflict::column(Tracks::TrackHash)
+                .update_columns([
+                    Tracks::Name,
+                    Tracks::AlbumId,
+                    Tracks::Duration,
+                    Tracks::ImageHash,
+                ])
+                .to_owned(),
+        )
+        .to_owned();
 
-    Ok(tx.query_row(
-        "SELECT id FROM tracks WHERE track_hash = ?1",
-        params![track_hash],
-        |row| row.get(0),
-    )?)
+    execute_tx(tx, &insert)?;
+
+    let select = Query::select()
+        .column(Tracks::Id)
+        .from(Tracks::Table)
+        .and_where(Expr::col(Tracks::TrackHash).eq(Expr::val(track_hash)))
+        .to_owned();
+
+    query_i64_tx(tx, &select)
 }
 
 fn upsert_track_source(tx: &Transaction, track_id: i64, source: &ScannedTrackSource) -> Result<()> {
-    tx.execute(
-        "INSERT INTO track_sources (track_id, path, size, modified)
-         VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(path) DO UPDATE SET
-             track_id = excluded.track_id,
-             size = excluded.size,
-             modified = excluded.modified",
-        params![
-            track_id,
-            source.path.to_string_lossy(),
-            source.size as i64,
-            source.modified as i64
-        ],
-    )?;
+    let insert = Query::insert()
+        .into_table(TrackSources::Table)
+        .columns([
+            TrackSources::TrackId,
+            TrackSources::Path,
+            TrackSources::Size,
+            TrackSources::Modified,
+        ])
+        .values_panic([
+            Expr::val(track_id),
+            Expr::val(source.path.to_string_lossy().to_string()),
+            Expr::val(source.size as i64),
+            Expr::val(source.modified as i64),
+        ])
+        .on_conflict(
+            OnConflict::column(TrackSources::Path)
+                .update_columns([
+                    TrackSources::TrackId,
+                    TrackSources::Size,
+                    TrackSources::Modified,
+                ])
+                .to_owned(),
+        )
+        .to_owned();
+
+    execute_tx(tx, &insert)?;
 
     Ok(())
 }
 
 fn insert_track_artist(tx: &Transaction, track_id: i64, artist_id: i64) -> Result<()> {
-    tx.execute(
-        "INSERT OR IGNORE INTO track_artists (track_id, artist_id) VALUES (?1, ?2)",
-        params![track_id, artist_id],
-    )?;
+    let insert = Query::insert()
+        .into_table(TrackArtists::Table)
+        .columns([TrackArtists::TrackId, TrackArtists::ArtistId])
+        .values_panic([Expr::val(track_id), Expr::val(artist_id)])
+        .on_conflict(
+            OnConflict::columns([TrackArtists::TrackId, TrackArtists::ArtistId])
+                .do_nothing()
+                .to_owned(),
+        )
+        .to_owned();
+
+    execute_tx(tx, &insert)?;
+
+    Ok(())
+}
+
+fn insert_album_artist(tx: &Transaction, album_id: i64, artist_id: i64) -> Result<()> {
+    let insert = Query::insert()
+        .into_table(AlbumArtists::Table)
+        .columns([AlbumArtists::AlbumId, AlbumArtists::ArtistId])
+        .values_panic([Expr::val(album_id), Expr::val(artist_id)])
+        .on_conflict(
+            OnConflict::columns([AlbumArtists::AlbumId, AlbumArtists::ArtistId])
+                .do_nothing()
+                .to_owned(),
+        )
+        .to_owned();
+
+    execute_tx(tx, &insert)?;
 
     Ok(())
 }
 
 pub fn get_all_tracks(conn: &Connection) -> Result<Vec<DbTrackSummary>> {
-    let mut stmt =
-        conn.prepare("SELECT id, track_hash, name, album_id, duration FROM tracks ORDER BY id")?;
+    let query = Query::select()
+        .columns([
+            Tracks::Id,
+            Tracks::TrackHash,
+            Tracks::Name,
+            Tracks::AlbumId,
+            Tracks::Duration,
+        ])
+        .from(Tracks::Table)
+        .order_by(Tracks::Id, Order::Asc)
+        .to_owned();
 
-    let rows = stmt.query_map([], |row| {
-        Ok(DbTrackSummary {
-            id: row.get(0)?,
-            track_hash: row.get(1)?,
-            name: row.get(2)?,
-            album_id: row.get(3)?,
-            duration_ms: row.get(4)?,
-        })
-    })?;
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    let mut stmt = conn.prepare(&sql)?;
+
+    let rows = stmt.query_map(params.as_slice(), |row| DbTrackSummary::from_row(row))?;
 
     let mut tracks = Vec::new();
     for row in rows {
@@ -164,4 +259,17 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<DbTrackSummary>> {
     }
 
     Ok(tracks)
+}
+
+fn execute_tx(tx: &Transaction, query: &sea_query::InsertStatement) -> Result<()> {
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    tx.execute(&sql, params.as_slice())?;
+    Ok(())
+}
+
+fn query_i64_tx(tx: &Transaction, query: &SelectStatement) -> Result<i64> {
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    Ok(tx.query_row(&sql, params.as_slice(), |row| row.get(0))?)
 }
