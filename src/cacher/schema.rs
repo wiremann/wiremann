@@ -254,12 +254,10 @@ impl From<CachedLibraryState> for LibraryState {
             })
             .collect();
 
-        Self {
-            tracks,
-            playlists,
-            db_tracks: Vec::new(),
-            db_index: std::collections::HashMap::new(),
-        }
+            Self {
+                tracks,
+                playlists,
+            }
     }
 }
 

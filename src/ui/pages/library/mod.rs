@@ -1,4 +1,5 @@
 mod helpers;
+mod models;
 
 use crate::controller::Controller;
 use crate::controller::state::TrackId;
@@ -39,11 +40,7 @@ impl LibraryPage {
 
         let cols = 4;
 
-        let (rows, heights) = if !library.db_tracks.is_empty() {
-            build_rows_from_db(&library.db_tracks, &library.playlists, cols)
-        } else {
-            build_rows(library, cols)
-        };
+        let (rows, heights) = build_rows(library, cols);
 
         LibraryPage {
             scroll_handle,
@@ -62,25 +59,7 @@ impl LibraryPage {
 
         let (maybe_image_id, title, artist, album, duration) = {
             let state = controller.state.read(cx);
-            if let Some(row) = state.library.db_index.get(id) {
-                let image_id = row.image_hash.as_deref().and_then(|b| {
-                    if b.len() == 16 {
-                        let mut h = [0u8; 16];
-                        h.copy_from_slice(&b[..16]);
-                        Some(crate::controller::state::ImageId(h))
-                    } else {
-                        None
-                    }
-                });
-
-                (
-                    image_id,
-                    row.name.clone(),
-                    row.artists.clone(),
-                    row.album.clone().unwrap_or_default(),
-                    std::time::Duration::from_millis(row.duration_ms as u64),
-                )
-            } else if let Some(track) = state.library.tracks.get(id) {
+            if let Some(track) = state.library.tracks.get(id) {
                 (
                     track.image_id,
                     track.title.clone(),
@@ -238,7 +217,7 @@ impl Render for LibraryPage {
         let state = controller.state.read(cx);
         let scroll_handle = self.scroll_handle.clone();
 
-        let use_db = !state.library.db_tracks.is_empty();
+        let library = &state.library;
 
         let width = window.bounds().size.width;
         let tile = 256.0;
@@ -246,22 +225,11 @@ impl Render for LibraryPage {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let cols = ((width.to_f64() / tile) as usize).max(1);
 
-        if cols != self.grid_cols || use_db != (self.last_fp != 0) {
-            if use_db {
-                let (rows, heights) =
-                    build_rows_from_db(&state.library.db_tracks, &state.library.playlists, cols);
-                self.rows = Rc::new(rows);
-                self.heights = Rc::new(heights);
-                self.last_fp = 1;
-                self.grid_cols = cols;
-            } else {
-                let library = &state.library;
-                let (rows, heights) = build_rows(library, cols);
-                self.rows = Rc::new(rows);
-                self.heights = Rc::new(heights);
-                self.last_fp = 0;
-                self.grid_cols = cols;
-            }
+        if cols != self.grid_cols {
+            let (rows, heights) = build_rows(library, cols);
+            self.rows = Rc::new(rows);
+            self.heights = Rc::new(heights);
+            self.grid_cols = cols;
         }
 
         let rows = self.rows.clone();

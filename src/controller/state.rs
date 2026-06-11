@@ -21,8 +21,6 @@ pub struct AppState {
 pub struct LibraryState {
     pub tracks: HashMap<TrackId, Arc<Track>>,
     pub playlists: HashMap<PlaylistId, Playlist>,
-    pub db_tracks: Vec<crate::db::queries::library::LibraryRow>,
-    pub db_index: std::collections::HashMap<TrackId, crate::db::queries::library::LibraryRow>,
 }
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
