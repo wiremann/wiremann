@@ -1,12 +1,14 @@
 mod helpers;
-mod models;
+pub mod models;
 
 use crate::controller::Controller;
 use crate::controller::state::TrackId;
+use crate::db::Database;
 use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
-use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
+use crate::ui::pages::library::helpers::build_initial_rows;
+use crate::ui::pages::library::models::{LibraryPlaylistRow, LibraryTrackRow};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -15,73 +17,111 @@ use gpui::{
     VirtualListScrollController, Window, div, img, vlist,
 };
 use helpers::{
-    HeaderKind, LibraryRow, build_rows, build_rows_from_db, render_header, render_playlist_grid,
-    render_track_table_header,
+    HeaderKind, LibraryRow, render_header, render_playlist_grid, render_track_table_header,
 };
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
+const TRACK_PAGE_SIZE: usize = 128;
+const TRACK_PREFETCH_PAGES: usize = 2;
 
 #[derive(Clone)]
 pub struct LibraryPage {
     scroll_handle: ScrollHandle,
+    list_controller: VirtualListScrollController,
+
+    playlists: Vec<LibraryPlaylistRow>,
+
+    track_pages: HashMap<usize, Vec<LibraryTrackRow>>,
+
+    loaded_pages: HashSet<usize>,
+    loading_pages: HashSet<usize>,
+
+    total_track_count: usize,
+
     rows: Rc<Vec<LibraryRow>>,
     heights: Rc<Vec<Pixels>>,
-    pub sorted_tracks: Vec<&'static TrackId>,
+
     grid_cols: usize,
-    last_fp: u128,
-    pub list_controller: VirtualListScrollController,
 }
 
 impl LibraryPage {
-    pub fn new(cx: &mut App) -> Self {
+    pub fn new(cx: &mut Context<Self>) -> Self {
         let scroll_handle = ScrollHandle::new();
-        let library = &cx.global::<Controller>().state.read(cx).library;
 
         let cols = 4;
 
-        let (rows, heights) = build_rows(library, cols);
+        let (rows, heights) = build_initial_rows(0, 0, cols, &[]);
+        let db = cx.global::<Database>().clone();
 
+        cx.spawn(async move |this, cx| {
+            let (playlists, total_tracks) = smol::unblock(move || {
+                let conn = db.pool().get()?;
+
+                let playlists = crate::db::queries::library::get_library_playlists(&conn)?;
+
+                let total_tracks = crate::db::queries::library::get_total_track_count(&conn)?;
+
+                anyhow::Ok((playlists, total_tracks))
+            })
+            .await
+            .unwrap();
+
+            this.update(cx, |view, cx| {
+                view.playlists = playlists;
+
+                view.total_track_count = total_tracks;
+
+                let (rows, heights) = build_initial_rows(
+                    view.playlists.len(),
+                    total_tracks,
+                    view.grid_cols,
+                    &view.playlists,
+                );
+
+                view.rows = Rc::new(rows);
+                view.heights = Rc::new(heights);
+
+                for page in 0..=TRACK_PREFETCH_PAGES {
+                    view.request_page(page, cx);
+                }
+
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
         LibraryPage {
             scroll_handle,
             rows: Rc::new(rows),
             heights: Rc::new(heights),
             grid_cols: cols,
-            sorted_tracks: Vec::new(),
-            last_fp: 0,
             list_controller: VirtualListScrollController::new(),
+            playlists: Vec::new(),
+            track_pages: HashMap::new(),
+            loaded_pages: HashSet::new(),
+            loading_pages: HashSet::new(),
+            total_track_count: 0,
         }
     }
-    #[allow(clippy::too_many_lines)]
-    fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
+
+    fn render_loaded_track(
+        absolute_index: usize,
+        track: &LibraryTrackRow,
+        height: Pixels,
+        cx: &mut App,
+    ) -> Div {
         let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
 
-        let (maybe_image_id, title, artist, album, duration) = {
-            let state = controller.state.read(cx);
-            if let Some(track) = state.library.tracks.get(id) {
-                (
-                    track.image_id,
-                    track.title.clone(),
-                    track.artist.clone(),
-                    track.album.clone(),
-                    track.duration,
-                )
-            } else {
-                (
-                    None,
-                    String::new(),
-                    String::new(),
-                    String::new(),
-                    std::time::Duration::from_secs(0),
-                )
-            }
-        };
-
-        let thumbnail = maybe_image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let thumbnail = track
+            .image_id
+            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         let state = controller.state.read(cx).clone();
-        let is_current = Some(id) == state.playback.current.as_ref();
+
+        let is_current = Some(&track.id) == state.playback.current.as_ref();
 
         div()
             .h(height)
@@ -90,7 +130,7 @@ impl LibraryPage {
             .border_color(theme.library_track_border)
             .child(
                 div()
-                    .id(format!("track_{:?}", id.0))
+                    .id(format!("track_{:?}", track.id.0))
                     .size_full()
                     .flex()
                     .items_center()
@@ -99,7 +139,8 @@ impl LibraryPage {
                     .hover(|this| this.bg(theme.library_track_bg_hover))
                     .when(is_current, |this| this.bg(theme.library_track_bg_active))
                     .on_click({
-                        let id = *id;
+                        let id = track.id;
+
                         move |_, _, cx| {
                             let controller = cx.global::<Controller>().clone();
 
@@ -116,7 +157,7 @@ impl LibraryPage {
                             .px_6()
                             .items_center()
                             .justify_start()
-                            .child(format! {"{i:02}"}),
+                            .child(format!("{:02}", absolute_index + 1)),
                     )
                     .child(
                         div()
@@ -138,6 +179,7 @@ impl LibraryPage {
                                         .border_color(theme.border)
                                         .rounded_sm(),
                                 ),
+
                                 None => div().size_11().flex_shrink_0().child(
                                     img("icons/placeholder.svg")
                                         .object_fit(ObjectFit::Contain)
@@ -147,11 +189,7 @@ impl LibraryPage {
                                         .rounded_sm(),
                                 ),
                             })
-                            .when(is_current, |this| {
-                                this.text_color(theme.library_track_title_text_active)
-                                    .font_weight(FontWeight::MEDIUM)
-                            })
-                            .child(title)
+                            .child(track.title.clone())
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis(),
@@ -165,7 +203,7 @@ impl LibraryPage {
                             .flex()
                             .items_center()
                             .justify_start()
-                            .child(artist)
+                            .child(track.artists.clone())
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis(),
@@ -179,7 +217,7 @@ impl LibraryPage {
                             .flex()
                             .items_center()
                             .justify_start()
-                            .child(album)
+                            .child(track.album.clone())
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis(),
@@ -197,14 +235,94 @@ impl LibraryPage {
                             .font_family("JetBrains Mono")
                             .child(format!(
                                 "{:02}:{:02}",
-                                duration.as_secs() / 60,
-                                duration.as_secs() % 60
-                            ))
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis(),
+                                (track.duration_ms / 1000) / 60,
+                                (track.duration_ms / 1000) % 60
+                            )),
                     ),
             )
+    }
+
+    fn patch_loaded_page(&mut self, page: usize) {
+        let Some(page_rows) = self.track_pages.get(&page) else {
+            return;
+        };
+
+        let rows = Rc::make_mut(&mut self.rows);
+
+        let base_index = page * TRACK_PAGE_SIZE;
+
+        let track_row_start = rows
+            .iter()
+            .position(|r| matches!(r, LibraryRow::TrackTableHeader));
+
+        let Some(track_header_idx) = track_row_start else {
+            return;
+        };
+
+        let first_track_row = track_header_idx + 1;
+
+        for offset in 0..page_rows.len() {
+            let absolute = base_index + offset;
+
+            let row_index = first_track_row + absolute;
+
+            if row_index >= rows.len() {
+                break;
+            }
+
+            rows[row_index] = LibraryRow::LoadedTrack {
+                absolute_index: absolute,
+                page,
+                offset,
+            };
+        }
+    }
+
+    fn request_page(&mut self, page: usize, cx: &mut Context<Self>) {
+        if self.loaded_pages.contains(&page) || self.loading_pages.contains(&page) {
+            return;
+        }
+
+        self.loading_pages.insert(page);
+
+        let db = cx.global::<Database>().clone();
+
+        cx.spawn(async move |this, cx| {
+            let offset = page * TRACK_PAGE_SIZE;
+
+            let rows = smol::unblock(move || {
+                let conn = db.pool().get()?;
+
+                crate::db::queries::library::get_tracks_page(
+                    &conn,
+                    TRACK_PAGE_SIZE as u64,
+                    offset as u64,
+                )
+            })
+            .await
+            .unwrap();
+
+            this.update(cx, |view, cx| {
+                view.track_pages.insert(page, rows);
+
+                view.loaded_pages.insert(page);
+
+                view.loading_pages.remove(&page);
+
+                view.patch_loaded_page(page);
+
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn first_track_row_index(rows: &[LibraryRow]) -> usize {
+        rows.iter()
+            .position(|r| matches!(r, LibraryRow::TrackTableHeader))
+            .map(|i| i + 1)
+            .unwrap_or(0)
     }
 }
 
@@ -217,8 +335,6 @@ impl Render for LibraryPage {
         let state = controller.state.read(cx);
         let scroll_handle = self.scroll_handle.clone();
 
-        let library = &state.library;
-
         let width = window.bounds().size.width;
         let tile = 256.0;
 
@@ -226,10 +342,22 @@ impl Render for LibraryPage {
         let cols = ((width.to_f64() / tile) as usize).max(1);
 
         if cols != self.grid_cols {
-            let (rows, heights) = build_rows(library, cols);
+            let (rows, heights) = build_initial_rows(
+                self.playlists.len(),
+                self.total_track_count,
+                cols,
+                &self.playlists,
+            );
+
             self.rows = Rc::new(rows);
             self.heights = Rc::new(heights);
             self.grid_cols = cols;
+
+            let loaded_pages: Vec<_> = self.loaded_pages.iter().copied().collect();
+
+            for page in loaded_pages {
+                self.patch_loaded_page(page);
+            }
         }
 
         let rows = self.rows.clone();
@@ -252,32 +380,72 @@ impl Render for LibraryPage {
 
                     let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
                     let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                    let first_track_row = Self::first_track_row_index(&rows);
 
-                    let thumb_track_ids: Vec<TrackId> = (start..end)
-                        .filter_map(|idx| match &rows[idx] {
-                            LibraryRow::TrackRow(_, id) => Some(*id),
-                            _ => None,
-                        })
-                        .collect();
+                    let visible_track_index = range.start.saturating_sub(first_track_row);
 
-                    controller.request_track_thumbnails(&thumb_track_ids, cx);
+                    let first_page = visible_track_index / TRACK_PAGE_SIZE;
+
+                    for page in first_page.saturating_sub(1)..=(first_page + TRACK_PREFETCH_PAGES) {
+                        _this.request_page(page, cx);
+                    }
+
+                    let mut visible_track_ids = Vec::new();
+
+                    for idx in start..end {
+                        if let LibraryRow::LoadedTrack { page, offset, .. } = &rows[idx] {
+                            if let Some(page_rows) = _this.track_pages.get(page) {
+                                if let Some(track) = page_rows.get(*offset) {
+                                    visible_track_ids.push(track.id);
+                                }
+                            }
+                        }
+                    }
+
+                    controller.request_track_thumbnails(&visible_track_ids, cx);
 
                     range
                         .map(|idx| match &rows[idx] {
                             LibraryRow::Header(kind) => render_header(kind, heights[idx], cx),
 
-                            LibraryRow::PlaylistGridRow(ids) => {
-                                render_playlist_grid(ids, heights[idx], cx)
+                            LibraryRow::PlaylistGridRow(playlists) => {
+                                render_playlist_grid(playlists, heights[idx], cx)
                             }
 
                             LibraryRow::TrackTableHeader => {
                                 render_track_table_header(heights[idx], cx)
                             }
 
-                            LibraryRow::TrackRow(i, id) => {
-                                Self::render_track(*i, id, heights[idx], cx)
+                            LibraryRow::LoadedTrack {
+                                absolute_index,
+                                page,
+                                offset,
+                            } => {
+                                if let Some(page_rows) = _this.track_pages.get(page) {
+                                    if let Some(track) = page_rows.get(*offset) {
+                                        Self::render_loaded_track(
+                                            *absolute_index,
+                                            track,
+                                            heights[idx],
+                                            cx,
+                                        )
+                                    } else {
+                                        div().h(heights[idx])
+                                    }
+                                } else {
+                                    div()
+                                        .h(heights[idx])
+                                        .w_full()
+                                        .border_b_1()
+                                        .border_color(theme.library_track_border)
+                                }
                             }
 
+                            LibraryRow::PlaceholderTrack => div()
+                                .h(heights[idx])
+                                .w_full()
+                                .border_b_1()
+                                .border_color(theme.library_track_border),
                             LibraryRow::Empty(kind) => match kind {
                                 HeaderKind::Playlists => div()
                                     .w_full()
