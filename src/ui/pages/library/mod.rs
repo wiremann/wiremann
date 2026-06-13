@@ -106,142 +106,6 @@ impl LibraryPage {
         }
     }
 
-    fn render_loaded_track(
-        absolute_index: usize,
-        track: &LibraryTrackRow,
-        height: Pixels,
-        cx: &mut App,
-    ) -> Div {
-        let controller = cx.global::<Controller>().clone();
-        let theme = *cx.global::<Theme>();
-
-        let thumbnail = track
-            .image_id
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
-
-        let state = controller.state.read(cx).clone();
-
-        let is_current = Some(&track.id) == state.playback.current.as_ref();
-
-        div()
-            .h(height)
-            .py_1()
-            .border_b_1()
-            .border_color(theme.library_track_border)
-            .child(
-                div()
-                    .id(format!("track_{:?}", track.id.0))
-                    .size_full()
-                    .flex()
-                    .items_center()
-                    .rounded_md()
-                    .cursor_pointer()
-                    .hover(|this| this.bg(theme.library_track_bg_hover))
-                    .when(is_current, |this| this.bg(theme.library_track_bg_active))
-                    .on_click({
-                        let id = track.id;
-
-                        move |_, _, cx| {
-                            let controller = cx.global::<Controller>().clone();
-
-                            controller.load_track(id, cx);
-
-                            *cx.global_mut::<Page>() = Page::Player;
-                        }
-                    })
-                    .child(
-                        div()
-                            .w_20()
-                            .h_full()
-                            .flex()
-                            .px_6()
-                            .items_center()
-                            .justify_start()
-                            .child(format!("{:02}", absolute_index + 1)),
-                    )
-                    .child(
-                        div()
-                            .w_2_3()
-                            .max_w_2_3()
-                            .h_full()
-                            .px_6()
-                            .py_1()
-                            .flex()
-                            .gap_x_3()
-                            .items_center()
-                            .justify_start()
-                            .child(match thumbnail {
-                                Some(image) => div().size_11().flex_shrink_0().child(
-                                    img(ImageSource::Render(image.clone()))
-                                        .object_fit(ObjectFit::Contain)
-                                        .size_full()
-                                        .border_1()
-                                        .border_color(theme.border)
-                                        .rounded_sm(),
-                                ),
-
-                                None => div().size_11().flex_shrink_0().child(
-                                    img("icons/placeholder.svg")
-                                        .object_fit(ObjectFit::Contain)
-                                        .size_full()
-                                        .border_1()
-                                        .border_color(theme.border)
-                                        .rounded_sm(),
-                                ),
-                            })
-                            .child(track.title.clone())
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis(),
-                    )
-                    .child(
-                        div()
-                            .w_1_3()
-                            .px_6()
-                            .max_w_1_3()
-                            .h_full()
-                            .flex()
-                            .items_center()
-                            .justify_start()
-                            .child(track.artists.clone())
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis(),
-                    )
-                    .child(
-                        div()
-                            .w_1_3()
-                            .max_w_1_3()
-                            .px_6()
-                            .h_full()
-                            .flex()
-                            .items_center()
-                            .justify_start()
-                            .child(track.album.clone())
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis(),
-                    )
-                    .child(
-                        div()
-                            .w_24()
-                            .max_w_24()
-                            .h_full()
-                            .px_4()
-                            .flex()
-                            .items_center()
-                            .justify_start()
-                            .text_sm()
-                            .font_family("JetBrains Mono")
-                            .child(format!(
-                                "{:02}:{:02}",
-                                (track.duration_ms / 1000) / 60,
-                                (track.duration_ms / 1000) % 60
-                            )),
-                    ),
-            )
-    }
-
     fn patch_loaded_page(&mut self, page: usize) {
         let Some(page_rows) = self.track_pages.get(&page) else {
             return;
@@ -329,20 +193,67 @@ impl LibraryPage {
 
         let old_total = self.total_track_count;
         let added = new_rows.len();
-        self.total_track_count = old_total + added;
 
-        let first_track_row = Self::first_track_row_index(&self.rows);
+        // Determine where track rows begin using an immutable reference first
+        let rows_ref = self.rows.clone();
 
+        // Find TrackTableHeader index if present
+        let track_header_idx_opt = rows_ref
+            .iter()
+            .position(|r| matches!(r, LibraryRow::TrackTableHeader));
+
+        let first_track_row_idx: usize;
+        let insert_pos: usize;
+
+        if let Some(track_header_idx) = track_header_idx_opt {
+            first_track_row_idx = track_header_idx + 1;
+            insert_pos = first_track_row_idx + old_total;
+        } else {
+            // If no TrackTableHeader, find Empty(HeaderKind::Tracks)
+            if let Some(empty_idx) = rows_ref
+                .iter()
+                .position(|r| matches!(r, LibraryRow::Empty(HeaderKind::Tracks)))
+            {
+                // We'll replace the empty slot after obtaining mutable access
+                first_track_row_idx = empty_idx + 1;
+                insert_pos = first_track_row_idx;
+            } else {
+                // Fallback: append at end
+                first_track_row_idx = Self::first_track_row_index(&rows_ref);
+                insert_pos = rows_ref.len();
+            }
+        }
+
+        // Now obtain mutable access to rows/heights and apply structural changes
         let rows_mut = Rc::make_mut(&mut self.rows);
         let heights_mut = Rc::make_mut(&mut self.heights);
 
-        // append placeholders and heights
-        for _ in 0..added {
-            rows_mut.push(helpers::LibraryRow::PlaceholderTrack);
-            heights_mut.push(px(60.0));
+        // If we decided to replace an Empty slot with TrackTableHeader, do it now
+        if track_header_idx_opt.is_none() {
+            if insert_pos > 0 && insert_pos - 1 < rows_mut.len() {
+                // Check if the slot we targeted is Empty(HeaderKind::Tracks) and replace it
+                let header_candidate_idx = insert_pos - 1;
+                if matches!(
+                    rows_mut[header_candidate_idx],
+                    LibraryRow::Empty(HeaderKind::Tracks)
+                ) {
+                    rows_mut[header_candidate_idx] = LibraryRow::TrackTableHeader;
+                    heights_mut[header_candidate_idx] = px(40.0);
+                }
+            }
         }
 
-        // populate page cache only for pages already loaded
+        // Insert matching placeholders and heights at insert_pos
+        for i in 0..added {
+            let pos = insert_pos + i;
+            rows_mut.insert(pos, helpers::LibraryRow::PlaceholderTrack);
+            heights_mut.insert(pos, px(60.0));
+        }
+
+        // Update total
+        self.total_track_count = old_total + added;
+
+        // Populate page cache for loaded pages only and patch loaded rows
         for (i, track) in new_rows.into_iter().enumerate() {
             let absolute = old_total + i;
             let page = absolute / TRACK_PAGE_SIZE;
@@ -367,7 +278,7 @@ impl LibraryPage {
 
                 page_vec[offset] = track.clone();
 
-                let row_index = first_track_row + absolute;
+                let row_index = first_track_row_idx + absolute;
                 if row_index < rows_mut.len() {
                     rows_mut[row_index] = helpers::LibraryRow::LoadedTrack {
                         absolute_index: absolute,
@@ -380,12 +291,67 @@ impl LibraryPage {
 
         cx.notify();
     }
+}
 
-    fn first_track_row_index(rows: &[LibraryRow]) -> usize {
+impl LibraryPage {
+    fn first_track_row_index(rows: &Rc<Vec<helpers::LibraryRow>>) -> usize {
         rows.iter()
-            .position(|r| matches!(r, LibraryRow::TrackTableHeader))
+            .position(|r| matches!(r, helpers::LibraryRow::TrackTableHeader))
             .map(|i| i + 1)
-            .unwrap_or(0)
+            .unwrap_or(rows.len())
+    }
+
+    fn render_loaded_track(
+        absolute_index: usize,
+        track: &models::LibraryTrackRow,
+        height: Pixels,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = *cx.global::<Theme>();
+
+        let mins = (track.duration_ms / 1000) / 60;
+        let secs = (track.duration_ms / 1000) % 60;
+
+        div()
+            .h(height)
+            .w_full()
+            .border_b_1()
+            .border_color(theme.library_track_border)
+            .child(
+                div()
+                    .w_20()
+                    .h_full()
+                    .items_center()
+                    .child(format!("{}", absolute_index + 1)),
+            )
+            .child(
+                div()
+                    .w_3_5()
+                    .h_full()
+                    .items_center()
+                    .child(track.title.clone()),
+            )
+            .child(
+                div()
+                    .w_1_2()
+                    .h_full()
+                    .items_center()
+                    .child(track.artists.clone()),
+            )
+            .child(
+                div()
+                    .w_1_2()
+                    .h_full()
+                    .items_center()
+                    .child(track.album.clone()),
+            )
+            .child(
+                div()
+                    .w_24()
+                    .h_full()
+                    .items_center()
+                    .child(format!("{:02}:{:02}", mins, secs)),
+            )
     }
 }
 
@@ -395,7 +361,7 @@ impl Render for LibraryPage {
         let theme = *cx.global::<Theme>();
 
         let controller = cx.global::<Controller>().clone();
-        let state = controller.state.read(cx);
+        let _state = controller.state.read(cx);
         let scroll_handle = self.scroll_handle.clone();
 
         let width = window.bounds().size.width;
