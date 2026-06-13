@@ -307,50 +307,131 @@ impl LibraryPage {
         height: Pixels,
         cx: &mut Context<Self>,
     ) -> Div {
+        let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
 
-        let mins = (track.duration_ms / 1000) / 60;
-        let secs = (track.duration_ms / 1000) % 60;
+        let state = controller.state.read(cx).clone();
+        let is_current = Some(&track.id) == state.playback.current.as_ref();
+
+        let thumbnail = track
+            .image_id
+            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         div()
             .h(height)
-            .w_full()
+            .py_1()
+            .px_4()
             .border_b_1()
             .border_color(theme.library_track_border)
             .child(
                 div()
-                    .w_20()
-                    .h_full()
+                    .id(format!("track_{:?}", track.id.0))
+                    .size_full()
+                    .flex()
                     .items_center()
-                    .child(format!("{}", absolute_index + 1)),
-            )
-            .child(
-                div()
-                    .w_3_5()
-                    .h_full()
-                    .items_center()
-                    .child(track.title.clone()),
-            )
-            .child(
-                div()
-                    .w_1_2()
-                    .h_full()
-                    .items_center()
-                    .child(track.artists.clone()),
-            )
-            .child(
-                div()
-                    .w_1_2()
-                    .h_full()
-                    .items_center()
-                    .child(track.album.clone()),
-            )
-            .child(
-                div()
-                    .w_24()
-                    .h_full()
-                    .items_center()
-                    .child(format!("{:02}:{:02}", mins, secs)),
+                    .rounded_md()
+                    .cursor_pointer()
+                    .hover(|this| this.bg(theme.playlist_track_bg_hover))
+                    .when(is_current, |this| this.bg(theme.playlist_track_bg_current))
+                    .on_click({
+                        let id = track.id;
+                        move |_, _, cx| {
+                            let controller = cx.global::<Controller>().clone();
+                            controller.load_track(id, cx);
+                        }
+                    })
+                    .child(
+                        div()
+                            .w_20()
+                            .h_full()
+                            .flex()
+                            .px_6()
+                            .items_center()
+                            .justify_start()
+                            .child(format!("{:02}", absolute_index + 1)),
+                    )
+                    .child(
+                        div()
+                            .w_2_3()
+                            .max_w_2_3()
+                            .h_full()
+                            .px_6()
+                            .py_1()
+                            .flex()
+                            .gap_x_3()
+                            .items_center()
+                            .justify_start()
+                            .child(match thumbnail {
+                                Some(image) => div().size_11().flex_shrink_0().child(
+                                    img(ImageSource::Render(image.clone()))
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .rounded_sm(),
+                                ),
+                                None => div().size_11().flex_shrink_0().child(
+                                    img("icons/placeholder.svg")
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .rounded_sm(),
+                                ),
+                            })
+                            .when(is_current, |this| {
+                                this.text_color(theme.playlist_track_title_current)
+                                    .font_weight(FontWeight::MEDIUM)
+                            })
+                            .child(track.title.clone())
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis(),
+                    )
+                    .child(
+                        div()
+                            .w_1_3()
+                            .px_6()
+                            .max_w_1_3()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_start()
+                            .child(track.artists.clone())
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis(),
+                    )
+                    .child(
+                        div()
+                            .w_1_3()
+                            .max_w_1_3()
+                            .px_6()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_start()
+                            .child(track.album.clone())
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis(),
+                    )
+                    .child(
+                        div()
+                            .w_24()
+                            .max_w_24()
+                            .h_full()
+                            .px_4()
+                            .flex()
+                            .items_center()
+                            .justify_start()
+                            .text_sm()
+                            .font_family("JetBrains Mono")
+                            .child(format!(
+                                "{:02}:{:02}",
+                                (track.duration_ms / 1000) / 60,
+                                (track.duration_ms / 1000) % 60
+                            ))
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis(),
+                    ),
             )
     }
 }
