@@ -1,11 +1,12 @@
 use anyhow::Result;
-use rusqlite::{Connection, Transaction};
+use rusqlite::{Connection, Error as RusqliteError, Transaction};
 use sea_query::{Expr, ExprTrait, OnConflict, Order, Query, SelectStatement, SqliteQueryBuilder};
 use sea_query_rusqlite::RusqliteBinder;
 use std::time::Duration;
 
 use crate::controller::state::{ImageId, PlaylistId, TrackId};
 use crate::db::models::DbTrackSummary;
+use crate::db::models::InsertedTrack;
 use crate::db::tables::{AlbumArtists, Albums, Artists, TrackArtists, TrackSources, Tracks};
 use crate::scanner::{ScannedTrack, ScannedTrackSource};
 
@@ -13,7 +14,7 @@ pub fn upsert_scanned_tracks(
     conn: &mut Connection,
     tracks: &[ScannedTrack],
     playlist_id: Option<PlaylistId>,
-) -> Result<()> {
+) -> Result<Vec<InsertedTrack>> {
     let tx = conn.transaction()?;
 
     // If persisting into a playlist, determine starting position once.
@@ -24,8 +25,10 @@ pub fn upsert_scanned_tracks(
         )?);
     }
 
+    let mut committed_rows: Vec<InsertedTrack> = Vec::new();
+
     for track in tracks {
-        let db_track_id = upsert_scanned_track(&tx, track)?;
+        let (db_track_id, maybe_row) = upsert_scanned_track_returning_row(&tx, track)?;
 
         if let Some(pid) = &playlist_id {
             let pos = position.unwrap_or(0);
@@ -34,24 +37,55 @@ pub fn upsert_scanned_tracks(
                 *p += 1;
             }
         }
+
+        if let Some(row) = maybe_row {
+            committed_rows.push(row);
+        }
     }
 
     tx.commit()?;
-    Ok(())
+    Ok(committed_rows)
 }
 
-fn upsert_scanned_track(tx: &Transaction, track: &ScannedTrack) -> Result<i64> {
+fn upsert_scanned_track_returning_row(
+    tx: &Transaction,
+    track: &ScannedTrack,
+) -> Result<(i64, Option<InsertedTrack>)> {
+    // Determine track hash
     let track_hash = TrackId::generate(
         &track.title,
         &track.artists.join(", "),
         track.album.as_deref().unwrap_or(""),
     )?;
 
-    let image_hash = track
-        .image
-        .as_deref()
-        .and_then(|bytes| ImageId::generate(bytes).ok())
-        .map(|id| id.0.to_vec());
+    // Check if track exists
+    let select = Query::select()
+        .column(Tracks::Id)
+        .from(Tracks::Table)
+        .and_where(Expr::col(Tracks::TrackHash).eq(Expr::val(track_hash.0.to_vec())))
+        .to_owned();
+
+    // If exists, upsert sources/relations but do not return a UI row
+    if let Ok(id) = query_i64_tx(tx, &select) {
+        let db_track_id = id;
+
+        upsert_track_source(tx, db_track_id, &track.source)?;
+
+        for artist_name in &track.artists {
+            let artist_id = upsert_artist(tx, artist_name)?;
+            // ensure album_artist relation if we have an album
+            if let Some(album_name) = &track.album {
+                let aid = upsert_album(tx, album_name)?;
+                insert_album_artist(tx, aid, artist_id)?;
+            }
+            insert_track_artist(tx, db_track_id, artist_id)?;
+        }
+
+        return Ok((db_track_id, None));
+    }
+
+    // New track — insert album/track and relations
+    let image_hash = track.image.as_deref().map(|bytes| bytes.to_vec());
 
     let album_id = if let Some(album_name) = &track.album {
         Some(upsert_album(tx, album_name)?)
@@ -72,14 +106,24 @@ fn upsert_scanned_track(tx: &Transaction, track: &ScannedTrack) -> Result<i64> {
 
     for artist_name in &track.artists {
         let artist_id = upsert_artist(tx, artist_name)?;
-        // ensure album_artist relation if we have an album
         if let Some(aid) = album_id {
             insert_album_artist(tx, aid, artist_id)?;
         }
         insert_track_artist(tx, db_track_id, artist_id)?;
     }
 
-    Ok(db_track_id)
+    // Build LibraryTrackRow directly from scanned metadata
+    let row = InsertedTrack {
+        id: db_track_id,
+        track_hash: track_hash.0.to_vec(),
+        artists: track.artists.join(", "),
+        name: track.title.clone(),
+        album: track.album.clone(),
+        duration_ms: track.duration.as_millis() as i64,
+        image_hash,
+    };
+
+    Ok((db_track_id, Some(row)))
 }
 
 fn upsert_album(tx: &Transaction, name: &str) -> Result<i64> {

@@ -14,7 +14,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
-    VirtualListScrollController, Window, div, img, vlist,
+    VirtualListScrollController, Window, div, img, px, vlist,
 };
 use helpers::{
     HeaderKind, LibraryRow, render_header, render_playlist_grid, render_track_table_header,
@@ -316,6 +316,69 @@ impl LibraryPage {
             .ok();
         })
         .detach();
+    }
+
+    pub fn append_committed_rows(
+        &mut self,
+        new_rows: Vec<LibraryTrackRow>,
+        cx: &mut Context<Self>,
+    ) {
+        if new_rows.is_empty() {
+            return;
+        }
+
+        let old_total = self.total_track_count;
+        let added = new_rows.len();
+        self.total_track_count = old_total + added;
+
+        let first_track_row = Self::first_track_row_index(&self.rows);
+
+        let rows_mut = Rc::make_mut(&mut self.rows);
+        let heights_mut = Rc::make_mut(&mut self.heights);
+
+        // append placeholders and heights
+        for _ in 0..added {
+            rows_mut.push(helpers::LibraryRow::PlaceholderTrack);
+            heights_mut.push(px(60.0));
+        }
+
+        // populate page cache only for pages already loaded
+        for (i, track) in new_rows.into_iter().enumerate() {
+            let absolute = old_total + i;
+            let page = absolute / TRACK_PAGE_SIZE;
+            let offset = absolute % TRACK_PAGE_SIZE;
+
+            if self.loaded_pages.contains(&page) {
+                let page_vec = self.track_pages.entry(page).or_insert_with(|| Vec::new());
+
+                if page_vec.len() <= offset {
+                    page_vec.resize(
+                        offset + 1,
+                        LibraryTrackRow {
+                            id: TrackId::default(),
+                            title: "".into(),
+                            artists: "".into(),
+                            album: "".into(),
+                            duration_ms: 0,
+                            image_id: None,
+                        },
+                    );
+                }
+
+                page_vec[offset] = track.clone();
+
+                let row_index = first_track_row + absolute;
+                if row_index < rows_mut.len() {
+                    rows_mut[row_index] = helpers::LibraryRow::LoadedTrack {
+                        absolute_index: absolute,
+                        page,
+                        offset,
+                    };
+                }
+            }
+        }
+
+        cx.notify();
     }
 
     fn first_track_row_index(rows: &[LibraryRow]) -> usize {

@@ -19,3 +19,13 @@ impl DbTrackSummary {
         })
     }
 }
+
+pub struct InsertedTrack {
+    pub id: i64,
+    pub track_hash: Vec<u8>,
+    pub artists: String,
+    pub name: String,
+    pub album: Option<String>,
+    pub duration_ms: i64,
+    pub image_hash: Option<Vec<u8>>,
+}

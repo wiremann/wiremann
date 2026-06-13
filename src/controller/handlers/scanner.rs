@@ -4,6 +4,8 @@ use super::{
 };
 
 use crate::db::Database;
+use crate::db::models::InsertedTrack;
+use crate::controller::state::{TrackId, ImageId};
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -17,15 +19,48 @@ impl Controller {
                 let db = cx.global::<Database>().clone();
                 let tracks = tracks.clone();
                 let playlist_id = playlist_id.clone();
+                let view = view.clone();
 
-                cx.spawn(async move |_cx| {
-                    smol::unblock(move || {
+                cx.spawn(async move |app_cx| {
+                    let committed = smol::unblock(move || {
                         let mut conn = db.pool().get()?;
 
                         crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks, playlist_id)
                     })
                     .await
-                    .unwrap();
+                    .unwrap_or_else(|_| Vec::new());
+
+                    if !committed.is_empty() {
+                        // Convert DB projection to UI rows and update UI on main thread after DB commit
+                        view.update(app_cx, move |this, cx| {
+                            let mut ui_rows: Vec<crate::ui::pages::library::models::LibraryTrackRow> = Vec::with_capacity(committed.len());
+
+                            for it in committed.into_iter() {
+                                if let Ok(arr) = <[u8;16]>::try_from(it.track_hash.clone()) {
+                                    let id = TrackId(arr);
+
+                                    let image_id = it.image_hash.as_ref().and_then(|b| ImageId::generate(b).ok());
+
+                                    ui_rows.push(crate::ui::pages::library::models::LibraryTrackRow {
+                                        id,
+                                        title: it.name.clone(),
+                                        artists: it.artists.clone(),
+                                        album: it.album.clone().unwrap_or_else(|| "Unknown Album".into()),
+                                        duration_ms: it.duration_ms,
+                                        image_id,
+                                    });
+                                }
+                            }
+
+                            if !ui_rows.is_empty() {
+                                this.library_page.update(cx, |page, cx| {
+                                    page.append_committed_rows(ui_rows, cx);
+                                });
+                            }
+
+                            cx.notify();
+                        });
+                    }
                 })
                 .detach();
             }
