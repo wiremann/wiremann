@@ -17,6 +17,8 @@ impl Database {
             let conn = pool.get()?;
 
             conn.pragma_update(None, "journal_mode", "WAL")?;
+            conn.pragma_update(None, "synchronous", "NORMAL")?;
+            conn.pragma_update(None, "busy_timeout", 5000)?;
             conn.pragma_update(None, "foreign_keys", "ON")?;
 
             crate::db::migrations::run(&conn)?;
