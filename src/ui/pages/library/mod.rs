@@ -486,6 +486,32 @@ impl Render for LibraryPage {
             self.rows = Rc::new(rows);
             self.heights = Rc::new(heights);
             self.last_fp = combined_fp;
+            // Patch any already-loaded pages to convert placeholders into LoadedTrack rows
+            let loaded_pages: Vec<usize> = self.loaded_pages.iter().copied().collect();
+            for &page in &loaded_pages {
+                self.patch_loaded_page(page);
+            }
+
+            // Request playlist thumbnails for the newly-rendered playlists
+            let playlist_ids: Vec<crate::controller::state::PlaylistId> =
+                self.playlists.iter().map(|p| p.id).collect();
+            if !playlist_ids.is_empty() {
+                controller.request_playlist_thumbnails(&playlist_ids, cx);
+            }
+
+            // Request thumbnails for visible tracks on loaded pages
+            let mut visible_track_ids = Vec::new();
+            for page in &loaded_pages {
+                if let Some(page_rows) = self.track_pages.get(page) {
+                    for tr in page_rows.iter() {
+                        visible_track_ids.push(tr.id);
+                    }
+                }
+            }
+
+            if !visible_track_ids.is_empty() {
+                controller.request_track_thumbnails(&visible_track_ids, cx);
+            }
         }
         let scroll_handle = self.scroll_handle.clone();
 

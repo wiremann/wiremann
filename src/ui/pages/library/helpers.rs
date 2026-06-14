@@ -153,7 +153,7 @@ pub(super) fn render_playlist_grid(
                         .hover(|this| this.bg(theme.library_playlist_bg_hover))
                         .cursor_pointer()
                         .child(match thumbnail {
-                            Some(image) => div().size_full().mb_3().child(
+                            Some(image) => div().size(px(160.0)).mb_3().child(
                                 img(ImageSource::Render(image.clone()))
                                     .object_fit(ObjectFit::Contain)
                                     .border_1()
@@ -162,7 +162,7 @@ pub(super) fn render_playlist_grid(
                                     .rounded_lg(),
                             ),
 
-                            None => div().size_full().mb_3().child(
+                            None => div().size(px(160.0)).mb_3().child(
                                 img("icons/placeholder.svg")
                                     .object_fit(ObjectFit::Contain)
                                     .border_1()

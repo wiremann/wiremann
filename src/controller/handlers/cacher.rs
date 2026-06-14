@@ -1,4 +1,9 @@
-use super::{Controller, App, CacherEvent, Entity, Wiremann, ControllerError, PlaybackStatus, duration_to_slider, ImageCache, drop_image_from_app, Rgb, Rgba, rgb, SystemIntegrationCommand, DominantColors, ImageProcessorCommand, HashSet, ImageKind, pick_playlist_thumbnail_tracks, LyricsState, LyricsStatus};
+use super::{
+    App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
+    ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus, PlaybackStatus, Rgb, Rgba,
+    SystemIntegrationCommand, Wiremann, drop_image_from_app, duration_to_slider,
+    pick_playlist_thumbnail_tracks, rgb,
+};
 
 impl Controller {
     pub fn handle_cacher_event(
@@ -9,46 +14,109 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             CacherEvent::AppState(state) => {
-                let playback_state = state.playback.clone();
-                self.state.update(cx, |this, _| {
-                    *this = state.clone();
-                });
+                // Defer merging cache state until we know if DB has data —
+                // if DB is empty and cache exists, we prefer NOT to restore cached playlists (user deleted DB).
+                let cached = state.clone();
+                let db = cx.global::<crate::db::Database>().clone();
+                let controller = self.clone();
+                let view = view.clone();
 
-                self.load_queue_current(cx);
-                self.set_volume(playback_state.volume, cx);
-                self.seek(playback_state.position);
+                cx.spawn(async move |cx2| {
+                    let has_db = smol::unblock(move || {
+                        let conn = db.pool().get()?;
+                        let pls = crate::db::queries::library::get_library_playlists(&conn)?;
+                        Ok::<bool, anyhow::Error>(!pls.is_empty())
+                    })
+                    .await
+                    .unwrap_or(false);
 
-                match playback_state.status {
-                    PlaybackStatus::Stopped => self.stop(),
-                    PlaybackStatus::Paused => self.pause(),
-                    PlaybackStatus::Playing => self.play(),
-                }
-
-                let duration = if let Some(current) = playback_state.current
-                    && let Some(track) = state.library.tracks.get(&current)
-                {
-                    Some(track.duration)
-                } else {
-                    None
-                };
-
-                view.update(cx, |this, cx| {
-                    this.player_page.update(cx, |this, cx| {
-                        this.controlbar.update(cx, |this, cx| {
-                            this.vol_slider_state.update(cx, |this, cx| {
-                                this.set_value(playback_state.volume * 100.0, cx);
-                            });
-                            this.playback_slider_state.update(cx, |this, cx| {
-                                if let Some(duration) = duration {
-                                    this.set_value(
-                                        duration_to_slider(playback_state.position, duration),
-                                        cx,
-                                    );
+                    if has_db {
+                        // Merge cached library into existing state but do not overwrite present data
+                        cx2.update(|app| {
+                            controller.state.update(app, |this, _| {
+                                for (id, track) in cached.library.tracks.iter() {
+                                    if !this.library.tracks.contains_key(id) {
+                                        this.library
+                                            .tracks
+                                            .insert(*id, std::sync::Arc::new((**track).clone()));
+                                    }
                                 }
+
+                                for (pid, playlist) in cached.library.playlists.iter() {
+                                    if let Some(existing) = this.library.playlists.get_mut(pid) {
+                                        if existing.image_id.is_none()
+                                            && playlist.image_id.is_some()
+                                        {
+                                            existing.image_id = playlist.image_id;
+                                        }
+                                        if existing.tracks.is_empty() && !playlist.tracks.is_empty()
+                                        {
+                                            existing.tracks = playlist.tracks.clone();
+                                        }
+                                    } else {
+                                        this.library.playlists.insert(*pid, playlist.clone());
+                                    }
+                                }
+
+                                if this.playback.current.is_none() {
+                                    this.playback = cached.playback.clone();
+                                }
+                            });
+                            app.notify(view.entity_id());
+                        });
+                    } else {
+                        // DB empty: do not restore cached library playlists/tracks (user likely deleted DB)
+                        cx2.update(|app| {
+                            controller.state.update(app, |this, _| {
+                                if this.playback.current.is_none() {
+                                    this.playback = cached.playback.clone();
+                                }
+                            });
+                            app.notify(view.entity_id());
+                        });
+                    }
+
+                    // Apply playback side-effects on the UI thread
+                    cx2.update(|app| {
+                        controller.load_queue_current(app);
+                        controller.set_volume(cached.playback.volume, app);
+                        controller.seek(cached.playback.position);
+
+                        match cached.playback.status {
+                            PlaybackStatus::Stopped => controller.stop(),
+                            PlaybackStatus::Paused => controller.pause(),
+                            PlaybackStatus::Playing => controller.play(),
+                        }
+                    });
+
+                    // Update player control UI values
+                    let duration = if let Some(current) = cached.playback.current
+                        && let Some(track) = cached.library.tracks.get(&current)
+                    {
+                        Some(track.duration)
+                    } else {
+                        None
+                    };
+
+                    view.update(cx2, |this, cx| {
+                        this.player_page.update(cx, |this, cx| {
+                            this.controlbar.update(cx, |this, cx| {
+                                this.vol_slider_state.update(cx, |this, cx| {
+                                    this.set_value(cached.playback.volume * 100.0, cx);
+                                });
+                                this.playback_slider_state.update(cx, |this, cx| {
+                                    if let Some(duration) = duration {
+                                        this.set_value(
+                                            duration_to_slider(cached.playback.position, duration),
+                                            cx,
+                                        );
+                                    }
+                                });
                             });
                         });
                     });
-                });
+                })
+                .detach();
             }
             CacherEvent::Thumbnails(thumbnails) => {
                 for (id, image) in thumbnails {
