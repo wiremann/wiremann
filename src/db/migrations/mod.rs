@@ -1,4 +1,5 @@
 pub mod m0001_init;
+pub mod m0002_playback_queue;
 
 use anyhow::Result;
 use rusqlite::Connection;
@@ -14,6 +15,10 @@ pub const MIGRATIONS: &[Migration] = &[Migration {
     version: 1,
     name: "m0001_init",
     run: m0001_init::run,
+}, Migration {
+    version: 2,
+    name: "m0002_playback_queue",
+    run: m0002_playback_queue::run,
 }];
 
 pub fn run(conn: &Connection) -> Result<()> {

@@ -44,10 +44,7 @@ impl Controller {
                         .send(SystemIntegrationCommand::SetPosition(*pos))
                         .ok();
 
-                    let state = self.state.read(cx).playback.clone();
-                    let _ = self
-                        .cacher_tx
-                        .send(CacherCommand::WritePlaybackState(state));
+                    self.persist_playback_state(cx);
                 }
             }
             AudioEvent::TrackLoaded(track_id, path) => {
@@ -104,10 +101,7 @@ impl Controller {
                     cx.notify();
                 });
 
-                let state = self.state.read(cx).playback.clone();
-                let _ = self
-                    .cacher_tx
-                    .send(CacherCommand::WritePlaybackState(state));
+                self.persist_playback_state(cx);
             }
             AudioEvent::PlaybackStatus(status) => {
                 self.state.update(cx, |this, cx| {
@@ -117,14 +111,9 @@ impl Controller {
                 cx.notify(view.entity_id());
                 let state = self.state.read(cx).playback.clone();
                 self.system_integration_tx
-                    .send(SystemIntegrationCommand::SetPlaybackStatus(
-                        *status,
-                        state.position,
-                    ))
+                    .send(SystemIntegrationCommand::SetPlaybackStatus(*status, state.position))
                     .ok();
-                let _ = self
-                    .cacher_tx
-                    .send(CacherCommand::WritePlaybackState(state));
+                self.persist_playback_state(cx);
             }
             AudioEvent::TrackEnded => {
                 let repeat = self.state.read(cx).playback.repeat;

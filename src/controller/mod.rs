@@ -14,6 +14,7 @@ use crate::controller::scan_manager::{ScanJob, ScanManager};
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{PlaybackStatus, Playlist, PlaylistSource};
 use crate::controller::state::{Track, TrackId};
+use crate::db::queries::{playback as db_playback, queue as db_queue};
 use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
@@ -138,6 +139,32 @@ impl Controller {
         }
     }
 
+    pub fn persist_playback_state(&self, cx: &App) {
+        let db = cx.global::<crate::db::Database>().clone();
+        let state = self.state.read(cx).playback.clone();
+        cx.spawn(async move |_cx| {
+            let _ = smol::unblock(move || {
+                let mut conn = db.pool().get()?;
+                db_playback::save_playback_state(&mut conn, &state)
+            })
+            .await;
+        })
+        .detach();
+    }
+
+    pub fn persist_queue_state(&self, cx: &App) {
+        let db = cx.global::<crate::db::Database>().clone();
+        let queue = self.state.read(cx).queue.clone();
+        cx.spawn(async move |_cx| {
+            let _ = smol::unblock(move || {
+                let mut conn = db.pool().get()?;
+                db_queue::save_queue(&mut conn, &queue)
+            })
+            .await;
+        })
+        .detach();
+    }
+
     pub fn get_pos(&self) {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
@@ -159,38 +186,41 @@ impl Controller {
                 duration: Duration::from_secs(0),
                 image_id: None,
             };
-            self.state.update(cx, |this, cx| {
-                this.library.playlists.insert(playlist.id, playlist.clone());
 
-                cx.notify();
-            });
-
-            let state = self.state.read(cx).library.clone();
-            let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
-
-            // Persist playlist to database asynchronously
+            // Persist playlist to DB first, then update in-memory state and start scan.
             let db = cx.global::<crate::db::Database>().clone();
-            let pid = playlist.id;
-            let pname = playlist.name.clone();
+            let mut controller = self.clone();
+            let playlist_clone = playlist.clone();
+            let pid = playlist_clone.id;
+            let pname = playlist_clone.name.clone();
+            let scan_path = path.clone();
 
-            cx.spawn(async move |_cx| {
-                smol::unblock(move || {
+            cx.spawn(async move |app_cx| {
+                let _ = smol::unblock(move || {
                     let mut conn = db.pool().get()?;
-
                     let tx = conn.transaction()?;
-
                     crate::db::queries::playlists::insert_playlist(&tx, &pid.0, &pname, "folder")?;
-
                     tx.commit()?;
-
                     Ok::<(), anyhow::Error>(())
                 })
-                .await
-                .unwrap();
+                .await;
+
+                app_cx.update(|app| {
+                    controller.state.update(app, |this, cx| {
+                        this.library.playlists.insert(pid, playlist_clone.clone());
+                        cx.notify();
+                    });
+
+                    // Persist cached library state and start the scan after DB insertion
+                    let state = controller.state.read(app).library.clone();
+                    let _ = controller
+                        .cacher_tx
+                        .send(CacherCommand::WriteLibraryState(state));
+
+                    controller.enqueue_scan(scan_path, Some(pid));
+                });
             })
             .detach();
-
-            self.enqueue_scan(path, Some(playlist_id));
         }
     }
 
@@ -239,8 +269,7 @@ impl Controller {
         });
 
         self.load_queue_current(cx);
-        let state = self.state.read(cx).queue.clone();
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx);
     }
 
     pub fn load_track(&self, track_id: TrackId, cx: &mut App) {
@@ -271,8 +300,7 @@ impl Controller {
         });
 
         self.load_queue_current(cx);
-        let state = self.state.read(cx).queue.clone();
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx);
     }
 
     pub fn scan_track(&self, path: PathBuf) {
@@ -295,10 +323,7 @@ impl Controller {
         self.state.update(cx, |this, _| {
             this.playback.repeat = !this.playback.repeat;
         });
-        let state = self.state.read(cx).playback.clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx);
     }
 
     pub fn set_mute(&self, cx: &mut App) {
@@ -313,10 +338,7 @@ impl Controller {
                     this.playback.volume
                 }));
         });
-        let state = self.state.read(cx).playback.clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx);
     }
 
     pub fn set_volume(&self, vol: f32, cx: &mut App) {
@@ -330,10 +352,7 @@ impl Controller {
             .audio_tx
             .send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
 
-        let state = self.state.read(cx).playback.clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx);
     }
 
     pub fn set_shuffle(&self, cx: &mut App) {
@@ -364,13 +383,8 @@ impl Controller {
             }
         });
 
-        let state = self.state.read(cx).clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_queue_state(cx);
+        self.persist_playback_state(cx);
     }
 
     pub fn next(&self, cx: &mut App) {
@@ -381,13 +395,8 @@ impl Controller {
 
         self.load_queue_current(cx);
 
-        let state = self.state.read(cx).clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_queue_state(cx);
+        self.persist_playback_state(cx);
     }
     pub fn prev(&self, cx: &mut App) {
         self.state.update(cx, |this, _| {
@@ -396,13 +405,8 @@ impl Controller {
 
         self.load_queue_current(cx);
 
-        let state = self.state.read(cx).clone();
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_queue_state(cx);
+        self.persist_playback_state(cx);
     }
 
     pub fn seek(&self, pos: Duration) {

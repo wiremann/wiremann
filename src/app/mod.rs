@@ -103,6 +103,8 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
 
                 cx.set_global(db);
 
+                // Restore playback and queue state from DB into controller state (moved after view creation)
+
                 let view = cx.new(Wiremann::new);
 
                 let res_handler = cx.new(|_| ResHandler {});
@@ -112,6 +114,73 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
                 spawn_event_loop(cx, controller.clone(), arc_res.clone());
 
                 subscribe_controller_events(cx, &res_handler, controller.clone(), view.clone());
+
+                // Restore playback/queue and playlists from DB into controller state
+                {
+                    let db = cx.global::<Database>().clone();
+                    let controller_for_pbq = controller.clone();
+                    let view_for_pbq = view.clone();
+
+                    cx.spawn(async move |cx| {
+                        let res = smol::unblock(move || {
+                            let conn = db.pool().get()?;
+                            let pb = crate::db::queries::playback::get_playback_state(&conn)?;
+                            let q = crate::db::queries::queue::get_queue(&conn)?;
+                            Ok::<_, anyhow::Error>((pb, q))
+                        })
+                        .await
+                        .ok();
+
+                        if let Some((pb, q)) = res {
+                            cx.update(|app| {
+                                controller_for_pbq.state.update(app, |this, _| {
+                                    this.playback = pb;
+                                    this.queue = q;
+                                });
+                                app.notify(view_for_pbq.entity_id());
+                                controller_for_pbq.load_queue_current(app);
+                            });
+                        }
+                    })
+                    .detach();
+
+                    let db2 = cx.global::<Database>().clone();
+                    let controller_for_playlists = controller.clone();
+                    let view_for_playlists = view.clone();
+
+                    cx.spawn(async move |cx| {
+                        let res = smol::unblock(move || {
+                            let conn = db2.pool().get()?;
+                            let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
+                            Ok::<_, anyhow::Error>(pls)
+                        })
+                        .await
+                        .ok();
+
+                        if let Some(pls) = res {
+                            cx.update(|app| {
+                                controller_for_playlists.state.update(app, |this, _| {
+                                    for p in pls {
+                                        this.library.playlists.insert(
+                                            p.id,
+                                            crate::controller::state::Playlist {
+                                                id: p.id,
+                                                name: p.name,
+                                                source: p.source,
+                                                folder_path: None,
+                                                duration: std::time::Duration::from_secs(0),
+                                                tracks: p.tracks,
+                                                image_id: p.image_id,
+                                            },
+                                        );
+                                    }
+                                });
+                                app.notify(view_for_playlists.entity_id());
+                            });
+                        }
+                    })
+                    .detach();
+                }
 
                 view
             })

@@ -50,6 +50,28 @@ pub enum Playlists {
     Source,
 }
 
+#[derive(Iden)]
+pub enum Playbacks {
+    Table,
+    Id,
+    CurrentTrack,
+    CurrentPlaylist,
+    CurrentIndex,
+    Status,
+    Position,
+    Volume,
+    Mute,
+    Shuffling,
+    Repeat,
+}
+
+#[derive(Iden)]
+pub enum Queue {
+    Table,
+    Position,
+    TrackHash,
+}
+
 //
 // Join Tables
 //
