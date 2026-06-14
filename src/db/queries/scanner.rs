@@ -51,21 +51,18 @@ fn upsert_scanned_track_returning_row(
     tx: &Transaction,
     track: &ScannedTrack,
 ) -> Result<(i64, Option<InsertedTrack>)> {
-    // Determine track hash
     let track_hash = TrackId::generate(
         &track.title,
         &track.artists.join(", "),
         track.album.as_deref().unwrap_or(""),
     )?;
 
-    // Check if track exists
     let select = Query::select()
         .column(Tracks::Id)
         .from(Tracks::Table)
         .and_where(Expr::col(Tracks::TrackHash).eq(Expr::val(track_hash.0.to_vec())))
         .to_owned();
 
-    // If exists, upsert sources/relations but do not return a UI row
     if let Ok(id) = query_i64_tx(tx, &select) {
         let db_track_id = id;
 
@@ -73,7 +70,6 @@ fn upsert_scanned_track_returning_row(
 
         for artist_name in &track.artists {
             let artist_id = upsert_artist(tx, artist_name)?;
-            // ensure album_artist relation if we have an album
             if let Some(album_name) = &track.album {
                 let aid = upsert_album(tx, album_name)?;
                 insert_album_artist(tx, aid, artist_id)?;
@@ -84,8 +80,12 @@ fn upsert_scanned_track_returning_row(
         return Ok((db_track_id, None));
     }
 
-    // New track — insert album/track and relations
-    let image_hash = track.image.as_deref().map(|bytes| bytes.to_vec());
+    let image_hash = track
+        .image
+        .as_deref()
+        .map(ImageId::generate)
+        .transpose()?
+        .map(|id| id.0.to_vec());
 
     let album_id = if let Some(album_name) = &track.album {
         Some(upsert_album(tx, album_name)?)
@@ -98,7 +98,7 @@ fn upsert_scanned_track_returning_row(
         &track.title,
         album_id,
         &track.duration,
-        image_hash.as_deref(),
+        image_hash.as_ref().map(|h| h.as_slice()),
         &track_hash.0,
     )?;
 
