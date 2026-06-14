@@ -48,22 +48,18 @@ pub fn get_library_playlists(conn: &Connection) -> Result<Vec<LibraryPlaylistRow
         let uuid = Uuid::parse_str(&id_str)
             .map_err(|e| RusqliteError::FromSqlConversionFailure(0, Type::Text, Box::new(e)))?;
 
-        let image_id = image_hash
-            .map(|hash| {
-                let arr: [u8; 16] = hash.try_into().map_err(|_| {
-                    RusqliteError::FromSqlConversionFailure(
-                        2,
-                        Type::Blob,
-                        Box::new(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "invalid image hash length",
-                        )),
-                    )
-                })?;
-
-                Ok::<state::ImageId, RusqliteError>(ImageId(arr))
-            })
-            .transpose()?;
+        // If image_hash exists but has invalid length, treat it as missing instead of erroring.
+        let image_id: Option<state::ImageId> = match image_hash {
+            Some(hash) => {
+                if hash.len() == 16 {
+                    let arr: [u8; 16] = hash.try_into().unwrap();
+                    Some(ImageId(arr))
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
 
         Ok(LibraryPlaylistRow {
             id: PlaylistId(uuid),
@@ -161,22 +157,18 @@ pub fn get_tracks_page(conn: &Connection, limit: u64, offset: u64) -> Result<Vec
             )
         })?;
 
-        let image_id = image_hash
-            .map(|hash| {
-                let arr: [u8; 16] = hash.try_into().map_err(|_| {
-                    RusqliteError::FromSqlConversionFailure(
-                        5,
-                        Type::Blob,
-                        Box::new(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "invalid image hash length",
-                        )),
-                    )
-                })?;
-
-                Ok::<state::ImageId, RusqliteError>(ImageId(arr))
-            })
-            .transpose()?;
+        // If image_hash exists but has invalid length, ignore it and return None.
+        let image_id: Option<state::ImageId> = match image_hash {
+            Some(hash) => {
+                if hash.len() == 16 {
+                    let arr: [u8; 16] = hash.try_into().unwrap();
+                    Some(ImageId(arr))
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
 
         Ok(LibraryTrackRow {
             id: TrackId(hash),
