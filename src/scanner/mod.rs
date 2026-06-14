@@ -172,6 +172,14 @@ impl Scanner {
                             Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
                         }
                     }
+
+                    // If discovery is finished and there are no more jobs queued for this
+                    // worker, flush any partial batch immediately instead of waiting for
+                    // the next ticker tick. This ensures small tail-batches aren't lost
+                    // when scans finish quickly.
+                    if scan_progress.discovery_done.load(Ordering::Acquire) && worker_rx.is_empty() {
+                        Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
+                    }
                 }
             });
         }

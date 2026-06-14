@@ -155,10 +155,31 @@ impl Controller {
     pub fn persist_queue_state(&self, cx: &App) {
         let db = cx.global::<crate::db::Database>().clone();
         let queue = self.state.read(cx).queue.clone();
+        // Persist queue using play order (queue.order) so shuffle is preserved across restarts.
         cx.spawn(async move |_cx| {
             let _ = smol::unblock(move || {
                 let mut conn = db.pool().get()?;
-                db_queue::save_queue(&mut conn, &queue)
+
+                // Build a copy of tracks in play order
+                let mut ordered: Vec<crate::controller::state::TrackId> = Vec::new();
+                for &idx in queue.order.iter() {
+                    if let Some(id) = queue.tracks.get(idx) {
+                        ordered.push(*id);
+                    }
+                }
+
+                // Fallback: if order empty or mismatch, use queue.tracks
+                let to_save = if ordered.is_empty() { queue.tracks.clone() } else { ordered };
+
+                let len = to_save.len();
+                let order_vec: Vec<usize> = (0..len).collect();
+                db_queue::save_queue(
+                    &mut conn,
+                    &crate::controller::state::QueueState {
+                        tracks: to_save,
+                        order: order_vec,
+                    },
+                )
             })
             .await;
         })

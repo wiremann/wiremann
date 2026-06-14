@@ -58,29 +58,41 @@ impl Controller {
                             }
 
                             if !ui_rows.is_empty() {
+                                // Insert Track objects into controller state so thumbnails and other
+                                // track-based operations can run immediately without requiring a
+                                // restart to load DB-backed state.
+                                let controller = cx.global::<Controller>().clone();
+                                controller.state.update(cx, |state, _| {
+                                    for it in ui_rows.iter() {
+                                        use crate::controller::state::{Track, TrackSource};
+                                        let id = it.id;
+                                        if !state.library.tracks.contains_key(&id) {
+                                            let track = Track {
+                                                id,
+                                                sources: Vec::new(),
+                                                title: it.title.clone(),
+                                                artist: it.artists.clone(),
+                                                album: it.album.clone(),
+                                                duration: std::time::Duration::from_millis(it.duration_ms as u64),
+                                                image_id: it.image_id,
+                                            };
+
+                                            state.library.tracks.insert(id, std::sync::Arc::new(track));
+                                        }
+                                    }
+                                    // notify will be called below
+                                });
+
                                 // Append rows into the library UI
                                 this.library_page.update(cx, |page, cx| {
                                     page.append_committed_rows(ui_rows, cx);
                                 });
 
-                                // Request thumbnails for newly-inserted tracks
+                                // Request thumbnails for newly-inserted tracks (state now contains tracks)
                                 let controller = cx.global::<Controller>().clone();
                                 controller.request_track_thumbnails(&inserted_ids, cx);
 
-                                // If these tracks were inserted into a playlist, update in-memory playlist state
-                                if let Some(pid) = playlist_id.clone() {
-                                    controller.state.update(cx, |state, _| {
-                                        if let Some(pl) = state.library.playlists.get_mut(&pid) {
-                                            for id in &inserted_ids {
-                                                pl.tracks.push(*id);
-                                            }
-                                            // leave duration update to background jobs that compute thumbnails/artwork
-                                        }
-                                        // notify will be called below
-                                    });
-
-                                    controller.request_playlist_thumbnails(&[pid], cx);
-                                }
+                                // Do NOT mutate playlist canonical state here — we'll refresh from DB below.
                             }
 
                             cx.notify();

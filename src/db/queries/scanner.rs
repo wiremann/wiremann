@@ -36,15 +36,97 @@ pub fn upsert_scanned_tracks(
             if let Some(ref mut p) = position {
                 *p += 1;
             }
-        }
 
-        if let Some(row) = maybe_row {
+            // For playlist insertions, always produce an InsertedTrack for UI consumption.
+            if let Some(row) = maybe_row {
+                committed_rows.push(row);
+            } else {
+                // Existing track — query metadata to build an InsertedTrack
+                if let Ok(existing) = fetch_inserted_track(&tx, db_track_id) {
+                    committed_rows.push(existing);
+                }
+            }
+        } else if let Some(row) = maybe_row {
             committed_rows.push(row);
         }
     }
 
     tx.commit()?;
     Ok(committed_rows)
+}
+
+fn fetch_inserted_track(tx: &Transaction, db_track_id: i64) -> Result<InsertedTrack> {
+    use crate::db::tables::{Albums, Artists, TrackArtists, Tracks};
+
+    // Fetch basic track info
+    let select = Query::select()
+        .columns([Tracks::Id, Tracks::TrackHash, Tracks::Name, Tracks::AlbumId, Tracks::Duration, Tracks::ImageHash])
+        .from(Tracks::Table)
+        .and_where(Expr::col(Tracks::Id).eq(Expr::val(db_track_id)))
+        .to_owned();
+
+    let (sql, values) = select.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    let mut stmt = tx.prepare(&sql)?;
+
+    let row = stmt.query_row(params.as_slice(), |row| {
+        let id: i64 = row.get(0)?;
+        let track_hash: Vec<u8> = row.get(1)?;
+        let name: String = row.get(2)?;
+        let album_id: Option<i64> = row.get(3)?;
+        let duration_ms: i64 = row.get(4)?;
+        let image_hash: Option<Vec<u8>> = row.get(5)?;
+
+        Ok((id, track_hash, name, album_id, duration_ms, image_hash))
+    })?;
+
+    let (id, track_hash, name, album_id, duration_ms, image_hash) = row;
+
+    // Fetch artists for the track
+    let artist_q = Query::select()
+        .column(Artists::Name)
+        .from(Artists::Table)
+        .join(
+            sea_query::JoinType::InnerJoin,
+            TrackArtists::Table,
+            Expr::col((TrackArtists::Table, TrackArtists::ArtistId)).equals((Artists::Table, Artists::Id)),
+        )
+        .and_where(Expr::col((TrackArtists::Table, TrackArtists::TrackId)).eq(Expr::val(id)))
+        .to_owned();
+
+    let (sql2, values2) = artist_q.build_rusqlite(SqliteQueryBuilder);
+    let params2 = values2.as_params();
+    let mut stmt2 = tx.prepare(&sql2)?;
+
+    let artist_rows = stmt2.query_map(params2.as_slice(), |r| r.get::<_, String>(0))?;
+    let mut artists: Vec<String> = Vec::new();
+    for ar in artist_rows {
+        artists.push(ar?);
+    }
+
+    // Fetch album name if present
+    let album_name = if let Some(aid) = album_id {
+        let sel = Query::select().column(Albums::Name).from(Albums::Table).and_where(Expr::col(Albums::Id).eq(Expr::val(aid))).to_owned();
+        let (sql3, vals3) = sel.build_rusqlite(SqliteQueryBuilder);
+        let params3 = vals3.as_params();
+        let mut s3 = tx.prepare(&sql3)?;
+        match s3.query_row(params3.as_slice(), |r| r.get::<_, String>(0)) {
+            Ok(n) => Some(n),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
+    Ok(InsertedTrack {
+        id,
+        track_hash,
+        artists: artists.join(", "),
+        name,
+        album: album_name,
+        duration_ms,
+        image_hash,
+    })
 }
 
 fn upsert_scanned_track_returning_row(
