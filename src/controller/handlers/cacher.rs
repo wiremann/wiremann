@@ -31,7 +31,6 @@ impl Controller {
                     .unwrap_or(false);
 
                     if has_db {
-                        // Merge cached library into existing state but do not overwrite present data
                         cx2.update(|app| {
                             controller.state.update(app, |this, _| {
                                 for (id, track) in cached.library.tracks.iter() {
@@ -42,22 +41,6 @@ impl Controller {
                                     }
                                 }
 
-                                for (pid, playlist) in cached.library.playlists.iter() {
-                                    if let Some(existing) = this.library.playlists.get_mut(pid) {
-                                        if existing.image_id.is_none()
-                                            && playlist.image_id.is_some()
-                                        {
-                                            existing.image_id = playlist.image_id;
-                                        }
-                                        if existing.tracks.is_empty() && !playlist.tracks.is_empty()
-                                        {
-                                            existing.tracks = playlist.tracks.clone();
-                                        }
-                                    } else {
-                                        this.library.playlists.insert(*pid, playlist.clone());
-                                    }
-                                }
-
                                 if this.playback.current.is_none() {
                                     this.playback = cached.playback.clone();
                                 }
@@ -65,7 +48,6 @@ impl Controller {
                             app.notify(view.entity_id());
                         });
                     } else {
-                        // DB empty: do not restore cached library playlists/tracks (user likely deleted DB)
                         cx2.update(|app| {
                             controller.state.update(app, |this, _| {
                                 if this.playback.current.is_none() {

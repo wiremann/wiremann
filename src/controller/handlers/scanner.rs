@@ -22,8 +22,10 @@ impl Controller {
                 let view = view.clone();
 
                 cx.spawn(async move |app_cx| {
+                    let db_for_commit = db.clone();
+
                     let committed = smol::unblock(move || {
-                        let mut conn = db.pool().get()?;
+                        let mut conn = db_for_commit.pool().get()?;
 
                         crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks, playlist_id)
                     })
@@ -77,15 +79,50 @@ impl Controller {
                                         // notify will be called below
                                     });
 
-                                    // Persist library state cache and request playlist thumbnail generation
-                                    let state_clone = controller.state.read(cx).library.clone();
-                                    let _ = controller.cacher_tx.send(crate::controller::commands::CacherCommand::WriteLibraryState(state_clone));
                                     controller.request_playlist_thumbnails(&[pid], cx);
                                 }
                             }
 
                             cx.notify();
                         });
+
+                        // If these tracks were inserted into a playlist, refresh derived playlist snapshot from DB
+                        if let Some(pid) = playlist_id.clone() {
+                            let db2 = db.clone();
+                            let pid2 = pid;
+
+                            let app_cx2 = app_cx.clone();
+                            app_cx.spawn(async move |_cx| {
+                                let proj = smol::unblock(move || {
+                                    let conn = db2.pool().get()?;
+                                    let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
+                                    Ok::<_, anyhow::Error>(pls.into_iter().find(|p| p.id == pid2))
+                                })
+                                .await
+                                .ok();
+
+                                if let Some(Some(p)) = proj {
+                                    app_cx2.update(|app| {
+                                        let controller = app.global::<Controller>().clone();
+                                        controller.state.update(app, |state, cx| {
+                                            state.library.playlists.insert(
+                                                p.id,
+                                                crate::controller::state::Playlist {
+                                                    id: p.id,
+                                                    name: p.name,
+                                                    source: p.source,
+                                                    folder_path: None,
+                                                    duration: std::time::Duration::from_secs(0),
+                                                    tracks: p.tracks,
+                                                    image_id: p.image_id,
+                                                },
+                                            );
+                                            cx.notify();
+                                        });
+                                    });
+                                }
+                            }).detach();
+                        }
                     }
                 })
                 .detach();

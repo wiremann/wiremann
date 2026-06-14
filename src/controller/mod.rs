@@ -211,12 +211,6 @@ impl Controller {
                         cx.notify();
                     });
 
-                    // Persist cached library state and start the scan after DB insertion
-                    let state = controller.state.read(app).library.clone();
-                    let _ = controller
-                        .cacher_tx
-                        .send(CacherCommand::WriteLibraryState(state));
-
                     controller.enqueue_scan(scan_path, Some(pid));
                 });
             })
@@ -255,21 +249,37 @@ impl Controller {
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
-        self.state.update(cx, |this, cx| {
-            if let Some(playlist) = this.library.playlists.get(&id) {
-                this.playback.current_playlist = Some(playlist.id);
-                this.queue.tracks.clone_from(&playlist.tracks);
-                this.queue.order = (0..playlist.tracks.len()).collect();
-                this.playback.current_index = 0;
-                this.playback.shuffling = false;
-                this.playback.repeat = false;
+        let db = cx.global::<crate::db::Database>().clone();
+        let controller = self.clone();
+        let pid = id;
 
-                cx.notify();
+        cx.spawn(async move |cx2| {
+            let res = smol::unblock(move || {
+                let conn = db.pool().get()?;
+                let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
+                Ok::<_, anyhow::Error>(pls.into_iter().find(|p| p.id == pid))
+            })
+            .await
+            .ok();
+
+            if let Some(Some(p)) = res {
+                cx2.update(|app| {
+                    controller.state.update(app, |this, _| {
+                        this.playback.current_playlist = Some(p.id);
+                        this.queue.tracks = p.tracks.clone();
+                        this.queue.order = (0..this.queue.tracks.len()).collect();
+                        this.playback.current_index = 0;
+                        this.playback.shuffling = false;
+                        this.playback.repeat = false;
+                        // notify via context
+                        // the inner cx here is the update context
+                    });
+                    controller.load_queue_current(app);
+                    controller.persist_queue_state(app);
+                });
             }
-        });
-
-        self.load_queue_current(cx);
-        self.persist_queue_state(cx);
+        })
+        .detach();
     }
 
     pub fn load_track(&self, track_id: TrackId, cx: &mut App) {
@@ -453,37 +463,45 @@ impl Controller {
     }
 
     pub fn request_playlist_thumbnails(&self, playlist_ids: &[PlaylistId], cx: &mut App) {
-        let mut cache_ids = Vec::new();
+        let ids: Vec<PlaylistId> = playlist_ids.to_vec();
+        let lib_tracks = self.state.read(cx).library.tracks.clone();
+        let db = cx.global::<crate::db::Database>().clone();
+        let image_tx = self.image_processor_tx.clone();
+        let cacher_tx = self.cacher_tx.clone();
 
-        let state = self.state.read(cx);
-        let playlists = &state.library.playlists;
+        cx.spawn(async move |app_cx| {
+            let pls = smol::unblock(move || {
+                let conn = db.pool().get()?;
+                crate::db::queries::playlists::load_playlists_with_tracks(&conn)
+            })
+            .await
+            .unwrap_or_default();
 
-        for pid in playlist_ids {
-            if let Some(playlist) = playlists.get(pid) {
-                if let Some(image_id) = playlist.image_id {
-                    cache_ids.push(image_id);
-                } else {
-                    let playlist_tracks = playlist.tracks.clone();
-                    let thumb_tracks = {
-                        let state = self.state.read(cx);
+            app_cx.update(|app| {
+                let mut cache_ids = Vec::new();
 
-                        pick_playlist_thumbnail_tracks(&state.library.tracks, &playlist_tracks, 4)
-                    };
-
-                    if !thumb_tracks.is_empty() {
-                        let _ = self.image_processor_tx.send(
-                            ImageProcessorCommand::PlaylistThumbnail {
-                                id: *pid,
-                                tracks: thumb_tracks,
-                            },
-                        );
+                for pid in ids.iter() {
+                    if let Some(p) = pls.iter().find(|pp| pp.id == *pid) {
+                        if let Some(image_id) = p.image_id {
+                            cache_ids.push(image_id);
+                        } else {
+                            let thumb_tracks =
+                                pick_playlist_thumbnail_tracks(&lib_tracks, &p.tracks, 4);
+                            if !thumb_tracks.is_empty() {
+                                let _ = image_tx.send(ImageProcessorCommand::PlaylistThumbnail {
+                                    id: *pid,
+                                    tracks: thumb_tracks,
+                                });
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        cx.global_mut::<ImageCache>()
-            .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
+                app.global_mut::<ImageCache>()
+                    .request(cache_ids, &cacher_tx, ImageKind::Playlist);
+            });
+        })
+        .detach();
     }
 
     pub fn get_lyrics(
