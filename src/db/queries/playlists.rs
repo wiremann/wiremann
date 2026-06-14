@@ -119,6 +119,22 @@ pub fn load_playlist_tracks(conn: &Connection, playlist_id: &Uuid) -> Result<Vec
     Ok(out)
 }
 
+pub fn set_playlist_image(conn: &Connection, playlist_id: &Uuid, image_hash: &[u8]) -> Result<()> {
+    use sea_query::{Query, Expr, ExprTrait, OnConflict, SqliteQueryBuilder};
+
+    let update = Query::update()
+        .table(Playlists::Table)
+        .values([(Playlists::ImageHash, Expr::val(image_hash.to_vec()))])
+        .and_where(Expr::col((Playlists::Table, Playlists::Id)).eq(Expr::val(playlist_id.to_string())))
+        .to_owned();
+
+    let (sql, values) = update.build_rusqlite(SqliteQueryBuilder);
+    let params = values.as_params();
+    conn.execute(&sql, params.as_slice())?;
+
+    Ok(())
+}
+
 fn execute_tx(tx: &Transaction, query: &sea_query::InsertStatement) -> Result<()> {
     let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
     let params = values.as_params();

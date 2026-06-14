@@ -3,9 +3,9 @@ use super::{
     ScannerEvent, ScanningStatus, ToastKind, ToastPhase, Wiremann,
 };
 
+use crate::controller::state::{ImageId, TrackId};
 use crate::db::Database;
 use crate::db::models::InsertedTrack;
-use crate::controller::state::{TrackId, ImageId};
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -34,6 +34,7 @@ impl Controller {
                         // Convert DB projection to UI rows and update UI on main thread after DB commit
                         view.update(app_cx, move |this, cx| {
                             let mut ui_rows: Vec<crate::ui::pages::library::models::LibraryTrackRow> = Vec::with_capacity(committed.len());
+                            let mut inserted_ids: Vec<TrackId> = Vec::with_capacity(committed.len());
 
                             for it in committed.into_iter() {
                                 if let Ok(arr) = <[u8;16]>::try_from(it.track_hash.clone()) {
@@ -49,13 +50,38 @@ impl Controller {
                                         duration_ms: it.duration_ms,
                                         image_id,
                                     });
+
+                                    inserted_ids.push(id);
                                 }
                             }
 
                             if !ui_rows.is_empty() {
+                                // Append rows into the library UI
                                 this.library_page.update(cx, |page, cx| {
                                     page.append_committed_rows(ui_rows, cx);
                                 });
+
+                                // Request thumbnails for newly-inserted tracks
+                                let controller = cx.global::<Controller>().clone();
+                                controller.request_track_thumbnails(&inserted_ids, cx);
+
+                                // If these tracks were inserted into a playlist, update in-memory playlist state
+                                if let Some(pid) = playlist_id.clone() {
+                                    controller.state.update(cx, |state, _| {
+                                        if let Some(pl) = state.library.playlists.get_mut(&pid) {
+                                            for id in &inserted_ids {
+                                                pl.tracks.push(*id);
+                                            }
+                                            // leave duration update to background jobs that compute thumbnails/artwork
+                                        }
+                                        // notify will be called below
+                                    });
+
+                                    // Persist library state cache and request playlist thumbnail generation
+                                    let state_clone = controller.state.read(cx).library.clone();
+                                    let _ = controller.cacher_tx.send(crate::controller::commands::CacherCommand::WriteLibraryState(state_clone));
+                                    controller.request_playlist_thumbnails(&[pid], cx);
+                                }
                             }
 
                             cx.notify();

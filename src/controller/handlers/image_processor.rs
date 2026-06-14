@@ -114,6 +114,21 @@ impl Controller {
                 });
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+
+                // Persist playlist image hash into the DB so it survives restarts
+                let db = cx.global::<crate::db::Database>().clone();
+                let pid = *id;
+                let iid = *image_id;
+
+                cx.spawn(async move |_cx| {
+                    let _ = smol::unblock(move || {
+                        let conn = db.pool().get()?;
+                        crate::db::queries::playlists::set_playlist_image(&conn, &pid.0, &iid.0.to_vec())?;
+                        Ok::<(), anyhow::Error>(())
+                    })
+                    .await;
+                })
+                .detach();
             }
         }
 

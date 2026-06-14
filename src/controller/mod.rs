@@ -466,7 +466,7 @@ impl Controller {
                         pick_playlist_thumbnail_tracks(&state.library.tracks, &playlist_tracks, 4)
                     };
 
-                    if thumb_tracks.len() >= 4 {
+                    if !thumb_tracks.is_empty() {
                         let _ = self.image_processor_tx.send(
                             ImageProcessorCommand::PlaylistThumbnail {
                                 id: *pid,

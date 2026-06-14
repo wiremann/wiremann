@@ -33,6 +33,8 @@ pub struct LibraryPage {
 
     playlists: Vec<LibraryPlaylistRow>,
 
+    last_fp: u128,
+
     track_pages: HashMap<usize, Vec<LibraryTrackRow>>,
 
     loaded_pages: HashSet<usize>,
@@ -103,6 +105,7 @@ impl LibraryPage {
             loaded_pages: HashSet::new(),
             loading_pages: HashSet::new(),
             total_track_count: 0,
+            last_fp: 0,
         }
     }
 
@@ -442,7 +445,48 @@ impl Render for LibraryPage {
         let theme = *cx.global::<Theme>();
 
         let controller = cx.global::<Controller>().clone();
-        let _state = controller.state.read(cx);
+        let state = controller.state.read(cx).clone();
+        // Compute fingerprints for tracks and playlists (include playlist metadata)
+        let tracks_fp =
+            crate::ui::helpers::fingerprint_tracks(state.library.tracks.keys().copied());
+
+        let mut playlists_fp: u128 = 0;
+        for pl in state.library.playlists.values() {
+            playlists_fp ^= u128::from_le_bytes(*pl.id.0.as_bytes());
+            playlists_fp ^= (pl.tracks.len() as u128).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+            if let Some(img) = pl.image_id {
+                playlists_fp ^= u128::from_le_bytes(img.0);
+            }
+        }
+
+        let combined_fp = tracks_fp ^ playlists_fp ^ (self.grid_cols as u128);
+
+        if combined_fp != self.last_fp {
+            // Rebuild playlist grid from the controller state
+            let playlists_vec: Vec<crate::ui::pages::library::models::LibraryPlaylistRow> = state
+                .library
+                .playlists
+                .values()
+                .map(|p| crate::ui::pages::library::models::LibraryPlaylistRow {
+                    id: p.id,
+                    name: p.name.clone(),
+                    track_count: p.tracks.len(),
+                    image_id: p.image_id,
+                })
+                .collect();
+
+            let (rows, heights) = build_initial_rows(
+                playlists_vec.len(),
+                self.total_track_count,
+                self.grid_cols,
+                &playlists_vec,
+            );
+
+            self.playlists = playlists_vec;
+            self.rows = Rc::new(rows);
+            self.heights = Rc::new(heights);
+            self.last_fp = combined_fp;
+        }
         let scroll_handle = self.scroll_handle.clone();
 
         let width = window.bounds().size.width;
