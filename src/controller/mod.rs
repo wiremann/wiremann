@@ -1,7 +1,6 @@
 pub mod commands;
 pub mod events;
 pub mod handlers;
-pub mod scan_manager;
 pub mod state;
 use crate::cacher::ImageKind;
 use crate::controller::commands::{
@@ -10,11 +9,9 @@ use crate::controller::commands::{
 use crate::controller::events::{
     CacherEvent, ImageProcessorEvent, LyricsEvent, SystemIntegrationEvent,
 };
-use crate::controller::scan_manager::{ScanJob, ScanManager};
+use crate::controller::state::PlaybackStatus;
 use crate::controller::state::PlaylistId;
-use crate::controller::state::{PlaybackStatus, Playlist, PlaylistSource};
 use crate::controller::state::{Track, TrackId};
-use crate::db::queries::{playback as db_playback, queue as db_queue};
 use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
@@ -31,12 +28,9 @@ use gpui::{App, Entity, Global, Rgba, rgb};
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
-use sea_query::ExprTrait;
-use sea_query_rusqlite::RusqliteBinder;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct Controller {
@@ -65,8 +59,6 @@ pub struct Controller {
     // Lyrics manager channel
     pub lyrics_manager_tx: Sender<LyricsCommand>,
     pub lyrics_manager_rx: Receiver<LyricsEvent>,
-
-    pub scan_manager: ScanManager,
 }
 
 impl Controller {
@@ -101,7 +93,6 @@ impl Controller {
             system_integration_rx,
             lyrics_manager_tx,
             lyrics_manager_rx,
-            scan_manager: ScanManager::default(),
         }
     }
 
@@ -125,246 +116,47 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
-        if let Some(track_id) = state.queue.get_id(state.playback.current_index) {
-            if let Some(track) = state.library.tracks.get(&track_id) {
-                if let Some(source) = track.get_valid_source() {
-                    self.audio_tx
-                        .send(AudioCommand::Load(track_id, source.path.clone()))
-                        .ok();
-                    self.image_processor_tx
-                        .send(ImageProcessorCommand::GetCurrentAlbumArt(
-                            track_id,
-                            source.path.clone(),
-                        ))
-                        .ok();
-                    return;
-                }
-            }
-
-            // Track not present in-memory or has no valid source — try to resolve a
-            // source path from the DB and load it. This preserves prior behavior
-            // where clicking a playlist would start playback even if the runtime
-            // track map wasn't fully populated yet.
-            let db = cx.global::<crate::db::Database>().clone();
-            let audio_tx = self.audio_tx.clone();
-            let image_tx = self.image_processor_tx.clone();
-            let tid = track_id;
-
-            cx.spawn(async move |_cx| {
-                let path_opt = smol::unblock(move || {
-                    use crate::db::tables::{TrackSources, Tracks};
-                    use sea_query::{Expr, Order, Query, SqliteQueryBuilder};
-
-                    let q = Query::select()
-                        .expr(Expr::col((TrackSources::Table, TrackSources::Path)))
-                        .from(TrackSources::Table)
-                        .join(
-                            sea_query::JoinType::InnerJoin,
-                            Tracks::Table,
-                            Expr::col((TrackSources::Table, TrackSources::TrackId))
-                                .equals((Tracks::Table, Tracks::Id)),
-                        )
-                        .and_where(
-                            Expr::col((Tracks::Table, Tracks::TrackHash))
-                                .eq(Expr::val(tid.0.to_vec())),
-                        )
-                        .order_by((TrackSources::Table, TrackSources::Modified), Order::Desc)
-                        .limit(1)
-                        .to_owned();
-
-                    let (sql, values) = q.build_rusqlite(SqliteQueryBuilder);
-                    let params = values.as_params();
-                    let conn = db.pool().get()?;
-                    let mut stmt = conn.prepare(&sql)?;
-
-                    let res = stmt.query_row(params.as_slice(), |row| row.get::<_, String>(0));
-                    match res {
-                        Ok(p) => Ok::<_, anyhow::Error>(Some(std::path::PathBuf::from(p))),
-                        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                        Err(e) => Err(anyhow::Error::new(e)),
-                    }
-                })
-                .await
-                .ok()
-                .flatten();
-
-                if let Some(path) = path_opt {
-                    audio_tx.send(AudioCommand::Load(tid, path.clone())).ok();
-                    image_tx
-                        .send(ImageProcessorCommand::GetCurrentAlbumArt(tid, path))
-                        .ok();
-                }
-            })
-            .detach();
+        if let Some(track_id) = state.queue.get_id(state.playback.current_index)
+            && let Some(track) = state.library.tracks.get(&track_id)
+            && let Some(source) = track.get_valid_source()
+        {
+            self.audio_tx
+                .send(AudioCommand::Load(track_id, source.path.clone()))
+                .ok();
+            self.image_processor_tx
+                .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                    track_id,
+                    source.path.clone(),
+                ))
+                .ok();
         }
-    }
-
-    pub fn persist_playback_state(&self, cx: &App) {
-        let db = cx.global::<crate::db::Database>().clone();
-        let state = self.state.read(cx).playback.clone();
-        cx.spawn(async move |_cx| {
-            let _ = smol::unblock(move || {
-                let mut conn = db.pool().get()?;
-                db_playback::save_playback_state(&mut conn, &state)
-            })
-            .await;
-        })
-        .detach();
-    }
-
-    pub fn persist_queue_state(&self, cx: &App) {
-        let db = cx.global::<crate::db::Database>().clone();
-        let queue = self.state.read(cx).queue.clone();
-        // Persist queue using play order (queue.order) so shuffle is preserved across restarts.
-        cx.spawn(async move |_cx| {
-            let _ = smol::unblock(move || {
-                let mut conn = db.pool().get()?;
-
-                // Build a copy of tracks in play order
-                let mut ordered: Vec<crate::controller::state::TrackId> = Vec::new();
-                for &idx in queue.order.iter() {
-                    if let Some(id) = queue.tracks.get(idx) {
-                        ordered.push(*id);
-                    }
-                }
-
-                // Fallback: if order empty or mismatch, use queue.tracks
-                let to_save = if ordered.is_empty() {
-                    queue.tracks.clone()
-                } else {
-                    ordered
-                };
-
-                let len = to_save.len();
-                let order_vec: Vec<usize> = (0..len).collect();
-                db_queue::save_queue(
-                    &mut conn,
-                    &crate::controller::state::QueueState {
-                        tracks: to_save,
-                        order: order_vec,
-                    },
-                )
-            })
-            .await;
-        })
-        .detach();
     }
 
     pub fn get_pos(&self) {
         let _ = self.audio_tx.send(AudioCommand::GetPosition);
     }
 
-    pub fn scan_dir(&mut self, cx: &mut App, path: PathBuf) {
-        if path.is_dir() {
-            let playlist_id = PlaylistId(Uuid::new_v4());
-
-            let playlist = Playlist {
-                id: playlist_id,
-                name: path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Unnamed Playlist")
-                    .to_string(),
-                source: PlaylistSource::Folder,
-                folder_path: Some(path.clone()),
-                tracks: Vec::new(),
-                duration: Duration::from_secs(0),
-                image_id: None,
-            };
-
-            // Persist playlist to DB first, then update in-memory state and start scan.
-            let db = cx.global::<crate::db::Database>().clone();
-            let mut controller = self.clone();
-            let playlist_clone = playlist.clone();
-            let pid = playlist_clone.id;
-            let pname = playlist_clone.name.clone();
-            let scan_path = path.clone();
-
-            cx.spawn(async move |app_cx| {
-                let _ = smol::unblock(move || {
-                    let mut conn = db.pool().get()?;
-                    let tx = conn.transaction()?;
-                    crate::db::queries::playlists::insert_playlist(&tx, &pid.0, &pname, "folder")?;
-                    tx.commit()?;
-                    Ok::<(), anyhow::Error>(())
-                })
-                .await;
-
-                app_cx.update(|app| {
-                    controller.state.update(app, |this, cx| {
-                        this.library.playlists.insert(pid, playlist_clone.clone());
-                        cx.notify();
-                    });
-
-                    controller.enqueue_scan(scan_path, Some(pid));
-                });
-            })
-            .detach();
-        }
-    }
-
-    pub fn enqueue_scan(&mut self, path: PathBuf, playlist_id: Option<PlaylistId>) {
-        let id = self.scan_manager.next_job_id();
-
-        let job = ScanJob {
-            id,
-            path,
-            playlist_id,
-        };
-
-        self.scan_manager.enqueue(job);
-
-        if self.scan_manager.is_idle() {
-            self.start_next_scan();
-        }
-    }
-
-    fn start_next_scan(&mut self) {
-        let job = match self.scan_manager.dequeue() {
-            Some(job) => job,
-            None => {
-                self.scan_manager.set_idle();
-                return;
-            }
-        };
-
-        self.scan_manager.start_job(job.id);
-
-        let _ = self.scanner_tx.send(ScannerCommand::ScanDir(job));
+    pub fn scan_dir(&self, path: PathBuf) {
+        let _ = self.scanner_tx.send(ScannerCommand::ScanDir(path));
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
-        let db = cx.global::<crate::db::Database>().clone();
-        let controller = self.clone();
-        let pid = id;
+        self.state.update(cx, |this, cx| {
+            if let Some(playlist) = this.library.playlists.get(&id) {
+                this.playback.current_playlist = Some(playlist.id);
+                this.queue.tracks.clone_from(&playlist.tracks);
+                this.queue.order = (0..playlist.tracks.len()).collect();
+                this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
 
-        cx.spawn(async move |cx2| {
-            let res = smol::unblock(move || {
-                let conn = db.pool().get()?;
-                let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
-                Ok::<_, anyhow::Error>(pls.into_iter().find(|p| p.id == pid))
-            })
-            .await
-            .ok();
-
-            if let Some(Some(p)) = res {
-                cx2.update(|app| {
-                    controller.state.update(app, |this, _| {
-                        this.playback.current_playlist = Some(p.id);
-                        this.queue.tracks = p.tracks.clone();
-                        this.queue.order = (0..this.queue.tracks.len()).collect();
-                        this.playback.current_index = 0;
-                        this.playback.shuffling = false;
-                        this.playback.repeat = false;
-                        // notify via context
-                        // the inner cx here is the update context
-                    });
-                    controller.load_queue_current(app);
-                    controller.persist_queue_state(app);
-                });
+                cx.notify();
             }
-        })
-        .detach();
+        });
+
+        self.load_queue_current(cx);
+        let state = self.state.read(cx).queue.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
     pub fn load_track(&self, track_id: TrackId, cx: &mut App) {
@@ -395,7 +187,8 @@ impl Controller {
         });
 
         self.load_queue_current(cx);
-        self.persist_queue_state(cx);
+        let state = self.state.read(cx).queue.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
     pub fn scan_track(&self, path: PathBuf) {
@@ -418,7 +211,10 @@ impl Controller {
         self.state.update(cx, |this, _| {
             this.playback.repeat = !this.playback.repeat;
         });
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).playback.clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state));
     }
 
     pub fn set_mute(&self, cx: &mut App) {
@@ -433,7 +229,10 @@ impl Controller {
                     this.playback.volume
                 }));
         });
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).playback.clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state));
     }
 
     pub fn set_volume(&self, vol: f32, cx: &mut App) {
@@ -447,7 +246,10 @@ impl Controller {
             .audio_tx
             .send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
 
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).playback.clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state));
     }
 
     pub fn set_shuffle(&self, cx: &mut App) {
@@ -478,8 +280,13 @@ impl Controller {
             }
         });
 
-        self.persist_queue_state(cx);
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteQueueState(state.queue));
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state.playback));
     }
 
     pub fn next(&self, cx: &mut App) {
@@ -490,8 +297,13 @@ impl Controller {
 
         self.load_queue_current(cx);
 
-        self.persist_queue_state(cx);
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteQueueState(state.queue));
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state.playback));
     }
     pub fn prev(&self, cx: &mut App) {
         self.state.update(cx, |this, _| {
@@ -500,8 +312,13 @@ impl Controller {
 
         self.load_queue_current(cx);
 
-        self.persist_queue_state(cx);
-        self.persist_playback_state(cx);
+        let state = self.state.read(cx).clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteQueueState(state.queue));
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(state.playback));
     }
 
     pub fn seek(&self, pos: Duration) {
@@ -548,45 +365,37 @@ impl Controller {
     }
 
     pub fn request_playlist_thumbnails(&self, playlist_ids: &[PlaylistId], cx: &mut App) {
-        let ids: Vec<PlaylistId> = playlist_ids.to_vec();
-        let lib_tracks = self.state.read(cx).library.tracks.clone();
-        let db = cx.global::<crate::db::Database>().clone();
-        let image_tx = self.image_processor_tx.clone();
-        let cacher_tx = self.cacher_tx.clone();
+        let mut cache_ids = Vec::new();
 
-        cx.spawn(async move |app_cx| {
-            let pls = smol::unblock(move || {
-                let conn = db.pool().get()?;
-                crate::db::queries::playlists::load_playlists_with_tracks(&conn)
-            })
-            .await
-            .unwrap_or_default();
+        let state = self.state.read(cx);
+        let playlists = &state.library.playlists;
 
-            app_cx.update(|app| {
-                let mut cache_ids = Vec::new();
+        for pid in playlist_ids {
+            if let Some(playlist) = playlists.get(pid) {
+                if let Some(image_id) = playlist.image_id {
+                    cache_ids.push(image_id);
+                } else {
+                    let playlist_tracks = playlist.tracks.clone();
+                    let thumb_tracks = {
+                        let state = self.state.read(cx);
 
-                for pid in ids.iter() {
-                    if let Some(p) = pls.iter().find(|pp| pp.id == *pid) {
-                        if let Some(image_id) = p.image_id {
-                            cache_ids.push(image_id);
-                        } else {
-                            let thumb_tracks =
-                                pick_playlist_thumbnail_tracks(&lib_tracks, &p.tracks, 4);
-                            if !thumb_tracks.is_empty() {
-                                let _ = image_tx.send(ImageProcessorCommand::PlaylistThumbnail {
-                                    id: *pid,
-                                    tracks: thumb_tracks,
-                                });
-                            }
-                        }
+                        pick_playlist_thumbnail_tracks(&state.library.tracks, &playlist_tracks, 4)
+                    };
+
+                    if thumb_tracks.len() >= 4 {
+                        let _ = self.image_processor_tx.send(
+                            ImageProcessorCommand::PlaylistThumbnail {
+                                id: *pid,
+                                tracks: thumb_tracks,
+                            },
+                        );
                     }
                 }
+            }
+        }
 
-                app.global_mut::<ImageCache>()
-                    .request(cache_ids, &cacher_tx, ImageKind::Playlist);
-            });
-        })
-        .detach();
+        cx.global_mut::<ImageCache>()
+            .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
     }
 
     pub fn get_lyrics(

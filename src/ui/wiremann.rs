@@ -1,5 +1,4 @@
 use crate::controller::Controller;
-use crate::db::Database;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::lyrics::{LyricsState, LyricsStateInner};

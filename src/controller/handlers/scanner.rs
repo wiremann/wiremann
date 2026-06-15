@@ -1,11 +1,4 @@
-use super::{
-    App, Controller, ControllerError, Entity, ImageKind, ImageProcessorCommand, Instant,
-    ScannerEvent, ScanningStatus, ToastKind, ToastPhase, Wiremann,
-};
-
-use crate::controller::state::{ImageId, TrackId};
-use crate::db::Database;
-use crate::db::models::InsertedTrack;
+use super::{Controller, App, ScannerEvent, Entity, Wiremann, ControllerError, HashSet, Arc, CacherCommand, ScanningStatus, ScannerCommand, TrackId, PathBuf, ImageProcessorCommand, ImageKind, ToastKind, ToastPhase, Instant, PlaylistId};
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -15,164 +8,101 @@ impl Controller {
         view: &Entity<Wiremann>,
     ) -> Result<(), ControllerError> {
         match event {
-            ScannerEvent::UpsertTracks(tracks, playlist_id) => {
-                let db = cx.global::<Database>().clone();
-                let tracks = tracks.clone();
-                let playlist_id = playlist_id.clone();
-                let view = view.clone();
+            ScannerEvent::UpsertTracks(tracks) => {
+                let mut modified_playlists = HashSet::new();
+                self.state.update(cx, |this, cx| {
+                    this.library.tracks.reserve(tracks.len());
+                    for (track, playlist_id) in tracks {
+                        let id = track.id;
 
-                cx.spawn(async move |app_cx| {
-                    let db_for_commit = db.clone();
+                        if let Some(existing) = this.library.tracks.get_mut(&id) {
+                            let existing = Arc::make_mut(existing);
 
-                    // Clone tracks for DB commit so we don't move the original `tracks`
-                    // which we need later for mapping sources into runtime state.
-                    let tracks_db = tracks.clone();
-
-                    let committed = smol::unblock(move || {
-                            let mut conn = db_for_commit.pool().get()?;
-
-                            crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks_db, playlist_id)
-                        })
-                    .await
-                    .unwrap_or_else(|_| Vec::new());
-
-                    if !committed.is_empty() {
-                        // Build a mapping from scanned metadata to source info so we can
-                        // populate runtime `Track` sources for immediate thumbnail work.
-                        use std::collections::HashMap;
-                        use crate::scanner::ScannedTrack as ScannerScannedTrack;
-
-                        let mut hash_to_source: HashMap<Vec<u8>, crate::scanner::ScannedTrackSource> = HashMap::new();
-                        for st in tracks.iter() {
-                            if let Ok(id) = crate::controller::state::TrackId::generate(
-                                &st.title,
-                                &st.artists.join(", "),
-                                st.album.as_deref().unwrap_or(""),
-                            ) {
-                                hash_to_source.insert(id.0.to_vec(), st.source.clone());
+                            for src in &track.sources {
+                                if !existing.sources.iter().any(|s| s.path == src.path) {
+                                    existing.sources.push(src.clone());
+                                }
                             }
+
+                            if existing.title.is_empty() && !track.title.is_empty() {
+                                existing.title.clone_from(&track.title);
+                            }
+
+                            if existing.artist.is_empty() && !track.artist.is_empty() {
+                                existing.artist.clone_from(&track.artist);
+                            }
+
+                            if existing.album.is_empty() && !track.album.is_empty() {
+                                existing.album.clone_from(&track.album);
+                            }
+                        } else {
+                            this.library.tracks.insert(id, Arc::new(track.clone()));
                         }
-                        // Convert DB projection to UI rows and update UI on main thread after DB commit
-                        view.update(app_cx, move |this, cx| {
-                            let mut ui_rows: Vec<crate::ui::pages::library::models::LibraryTrackRow> = Vec::with_capacity(committed.len());
-                            let mut inserted_ids: Vec<TrackId> = Vec::with_capacity(committed.len());
 
-                            for it in committed.into_iter() {
-                                if let Ok(arr) = <[u8;16]>::try_from(it.track_hash.clone()) {
-                                    let id = TrackId(arr);
-
-                                    let image_id = it.image_hash.as_ref().and_then(|b| ImageId::generate(b).ok());
-
-                                    ui_rows.push(crate::ui::pages::library::models::LibraryTrackRow {
-                                        id,
-                                        title: it.name.clone(),
-                                        artists: it.artists.clone(),
-                                        album: it.album.clone().unwrap_or_else(|| "Unknown Album".into()),
-                                        duration_ms: it.duration_ms,
-                                        image_id,
-                                    });
-
-                                    inserted_ids.push(id);
-                                    // capture source if available
-                                    let source_opt = hash_to_source.get(&it.track_hash).cloned();
-                                    let _source = source_opt;
-                                }
+                        if let Some(pid) = playlist_id
+                            && let Some(playlist) = this.library.playlists.get_mut(pid)
+                        {
+                            if !playlist.tracks.contains(&id) {
+                                playlist.tracks.push(id);
                             }
-
-                            if !ui_rows.is_empty() {
-                                // Insert Track objects into controller state so thumbnails and other
-                                // track-based operations can run immediately without requiring a
-                                // restart to load DB-backed state. Populate `sources` from the
-                                // scanned metadata we captured above when available.
-                                let controller = cx.global::<Controller>().clone();
-                                controller.state.update(cx, |state, _| {
-                                    for it in ui_rows.iter() {
-                                        use crate::controller::state::{Track, TrackSource};
-                                        let id = it.id;
-                                        if !state.library.tracks.contains_key(&id) {
-                                            let mut sources: Vec<TrackSource> = Vec::new();
-                                            if let Some(src) = hash_to_source.get(&it.id.0.to_vec()) {
-                                                sources.push(TrackSource {
-                                                    path: src.path.clone(),
-                                                    size: src.size,
-                                                    modified: src.modified,
-                                                });
-                                            }
-
-                                            let track = Track {
-                                                id,
-                                                sources,
-                                                title: it.title.clone(),
-                                                artist: it.artists.clone(),
-                                                album: it.album.clone(),
-                                                duration: std::time::Duration::from_millis(it.duration_ms as u64),
-                                                image_id: it.image_id,
-                                            };
-
-                                            state.library.tracks.insert(id, std::sync::Arc::new(track));
-                                        }
-                                    }
-                                    // notify will be called below
-                                });
-
-                                // Append rows into the library UI
-                                this.library_page.update(cx, |page, cx| {
-                                    page.append_committed_rows(ui_rows, cx);
-                                });
-
-                                // Request thumbnails for newly-inserted tracks (state now contains tracks)
-                                let controller = cx.global::<Controller>().clone();
-                                controller.request_track_thumbnails(&inserted_ids, cx);
-
-                                // Do NOT mutate playlist canonical state here — we'll refresh from DB below.
-                            }
-
-                            cx.notify();
-                        });
-
-                        // If these tracks were inserted into a playlist, refresh derived playlist snapshot from DB
-                        if let Some(pid) = playlist_id.clone() {
-                            let db2 = db.clone();
-                            let pid2 = pid;
-
-                            let app_cx2 = app_cx.clone();
-                            app_cx.spawn(async move |_cx| {
-                                let proj = smol::unblock(move || {
-                                    let conn = db2.pool().get()?;
-                                    let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
-                                    Ok::<_, anyhow::Error>(pls.into_iter().find(|p| p.id == pid2))
-                                })
-                                .await
-                                .ok();
-
-                                if let Some(Some(p)) = proj {
-                                    app_cx2.update(|app| {
-                                        let controller = app.global::<Controller>().clone();
-                                        controller.state.update(app, |state, cx| {
-                                            state.library.playlists.insert(
-                                                p.id,
-                                                crate::controller::state::Playlist {
-                                                    id: p.id,
-                                                    name: p.name,
-                                                    source: p.source,
-                                                    folder_path: None,
-                                                    duration: std::time::Duration::from_secs(0),
-                                                    tracks: p.tracks,
-                                                    image_id: p.image_id,
-                                                },
-                                            );
-                                            cx.notify();
-                                        });
-                                    });
-                                }
-                            }).detach();
+                            modified_playlists.insert(*pid);
                         }
                     }
-                })
-                .detach();
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
+            ScannerEvent::InsertTracksIntoPlaylist(pid, tids) => {
+                self.state.update(cx, |this, cx| {
+                    if let Some(playlist) = this.library.playlists.get_mut(pid) {
+                        for tid in tids {
+                            if !playlist.tracks.contains(tid) {
+                                playlist.tracks.push(*tid);
+                            }
+                        }
+                    }
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::AddTrackSource(id, source) => {
+                self.state.update(cx, |this, cx| {
+                    if let Some(track) = this.library.tracks.get_mut(id) {
+                        Arc::make_mut(track).sources.push(source.clone());
+                    }
 
-            ScannerEvent::ScanStarted(_) => {
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::RemoveTrackSource(id, path) => {
+                self.state.update(cx, |this, cx| {
+                    if let Some(track) = this.library.tracks.get_mut(id)
+                        && let Some(source) =
+                            track.sources.iter().position(|this| this.path == *path)
+                    {
+                        Arc::make_mut(track).sources.remove(source);
+                    }
+
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::InsertPlaylist(playlist) => {
+                self.state.update(cx, |this, cx| {
+                    this.library.playlists.insert(playlist.id, playlist.clone());
+
+                    cx.notify();
+                });
+
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
+            }
+            ScannerEvent::ScanStarted => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().clone().0;
 
                 scanning_status.update(cx, |this, cx| {
@@ -187,38 +117,58 @@ impl Controller {
                         this.info("Scanning started...", cx);
                         this.scanning_status(cx);
                     });
-
                     cx.notify();
                 });
             }
-
             ScannerEvent::Discovered(discovered) => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
                 scanning_status.update(cx, |this, cx| {
-                    this.is_discovering = true;
+                    if !this.is_discovering {
+                        this.is_discovering = true;
+                    }
+
                     this.discovered = *discovered;
 
                     cx.notify();
                 });
             }
-
             ScannerEvent::Processed { processed, total } => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
                 scanning_status.update(cx, |this, cx| {
-                    this.is_discovering = false;
-                    this.is_processing = true;
+                    if this.is_discovering {
+                        this.is_discovering = false;
+                    }
+                    if !this.is_processing {
+                        this.is_processing = true;
+                    }
 
                     this.total = *total;
                     this.processed = *processed;
-
                     cx.notify();
                 });
             }
+            ScannerEvent::ScanFinished => {
+                self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
+                let tracks = self.state.read(cx).library.tracks.clone();
 
-            ScannerEvent::ScanFinished(_) => {
-                self.start_next_scan();
+                let to_request: HashSet<(TrackId, PathBuf)> = tracks
+                    .iter()
+                    .filter(|(_, track)| track.image_id.is_none())
+                    .filter_map(|(id, track)| {
+                        track
+                            .get_valid_source()
+                            .map(|src| src.path.clone())
+                            .map(|path| (*id, path))
+                    })
+                    .collect();
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::GetThumbnails(
+                        to_request,
+                        ImageKind::ThumbnailSmall,
+                    ));
 
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
@@ -232,13 +182,11 @@ impl Controller {
                                 }
                             }
                         });
-
                         this.success("Scan complete!", cx);
                     });
                 });
 
                 let status = cx.global::<ScanningStatus>().0.clone();
-
                 status.update(cx, |s, _| {
                     s.is_scanning = false;
                     s.is_discovering = false;
@@ -249,52 +197,21 @@ impl Controller {
                     s.processed = 0;
                 });
 
-                let db = cx.global::<Database>().clone();
-                let image_tx = self.image_processor_tx.clone();
-
-                cx.spawn(async move |_cx| {
-                    let missing = smol::unblock(move || {
-                        let conn = db.pool().get()?;
-
-                        crate::db::queries::images::get_tracks_missing_thumbnails(&conn)
+                let library = cx.global::<Controller>().state.read(cx).library.clone();
+                let missing: Vec<PlaylistId> = library
+                    .playlists
+                    .iter()
+                    .filter_map(|(id, playlist)| {
+                        if playlist.image_id.is_none() {
+                            Some(*id)
+                        } else {
+                            None
+                        }
                     })
-                    .await
-                    .unwrap();
-
-                    image_tx
-                        .send(ImageProcessorCommand::GetThumbnails(
-                            missing,
-                            ImageKind::ThumbnailSmall,
-                        ))
-                        .ok();
-                })
-                .detach();
-
-                let db = cx.global::<Database>().clone();
-                let image_tx = self.image_processor_tx.clone();
-
-                cx.spawn(async move |_cx| {
-                    let playlists = smol::unblock(move || {
-                        let conn = db.pool().get()?;
-
-                        crate::db::queries::images::get_playlist_thumbnail_jobs(&conn)
-                    })
-                    .await
-                    .unwrap();
-
-                    for (playlist_id, paths) in playlists {
-                        image_tx
-                            .send(ImageProcessorCommand::PlaylistThumbnail {
-                                id: playlist_id,
-                                tracks: paths,
-                            })
-                            .ok();
-                    }
-                })
-                .detach();
+                    .collect();
+                self.request_playlist_thumbnails(&missing, cx);
             }
         }
-
         Ok(())
     }
 }

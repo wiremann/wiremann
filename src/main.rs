@@ -16,7 +16,6 @@ pub mod app;
 pub mod audio;
 pub mod cacher;
 pub mod controller;
-pub mod db;
 pub mod errors;
 pub mod image_processor;
 pub mod logging;

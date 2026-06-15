@@ -1,5 +1,4 @@
 use crate::cacher::ImageKind;
-use crate::controller::scan_manager::ScanJob;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
 use crate::controller::state::{LibraryState, PlaybackState, PlaybackStatus, QueueState};
@@ -20,8 +19,9 @@ pub enum AudioCommand {
 }
 
 pub enum ScannerCommand {
-    ScanDir(ScanJob),
+    ScanDir(PathBuf),
     ScanTrack(PathBuf),
+    StartNextScan,
 }
 
 pub enum ImageProcessorCommand {

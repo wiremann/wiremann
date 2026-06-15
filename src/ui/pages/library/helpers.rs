@@ -1,8 +1,9 @@
 use crate::controller::Controller;
+use crate::controller::state::LibraryState;
 use crate::controller::state::PlaylistId;
+use crate::controller::state::TrackId;
 use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
-use crate::ui::pages::library::models::LibraryPlaylistRow;
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -19,22 +20,11 @@ pub(super) enum HeaderKind {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
-pub enum LibraryRow {
+pub(super) enum LibraryRow {
     Header(HeaderKind),
-
-    PlaylistGridRow(Vec<LibraryPlaylistRow>),
-
+    PlaylistGridRow(Vec<PlaylistId>),
     TrackTableHeader,
-
-    LoadedTrack {
-        absolute_index: usize,
-        page: usize,
-        offset: usize,
-    },
-
-    PlaceholderTrack,
-
+    TrackRow(usize, TrackId),
     Empty(HeaderKind),
 }
 
@@ -75,10 +65,9 @@ pub(super) fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div 
                 .hover(|this| this.bg(theme.library_header_button_bg_hover))
                 .on_click(move |_, _, cx| {
                     let controller = cx.global::<Controller>().clone();
-                    cx.spawn(async move |cx| {
-                        let mut controller = controller;
+                    cx.spawn(async move |_| {
                         if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
-                            cx.update(|app| controller.scan_dir(app, folder.path().into()));
+                            controller.scan_dir(folder.path().into());
                         }
                     })
                     .detach();
@@ -117,14 +106,9 @@ pub(super) fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div 
         })
 }
 
-pub(super) fn render_playlist_grid(
-    playlists: &[LibraryPlaylistRow],
-    height: Pixels,
-    cx: &mut App,
-) -> Div {
+pub(super) fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
+    let controller = cx.global::<Controller>().clone();
     let theme = *cx.global::<Theme>();
-
-    let cache = cx.global_mut::<ImageCache>();
 
     div()
         .h(height)
@@ -132,14 +116,21 @@ pub(super) fn render_playlist_grid(
         .gap_8()
         .py_2()
         .items_center()
-        .children(
-            playlists
-                .iter()
-                .map(|playlist| {
+        .children({
+            let state = controller.state.read(cx).clone();
+
+            controller.request_playlist_thumbnails(ids, cx);
+
+            let cache = cx.global_mut::<ImageCache>();
+
+            let mut elements = Vec::new();
+
+            for pid in ids {
+                if let Some(playlist) = state.library.playlists.get(pid) {
                     let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
 
-                    div()
-                        .id(format!("playlist_{:?}", playlist.id.0))
+                    let el = div()
+                        .id(format!("playlist_{}", playlist.id.0))
                         .bg(theme.library_playlist_bg)
                         .size_full()
                         .max_w_64()
@@ -152,8 +143,21 @@ pub(super) fn render_playlist_grid(
                         .rounded_lg()
                         .hover(|this| this.bg(theme.library_playlist_bg_hover))
                         .cursor_pointer()
+                        .on_click({
+                            let id = playlist.id;
+                            move |_, _, cx| {
+                                let controller = cx.global::<Controller>().clone();
+
+                                controller.load_playlist(id, cx);
+                                *cx.global_mut::<Page>() = Page::Player;
+                            }
+                        })
+                        .when(
+                            state.playback.current_playlist == Some(playlist.id),
+                            |this| this.bg(theme.library_playlist_bg_active),
+                        )
                         .child(match thumbnail {
-                            Some(image) => div().size(px(160.0)).mb_3().child(
+                            Some(image) => div().size_full().mb_3().child(
                                 img(ImageSource::Render(image.clone()))
                                     .object_fit(ObjectFit::Contain)
                                     .border_1()
@@ -161,8 +165,7 @@ pub(super) fn render_playlist_grid(
                                     .size_full()
                                     .rounded_lg(),
                             ),
-
-                            None => div().size(px(160.0)).mb_3().child(
+                            None => div().size_full().mb_3().child(
                                 img("icons/placeholder.svg")
                                     .object_fit(ObjectFit::Contain)
                                     .border_1()
@@ -182,11 +185,16 @@ pub(super) fn render_playlist_grid(
                             div()
                                 .text_sm()
                                 .text_color(theme.library_playlist_meta_text)
-                                .child(format!("{} tracks", playlist.track_count)),
-                        )
-                })
-                .collect::<Vec<_>>(),
-        )
+                                .font_weight(FontWeight::MEDIUM)
+                                .child(format!("{} tracks", playlist.tracks.len())),
+                        );
+
+                    elements.push(el);
+                }
+            }
+
+            elements
+        })
 }
 
 pub(super) fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
@@ -249,31 +257,25 @@ pub(super) fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
         )
 }
 
-pub(super) fn build_initial_rows(
-    playlist_count: usize,
-    total_track_count: usize,
-    cols: usize,
-    playlists: &[LibraryPlaylistRow],
-) -> (Vec<LibraryRow>, Vec<Pixels>) {
+pub(super) fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();
 
     rows.push(LibraryRow::Header(HeaderKind::Playlists));
     heights.push(px(60.0));
 
-    if playlists.is_empty() {
+    if library.playlists.is_empty() {
         rows.push(LibraryRow::Empty(HeaderKind::Playlists));
         heights.push(px(192.0));
     } else {
         let mut chunk = Vec::with_capacity(cols);
 
-        for playlist in playlists {
-            chunk.push(playlist.clone());
+        for pid in library.playlists.keys() {
+            chunk.push(*pid);
 
             if chunk.len() == cols {
                 rows.push(LibraryRow::PlaylistGridRow(chunk));
                 heights.push(px(280.0));
-
                 chunk = Vec::with_capacity(cols);
             }
         }
@@ -283,22 +285,24 @@ pub(super) fn build_initial_rows(
             heights.push(px(280.0));
         }
     }
-
     rows.push(LibraryRow::Header(HeaderKind::Tracks));
     heights.push(px(60.0));
 
-    if total_track_count == 0 {
+    if library.tracks.is_empty() {
         rows.push(LibraryRow::Empty(HeaderKind::Tracks));
         heights.push(px(192.0));
     } else {
+        let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
+
+        sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
+
         rows.push(LibraryRow::TrackTableHeader);
         heights.push(px(40.0));
 
-        for _ in 0..total_track_count {
-            rows.push(LibraryRow::PlaceholderTrack);
+        for (i, track) in sorted_tracks.iter().enumerate() {
+            rows.push(LibraryRow::TrackRow(i + 1, track.id));
             heights.push(px(60.0));
         }
     }
-
     (rows, heights)
 }

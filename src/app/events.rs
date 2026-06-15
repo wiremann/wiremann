@@ -18,39 +18,51 @@ pub fn spawn_event_loop(cx: &mut App, controller: Controller, arc_res: Arc<Entit
 
         loop {
             while let Ok(e) = controller.audio_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::Audio(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::Audio(e));
+                    })
+                    .ok();
             }
 
             while let Ok(e) = controller.scanner_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::Scanner(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::Scanner(e));
+                    })
+                    .ok();
             }
 
             while let Ok(e) = controller.cacher_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::Cacher(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::Cacher(e));
+                    })
+                    .ok();
             }
 
             while let Ok(e) = controller.image_processor_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::ImageProcessor(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::ImageProcessor(e));
+                    })
+                    .ok();
             }
 
             while let Ok(e) = controller.system_integration_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::SystemIntegration(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::SystemIntegration(e));
+                    })
+                    .ok();
             }
 
             while let Ok(e) = controller.lyrics_manager_rx.try_recv() {
-                arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::LyricsEvent(e));
-                });
+                arc_res
+                    .update(cx, |res_handler, cx| {
+                        res_handler.handle(cx, Event::LyricsEvent(e));
+                    })
+                    .ok();
             }
 
             if last_pos_request.elapsed() >= Duration::from_millis(16) {

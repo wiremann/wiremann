@@ -1,36 +1,30 @@
 pub mod metadata;
-
 use crate::app::AppPaths;
 use crate::cacher::CachedTrackSource;
-use crate::controller::scan_manager::ScanJob;
-use crate::controller::{
-    commands::ScannerCommand,
-    events::ScannerEvent,
-    state::{PlaylistId, TrackId},
+use crate::controller::state::{Playlist, PlaylistId, PlaylistSource};
+use crate::controller::state::{Track, TrackSource};
+use crate::{
+    controller::{commands::ScannerCommand, events::ScannerEvent, state::TrackId},
+    errors::ScannerError,
 };
-use crate::errors::ScannerError;
-
 use crossbeam_channel::{Receiver, Sender, select, tick};
-
 use dashmap::DashMap;
-
-use std::io;
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
-    time::Duration,
-};
-
+use std::cmp::PartialEq;
+use std::collections::{HashMap, VecDeque};
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
+use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub struct Scanner {
     pub tx: Sender<ScannerEvent>,
     pub rx: Receiver<ScannerCommand>,
+
+    state: State,
+    queue: VecDeque<PathBuf>,
 
     app_paths: AppPaths,
 
@@ -38,54 +32,19 @@ pub struct Scanner {
     scan_record: ScanRecord,
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct ScannedTrack {
-    pub source: ScannedTrackSource,
-
-    pub title: String,
-    pub artists: Vec<String>,
-    pub album: Option<String>,
-
-    pub duration: Duration,
-
-    pub image: Option<Box<[u8]>>,
-}
-
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
-pub struct ScannedTrackSource {
-    pub path: PathBuf,
-    pub size: u64,
-    pub modified: u64,
+#[derive(PartialEq)]
+enum State {
+    Idle,
+    Scanning,
 }
 
 struct ScanProgress {
     discovery_done: AtomicBool,
     total: AtomicUsize,
     processed: AtomicUsize,
-    finished_sent: AtomicBool,
 }
 
-type ScanRecord = Arc<DashMap<ScannedTrackSource, TrackId>>;
-
-impl ScannedTrackSource {
-    #[allow(clippy::missing_errors_doc)]
-    pub fn generate(path: &Path) -> Result<Self, io::Error> {
-        let meta = std::fs::metadata(path)?;
-        let modified = meta
-            .modified()?
-            .elapsed()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-            .as_secs();
-
-        let size = meta.len();
-
-        Ok(ScannedTrackSource {
-            path: path.to_path_buf(),
-            modified,
-            size,
-        })
-    }
-}
+type ScanRecord = Arc<DashMap<TrackSource, TrackId>>;
 
 impl Scanner {
     #[must_use]
@@ -93,9 +52,12 @@ impl Scanner {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
 
-        let scanner = Self {
+        let scanner = Scanner {
             tx: event_tx,
             rx: cmd_rx,
+
+            state: State::Idle,
+            queue: VecDeque::new(),
 
             app_paths,
 
@@ -103,40 +65,54 @@ impl Scanner {
                 discovery_done: AtomicBool::new(false),
                 total: AtomicUsize::new(0),
                 processed: AtomicUsize::new(0),
-                finished_sent: AtomicBool::new(false),
             }),
-
             scan_record: Arc::new(DashMap::new()),
         };
 
         (scanner, cmd_tx, event_rx)
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn run(&mut self, metadata_workers: usize) -> Result<(), ScannerError> {
-        let (worker_tx, worker_rx) = crossbeam_channel::bounded::<(ScanJob, PathBuf)>(64);
+        let (worker_tx, worker_rx) = crossbeam_channel::bounded(64);
 
         self.spawn_metadata_workers(&worker_rx, metadata_workers);
 
         loop {
             match self.rx.recv()? {
-                ScannerCommand::ScanDir(job) => {
-                    self.scan_folder(job, &worker_tx);
+                ScannerCommand::ScanDir(path) => {
+                    self.queue.push_back(path);
+
+                    if self.state == State::Idle
+                        && let Some(path) = self.queue.pop_front()
+                    {
+                        self.state = State::Scanning;
+                        self.scan_folder(path, &worker_tx);
+                    }
                 }
+                ScannerCommand::StartNextScan => {
+                    self.state = State::Idle;
+                    self.write_scan_record();
 
+                    if self.state == State::Idle
+                        && let Some(path) = self.queue.pop_front()
+                    {
+                        self.state = State::Scanning;
+                        self.scan_folder(path, &worker_tx);
+                    }
+                }
                 ScannerCommand::ScanTrack(path) => {
-                    let job = ScanJob {
-                        id: 0,
-                        path: path.clone(),
-                        playlist_id: None,
-                    };
-
-                    worker_tx.send((job, path)).ok();
+                    worker_tx.send((path, None)).ok();
                 }
             }
         }
     }
 
-    fn spawn_metadata_workers(&self, worker_rx: &Receiver<(ScanJob, PathBuf)>, workers: usize) {
+    fn spawn_metadata_workers(
+        &self,
+        worker_rx: &Receiver<(PathBuf, Option<PlaylistId>)>,
+        workers: usize,
+    ) {
         let ticker = tick(Duration::from_millis(128));
 
         for _ in 0..workers {
@@ -147,41 +123,28 @@ impl Scanner {
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
-                let mut new_tracks: Vec<ScannedTrack> = Vec::with_capacity(32);
-                let mut current_playlist: Option<PlaylistId> = None;
+                let mut new: Vec<(Track, Option<PlaylistId>)> = Vec::with_capacity(32);
+                let mut existing: HashMap<PlaylistId, Vec<TrackId>> = HashMap::with_capacity(32);
 
                 loop {
                     select! {
-                        recv(worker_rx) -> msg => {
-                            if let Ok((job, path)) = msg {
-                                // update current playlist context for this worker
-                                current_playlist = job.playlist_id;
-
+                        recv(worker_rx) -> job => {
+                            if let Ok((path, pid)) = job {
                                 Self::handle_job(
-                                    &job,
                                     path.as_path(),
+                                    pid,
                                     &scan_record,
                                     &scan_progress,
                                     &tx,
-                                    &mut new_tracks,
+                                    &mut existing,
+                                    &mut new,
                                 );
                             }
                         }
 
                         recv(ticker) -> _ => {
-                            Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
+                            Self::flush_batches(&tx, &mut existing, &mut new);
                         }
-                    }
-
-                    // If discovery is finished and there are no more jobs queued for this
-                    // worker, flush any partial batch immediately instead of waiting for
-                    // the next ticker tick. This ensures small tail-batches aren't lost
-                    // when scans finish quickly.
-                    if scan_progress.discovery_done.load(Ordering::Acquire) {
-                        // Discovery is complete and no more jobs will be enqueued —
-                        // flush any partial batch this worker may be holding so no
-                        // discovered tracks are lost.
-                        Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
                     }
                 }
             });
@@ -189,131 +152,153 @@ impl Scanner {
     }
 
     fn handle_job(
-        _job: &ScanJob,
         path: &Path,
+        pid: Option<PlaylistId>,
         scan_record: &ScanRecord,
         scan_progress: &ScanProgress,
         tx: &Sender<ScannerEvent>,
-        new_tracks: &mut Vec<ScannedTrack>,
+        existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
+        new: &mut Vec<(Track, Option<PlaylistId>)>,
     ) {
-        let Ok(source) = ScannedTrackSource::generate(path) else {
+        let mut incremented = false;
+
+        let Ok(ts) = TrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             return;
         };
 
-        if scan_record.get(&source).is_none() {
-            if let Ok(track) = metadata::read_metadata(source.clone()) {
-                let track_id = TrackId::generate(
-                    &track.title,
-                    &track.artists.join(", "),
-                    track.album.as_deref().unwrap_or(""),
-                )
-                .unwrap();
+        if let Some(entry) = scan_record.get(&ts) {
+            if let Some(pid) = pid {
+                let batch = existing.entry(pid).or_default();
+                batch.push(*entry.value());
 
-                scan_record.insert(source, track_id);
-
-                new_tracks.push(track);
-
-                if new_tracks.len() >= 32 {
-                    let batch = std::mem::take(new_tracks);
-
-                    tx.send(ScannerEvent::UpsertTracks(batch, _job.playlist_id)).ok();
+                if batch.len() >= 32 {
+                    let to_send = std::mem::take(batch);
+                    tx.send(ScannerEvent::InsertTracksIntoPlaylist(pid, to_send))
+                        .ok();
                 }
+
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+                incremented = true;
+            }
+        } else {
+            if let Ok(track) = metadata::read_metadata(ts.clone()) {
+                let id = track.id;
+                new.push((track, pid));
+
+                if new.len() >= 32 {
+                    let to_send = std::mem::take(new);
+                    tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
+                }
+
+                scan_record.insert(ts, id);
+            }
+
+            scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+            incremented = true;
+        }
+
+        let processed = scan_progress.processed.load(Ordering::Relaxed);
+        let total = scan_progress.total.load(Ordering::Relaxed);
+
+        if incremented && (processed.is_multiple_of(16) || processed == total) {
+            tx.send(ScannerEvent::Processed { processed, total }).ok();
+        }
+        if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
+            tx.send(ScannerEvent::ScanFinished).ok();
+        }
+    }
+
+    fn flush_batches(
+        tx: &Sender<ScannerEvent>,
+        existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
+        new: &mut Vec<(Track, Option<PlaylistId>)>,
+    ) {
+        for (pid, batch) in existing.iter_mut() {
+            if !batch.is_empty() {
+                let to_send = std::mem::take(batch);
+
+                tx.send(ScannerEvent::InsertTracksIntoPlaylist(*pid, to_send))
+                    .ok();
             }
         }
 
-        let processed = scan_progress.processed.fetch_add(1, Ordering::Relaxed) + 1;
+        if !new.is_empty() {
+            let to_send = std::mem::take(new);
 
-        let total = scan_progress.total.load(Ordering::Relaxed);
-
-        if processed.is_multiple_of(16) || processed == total {
-            tx.send(ScannerEvent::Processed { processed, total }).ok();
-        }
-
-        if processed == total
-            && scan_progress.discovery_done.load(Ordering::Acquire)
-            && !scan_progress.finished_sent.swap(true, Ordering::AcqRel)
-        {
-            Self::flush_batches(tx, new_tracks, _job.playlist_id);
-
-            tx.send(ScannerEvent::ScanFinished(_job.id)).ok();
+            tx.send(ScannerEvent::UpsertTracks(to_send)).ok();
         }
     }
 
-    fn flush_batches(tx: &Sender<ScannerEvent>, new_tracks: &mut Vec<ScannedTrack>, playlist_id: Option<PlaylistId>) {
-        if !new_tracks.is_empty() {
-            let batch = std::mem::take(new_tracks);
-
-            tx.send(ScannerEvent::UpsertTracks(batch, playlist_id)).ok();
-        }
-    }
-
-    fn scan_folder(&self, job: ScanJob, worker_tx: &Sender<(ScanJob, PathBuf)>) {
+    fn scan_folder(&self, path: PathBuf, worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>) {
         self.scan_progress.total.store(0, Ordering::Relaxed);
-
         self.scan_progress.processed.store(0, Ordering::Relaxed);
-
         self.scan_progress
             .discovery_done
             .store(false, Ordering::Release);
 
-        self.scan_progress
-            .finished_sent
-            .store(false, Ordering::Release);
+        self.read_scan_record();
 
-        // Do not load the old on-disk scan record: it may contain stale
-        // entries from the previous in-memory system and prevent new files
-        // from being discovered. Start each scan with a fresh record.
-        self.scan_record.clear();
+        self.tx.send(ScannerEvent::ScanStarted).ok();
 
-        self.tx.send(ScannerEvent::ScanStarted(job.id)).ok();
+        let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
-        let exts = ["mp3", "wav", "ogg", "aac", "m4a", "flac"];
+        if path.is_dir() {
+            let playlist_id = PlaylistId(Uuid::new_v4());
 
-        let scan_progress = self.scan_progress.clone();
-        let worker_tx = worker_tx.clone();
-        let tx = self.tx.clone();
+            let playlist = Playlist {
+                id: playlist_id,
+                name: path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unnamed Playlist")
+                    .to_string(),
+                source: PlaylistSource::Folder,
+                folder_path: Some(path.clone()),
+                tracks: Vec::new(),
+                duration: Duration::from_secs(0),
+                image_id: None,
+            };
 
-        std::thread::spawn(move || {
-            let mut paths = Vec::with_capacity(1024);
+            let _ = self.tx.send(ScannerEvent::InsertPlaylist(playlist));
 
-            for entry in WalkDir::new(&job.path)
-                .into_iter()
-                .filter_map(Result::ok)
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .and_then(OsStr::to_str)
-                        .is_some_and(|ext| exts.contains(&ext))
-                })
-            {
-                paths.push(entry.path().to_path_buf());
+            let scan_progress = self.scan_progress.clone();
+            let worker_tx = worker_tx.clone();
+            let tx = self.tx.clone();
 
-                if paths.len().is_multiple_of(16) {
-                    tx.send(ScannerEvent::Discovered(paths.len())).ok();
+            std::thread::spawn(move || {
+                let mut paths = Vec::with_capacity(1024);
+
+                for entry in WalkDir::new(&path)
+                    .into_iter()
+                    .filter_map(Result::ok)
+                    .filter(|e| {
+                        e.path()
+                            .extension()
+                            .and_then(OsStr::to_str)
+                            .is_some_and(|ext| exts.contains(&ext))
+                    })
+                {
+                    if paths.len() % 16 == 0 {
+                        tx.send(ScannerEvent::Discovered(paths.len())).ok();
+                    }
+                    paths.push(entry.path().to_path_buf());
                 }
-            }
 
-            let total = paths.len();
+                let total = paths.len();
+                scan_progress.total.store(total, Ordering::Relaxed);
 
-            scan_progress.total.store(total, Ordering::Relaxed);
-
-            if total == 0 {
-                // no files found
                 scan_progress.discovery_done.store(true, Ordering::Release);
-                tx.send(ScannerEvent::ScanFinished(job.id)).ok();
-                return;
-            }
 
-            for path in paths {
-                worker_tx.send((job.clone(), path)).ok();
-            }
+                for path in paths {
+                    let _ = worker_tx.send((path, Some(playlist_id)));
+                }
+            });
+        }
 
-            // Mark discovery complete after all jobs have been enqueued so workers
-            // won't prematurely consider discovery finished and flush partial
-            // batches before all work has been dispatched.
-            scan_progress.discovery_done.store(true, Ordering::Release);
-        });
+        self.scan_progress
+            .discovery_done
+            .store(true, Ordering::Release);
     }
 
     fn write_scan_record(&self) {
@@ -326,23 +311,26 @@ impl Scanner {
             .collect();
 
         let bytes = bitcode::encode(&map);
-
-        std::fs::write(path, bytes).ok();
+        std::fs::write(path, bytes).unwrap();
     }
 
     fn read_scan_record(&self) {
         let path = self.app_paths.cache.join("scan_record.bin");
 
-        let Ok(bytes) = std::fs::read(path) else {
-            return;
-        };
+        let file = std::fs::read(path).ok();
 
-        let raw: HashMap<CachedTrackSource, [u8; 16]> = bitcode::decode(&bytes).unwrap_or_default();
+        if let Some(bytes) = file {
+            let raw: HashMap<CachedTrackSource, [u8; 16]> =
+                bitcode::decode(&bytes).unwrap_or_default();
 
-        self.scan_record.clear();
+            let map: HashMap<TrackSource, TrackId> =
+                raw.iter().map(|(k, v)| (k.into(), TrackId(*v))).collect();
 
-        for (k, v) in raw {
-            self.scan_record.insert((&k).into(), TrackId(v));
+            self.scan_record.clear();
+
+            for (k, v) in map {
+                self.scan_record.insert(k, v);
+            }
         }
     }
 }

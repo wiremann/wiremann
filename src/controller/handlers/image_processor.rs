@@ -1,8 +1,4 @@
-use super::{
-    App, Arc, CacherCommand, Controller, ControllerError, Entity, ImageCache, ImageKind,
-    ImageProcessorCommand, ImageProcessorEvent, SystemIntegrationCommand, Wiremann,
-    drop_image_from_app,
-};
+use super::{Controller, App, ImageProcessorEvent, Entity, Wiremann, ControllerError, ImageCache, CacherCommand, ImageKind, SystemIntegrationCommand, drop_image_from_app, Arc, ImageProcessorCommand};
 
 impl Controller {
     pub fn handle_image_processor_event(
@@ -83,6 +79,8 @@ impl Controller {
 
                     cx.notify();
                 });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ImageProcessorEvent::InsertPlaylistThumbnail(id, image_id, image) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
@@ -108,60 +106,14 @@ impl Controller {
                     });
                 }
 
-                // Persist playlist image hash into the DB so it survives restarts
-                let db = cx.global::<crate::db::Database>().clone();
-                let pid = *id;
-                let iid = *image_id;
-
-                cx.spawn(async move |_cx| {
-                    let _ = smol::unblock(move || {
-                        let conn = db.pool().get()?;
-                        crate::db::queries::playlists::set_playlist_image(
-                            &conn,
-                            &pid.0,
-                            &iid.0.to_vec(),
-                        )?;
-                        Ok::<(), anyhow::Error>(())
-                    })
-                    .await;
-                })
-                .detach();
-
-                // Refresh derived playlist snapshot from DB so UI can display the new image id
-                let db2 = cx.global::<crate::db::Database>().clone();
-                let pid2 = *id;
-
-                cx.spawn(async move |app_cx2| {
-                    let proj = smol::unblock(move || {
-                        let conn = db2.pool().get()?;
-                        let pls = crate::db::queries::playlists::load_playlists_with_tracks(&conn)?;
-                        Ok::<_, anyhow::Error>(pls.into_iter().find(|p| p.id == pid2))
-                    })
-                    .await
-                    .ok();
-
-                    if let Some(Some(p)) = proj {
-                        app_cx2.update(|app| {
-                            let controller = app.global::<Controller>().clone();
-                            controller.state.update(app, |state, cx| {
-                                state.library.playlists.insert(
-                                    p.id,
-                                    crate::controller::state::Playlist {
-                                        id: p.id,
-                                        name: p.name,
-                                        source: p.source,
-                                        folder_path: None,
-                                        duration: std::time::Duration::from_secs(0),
-                                        tracks: p.tracks,
-                                        image_id: p.image_id,
-                                    },
-                                );
-                                cx.notify();
-                            });
-                        });
+                self.state.update(cx, |this, cx| {
+                    if let Some(playlist) = this.library.playlists.get_mut(id) {
+                        playlist.image_id = Some(*image_id);
                     }
-                })
-                .detach();
+                    cx.notify();
+                });
+                let state = self.state.read(cx).library.clone();
+                let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
         }
 

@@ -1,9 +1,4 @@
-use super::{
-    App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
-    ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus, PlaybackStatus, Rgb, Rgba,
-    SystemIntegrationCommand, Wiremann, drop_image_from_app, duration_to_slider,
-    pick_playlist_thumbnail_tracks, rgb,
-};
+use super::{Controller, App, CacherEvent, Entity, Wiremann, ControllerError, PlaybackStatus, duration_to_slider, ImageCache, drop_image_from_app, Rgb, Rgba, rgb, SystemIntegrationCommand, DominantColors, ImageProcessorCommand, HashSet, ImageKind, pick_playlist_thumbnail_tracks, LyricsState, LyricsStatus};
 
 impl Controller {
     pub fn handle_cacher_event(
@@ -14,91 +9,46 @@ impl Controller {
     ) -> Result<(), ControllerError> {
         match event {
             CacherEvent::AppState(state) => {
-                // Defer merging cache state until we know if DB has data —
-                // if DB is empty and cache exists, we prefer NOT to restore cached playlists (user deleted DB).
-                let cached = state.clone();
-                let db = cx.global::<crate::db::Database>().clone();
-                let controller = self.clone();
-                let view = view.clone();
+                let playback_state = state.playback.clone();
+                self.state.update(cx, |this, _| {
+                    *this = state.clone();
+                });
 
-                cx.spawn(async move |cx2| {
-                    let has_db = smol::unblock(move || {
-                        let conn = db.pool().get()?;
-                        let pls = crate::db::queries::library::get_library_playlists(&conn)?;
-                        Ok::<bool, anyhow::Error>(!pls.is_empty())
-                    })
-                    .await
-                    .unwrap_or(false);
+                self.load_queue_current(cx);
+                self.set_volume(playback_state.volume, cx);
+                self.seek(playback_state.position);
 
-                    if has_db {
-                        cx2.update(|app| {
-                            controller.state.update(app, |this, _| {
-                                for (id, track) in cached.library.tracks.iter() {
-                                    if !this.library.tracks.contains_key(id) {
-                                        this.library
-                                            .tracks
-                                            .insert(*id, std::sync::Arc::new((**track).clone()));
-                                    }
-                                }
+                match playback_state.status {
+                    PlaybackStatus::Stopped => self.stop(),
+                    PlaybackStatus::Paused => self.pause(),
+                    PlaybackStatus::Playing => self.play(),
+                }
 
-                                if this.playback.current.is_none() {
-                                    this.playback = cached.playback.clone();
-                                }
+                let duration = if let Some(current) = playback_state.current
+                    && let Some(track) = state.library.tracks.get(&current)
+                {
+                    Some(track.duration)
+                } else {
+                    None
+                };
+
+                view.update(cx, |this, cx| {
+                    this.player_page.update(cx, |this, cx| {
+                        this.controlbar.update(cx, |this, cx| {
+                            this.vol_slider_state.update(cx, |this, cx| {
+                                this.set_value(playback_state.volume * 100.0, cx);
                             });
-                            app.notify(view.entity_id());
-                        });
-                    } else {
-                        cx2.update(|app| {
-                            controller.state.update(app, |this, _| {
-                                if this.playback.current.is_none() {
-                                    this.playback = cached.playback.clone();
+                            this.playback_slider_state.update(cx, |this, cx| {
+                                if let Some(duration) = duration {
+                                    this.set_value(
+                                        duration_to_slider(playback_state.position, duration),
+                                        cx,
+                                    );
                                 }
-                            });
-                            app.notify(view.entity_id());
-                        });
-                    }
-
-                    // Apply playback side-effects on the UI thread
-                    cx2.update(|app| {
-                        controller.load_queue_current(app);
-                        controller.set_volume(cached.playback.volume, app);
-                        controller.seek(cached.playback.position);
-
-                        match cached.playback.status {
-                            PlaybackStatus::Stopped => controller.stop(),
-                            PlaybackStatus::Paused => controller.pause(),
-                            PlaybackStatus::Playing => controller.play(),
-                        }
-                    });
-
-                    // Update player control UI values
-                    let duration = if let Some(current) = cached.playback.current
-                        && let Some(track) = cached.library.tracks.get(&current)
-                    {
-                        Some(track.duration)
-                    } else {
-                        None
-                    };
-
-                    view.update(cx2, |this, cx| {
-                        this.player_page.update(cx, |this, cx| {
-                            this.controlbar.update(cx, |this, cx| {
-                                this.vol_slider_state.update(cx, |this, cx| {
-                                    this.set_value(cached.playback.volume * 100.0, cx);
-                                });
-                                this.playback_slider_state.update(cx, |this, cx| {
-                                    if let Some(duration) = duration {
-                                        this.set_value(
-                                            duration_to_slider(cached.playback.position, duration),
-                                            cx,
-                                        );
-                                    }
-                                });
                             });
                         });
                     });
-                })
-                .detach();
+                });
             }
             CacherEvent::Thumbnails(thumbnails) => {
                 for (id, image) in thumbnails {
