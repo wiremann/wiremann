@@ -60,7 +60,14 @@ fn fetch_inserted_track(tx: &Transaction, db_track_id: i64) -> Result<InsertedTr
 
     // Fetch basic track info
     let select = Query::select()
-        .columns([Tracks::Id, Tracks::TrackHash, Tracks::Name, Tracks::AlbumId, Tracks::Duration, Tracks::ImageHash])
+        .columns([
+            Tracks::Id,
+            Tracks::TrackHash,
+            Tracks::Name,
+            Tracks::AlbumId,
+            Tracks::Duration,
+            Tracks::ImageHash,
+        ])
         .from(Tracks::Table)
         .and_where(Expr::col(Tracks::Id).eq(Expr::val(db_track_id)))
         .to_owned();
@@ -89,7 +96,8 @@ fn fetch_inserted_track(tx: &Transaction, db_track_id: i64) -> Result<InsertedTr
         .join(
             sea_query::JoinType::InnerJoin,
             TrackArtists::Table,
-            Expr::col((TrackArtists::Table, TrackArtists::ArtistId)).equals((Artists::Table, Artists::Id)),
+            Expr::col((TrackArtists::Table, TrackArtists::ArtistId))
+                .equals((Artists::Table, Artists::Id)),
         )
         .and_where(Expr::col((TrackArtists::Table, TrackArtists::TrackId)).eq(Expr::val(id)))
         .to_owned();
@@ -106,7 +114,11 @@ fn fetch_inserted_track(tx: &Transaction, db_track_id: i64) -> Result<InsertedTr
 
     // Fetch album name if present
     let album_name = if let Some(aid) = album_id {
-        let sel = Query::select().column(Albums::Name).from(Albums::Table).and_where(Expr::col(Albums::Id).eq(Expr::val(aid))).to_owned();
+        let sel = Query::select()
+            .column(Albums::Name)
+            .from(Albums::Table)
+            .and_where(Expr::col(Albums::Id).eq(Expr::val(aid)))
+            .to_owned();
         let (sql3, vals3) = sel.build_rusqlite(SqliteQueryBuilder);
         let params3 = vals3.as_params();
         let mut s3 = tx.prepare(&sql3)?;

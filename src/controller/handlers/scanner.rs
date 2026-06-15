@@ -24,15 +24,34 @@ impl Controller {
                 cx.spawn(async move |app_cx| {
                     let db_for_commit = db.clone();
 
-                    let committed = smol::unblock(move || {
-                        let mut conn = db_for_commit.pool().get()?;
+                    // Clone tracks for DB commit so we don't move the original `tracks`
+                    // which we need later for mapping sources into runtime state.
+                    let tracks_db = tracks.clone();
 
-                        crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks, playlist_id)
-                    })
+                    let committed = smol::unblock(move || {
+                            let mut conn = db_for_commit.pool().get()?;
+
+                            crate::db::queries::scanner::upsert_scanned_tracks(&mut conn, &tracks_db, playlist_id)
+                        })
                     .await
                     .unwrap_or_else(|_| Vec::new());
 
                     if !committed.is_empty() {
+                        // Build a mapping from scanned metadata to source info so we can
+                        // populate runtime `Track` sources for immediate thumbnail work.
+                        use std::collections::HashMap;
+                        use crate::scanner::ScannedTrack as ScannerScannedTrack;
+
+                        let mut hash_to_source: HashMap<Vec<u8>, crate::scanner::ScannedTrackSource> = HashMap::new();
+                        for st in tracks.iter() {
+                            if let Ok(id) = crate::controller::state::TrackId::generate(
+                                &st.title,
+                                &st.artists.join(", "),
+                                st.album.as_deref().unwrap_or(""),
+                            ) {
+                                hash_to_source.insert(id.0.to_vec(), st.source.clone());
+                            }
+                        }
                         // Convert DB projection to UI rows and update UI on main thread after DB commit
                         view.update(app_cx, move |this, cx| {
                             let mut ui_rows: Vec<crate::ui::pages::library::models::LibraryTrackRow> = Vec::with_capacity(committed.len());
@@ -54,22 +73,35 @@ impl Controller {
                                     });
 
                                     inserted_ids.push(id);
+                                    // capture source if available
+                                    let source_opt = hash_to_source.get(&it.track_hash).cloned();
+                                    let _source = source_opt;
                                 }
                             }
 
                             if !ui_rows.is_empty() {
                                 // Insert Track objects into controller state so thumbnails and other
                                 // track-based operations can run immediately without requiring a
-                                // restart to load DB-backed state.
+                                // restart to load DB-backed state. Populate `sources` from the
+                                // scanned metadata we captured above when available.
                                 let controller = cx.global::<Controller>().clone();
                                 controller.state.update(cx, |state, _| {
                                     for it in ui_rows.iter() {
                                         use crate::controller::state::{Track, TrackSource};
                                         let id = it.id;
                                         if !state.library.tracks.contains_key(&id) {
+                                            let mut sources: Vec<TrackSource> = Vec::new();
+                                            if let Some(src) = hash_to_source.get(&it.id.0.to_vec()) {
+                                                sources.push(TrackSource {
+                                                    path: src.path.clone(),
+                                                    size: src.size,
+                                                    modified: src.modified,
+                                                });
+                                            }
+
                                             let track = Track {
                                                 id,
-                                                sources: Vec::new(),
+                                                sources,
                                                 title: it.title.clone(),
                                                 artist: it.artists.clone(),
                                                 album: it.album.clone(),

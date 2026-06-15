@@ -177,7 +177,10 @@ impl Scanner {
                     // worker, flush any partial batch immediately instead of waiting for
                     // the next ticker tick. This ensures small tail-batches aren't lost
                     // when scans finish quickly.
-                    if scan_progress.discovery_done.load(Ordering::Acquire) && worker_rx.is_empty() {
+                    if scan_progress.discovery_done.load(Ordering::Acquire) {
+                        // Discovery is complete and no more jobs will be enqueued —
+                        // flush any partial batch this worker may be holding so no
+                        // discovered tracks are lost.
                         Self::flush_batches(&tx, &mut new_tracks, current_playlist.clone());
                     }
                 }
@@ -295,9 +298,9 @@ impl Scanner {
 
             scan_progress.total.store(total, Ordering::Relaxed);
 
-            scan_progress.discovery_done.store(true, Ordering::Release);
-
             if total == 0 {
+                // no files found
+                scan_progress.discovery_done.store(true, Ordering::Release);
                 tx.send(ScannerEvent::ScanFinished(job.id)).ok();
                 return;
             }
@@ -305,6 +308,11 @@ impl Scanner {
             for path in paths {
                 worker_tx.send((job.clone(), path)).ok();
             }
+
+            // Mark discovery complete after all jobs have been enqueued so workers
+            // won't prematurely consider discovery finished and flush partial
+            // batches before all work has been dispatched.
+            scan_progress.discovery_done.store(true, Ordering::Release);
         });
     }
 

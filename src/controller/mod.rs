@@ -31,6 +31,8 @@ use gpui::{App, Entity, Global, Rgba, rgb};
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
+use sea_query::ExprTrait;
+use sea_query_rusqlite::RusqliteBinder;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
@@ -123,19 +125,77 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
-        if let Some(track_id) = state.queue.get_id(state.playback.current_index)
-            && let Some(track) = state.library.tracks.get(&track_id)
-            && let Some(source) = track.get_valid_source()
-        {
-            self.audio_tx
-                .send(AudioCommand::Load(track_id, source.path.clone()))
-                .ok();
-            self.image_processor_tx
-                .send(ImageProcessorCommand::GetCurrentAlbumArt(
-                    track_id,
-                    source.path.clone(),
-                ))
-                .ok();
+        if let Some(track_id) = state.queue.get_id(state.playback.current_index) {
+            if let Some(track) = state.library.tracks.get(&track_id) {
+                if let Some(source) = track.get_valid_source() {
+                    self.audio_tx
+                        .send(AudioCommand::Load(track_id, source.path.clone()))
+                        .ok();
+                    self.image_processor_tx
+                        .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                            track_id,
+                            source.path.clone(),
+                        ))
+                        .ok();
+                    return;
+                }
+            }
+
+            // Track not present in-memory or has no valid source — try to resolve a
+            // source path from the DB and load it. This preserves prior behavior
+            // where clicking a playlist would start playback even if the runtime
+            // track map wasn't fully populated yet.
+            let db = cx.global::<crate::db::Database>().clone();
+            let audio_tx = self.audio_tx.clone();
+            let image_tx = self.image_processor_tx.clone();
+            let tid = track_id;
+
+            cx.spawn(async move |_cx| {
+                let path_opt = smol::unblock(move || {
+                    use crate::db::tables::{TrackSources, Tracks};
+                    use sea_query::{Expr, Order, Query, SqliteQueryBuilder};
+
+                    let q = Query::select()
+                        .expr(Expr::col((TrackSources::Table, TrackSources::Path)))
+                        .from(TrackSources::Table)
+                        .join(
+                            sea_query::JoinType::InnerJoin,
+                            Tracks::Table,
+                            Expr::col((TrackSources::Table, TrackSources::TrackId))
+                                .equals((Tracks::Table, Tracks::Id)),
+                        )
+                        .and_where(
+                            Expr::col((Tracks::Table, Tracks::TrackHash))
+                                .eq(Expr::val(tid.0.to_vec())),
+                        )
+                        .order_by((TrackSources::Table, TrackSources::Modified), Order::Desc)
+                        .limit(1)
+                        .to_owned();
+
+                    let (sql, values) = q.build_rusqlite(SqliteQueryBuilder);
+                    let params = values.as_params();
+                    let conn = db.pool().get()?;
+                    let mut stmt = conn.prepare(&sql)?;
+
+                    let res = stmt.query_row(params.as_slice(), |row| row.get::<_, String>(0));
+                    match res {
+                        Ok(p) => Ok::<_, anyhow::Error>(Some(std::path::PathBuf::from(p))),
+                        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                        Err(e) => Err(anyhow::Error::new(e)),
+                    }
+                })
+                .await
+                .ok()
+                .flatten();
+
+                if let Some(path) = path_opt {
+                    audio_tx.send(AudioCommand::Load(tid, path.clone())).ok();
+                    image_tx
+                        .send(ImageProcessorCommand::GetCurrentAlbumArt(tid, path))
+                        .ok();
+                }
+            })
+            .detach();
         }
     }
 
@@ -169,7 +229,11 @@ impl Controller {
                 }
 
                 // Fallback: if order empty or mismatch, use queue.tracks
-                let to_save = if ordered.is_empty() { queue.tracks.clone() } else { ordered };
+                let to_save = if ordered.is_empty() {
+                    queue.tracks.clone()
+                } else {
+                    ordered
+                };
 
                 let len = to_save.len();
                 let order_vec: Vec<usize> = (0..len).collect();
