@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::hash::Hasher;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use twox_hash::XxHash3_128;
+use twox_hash::{XxHash3_64, XxHash3_128};
 use uuid::Uuid;
 
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
@@ -21,6 +23,8 @@ pub struct AppState {
 pub struct LibraryState {
     pub tracks: HashMap<TrackId, Arc<Track>>,
     pub playlists: HashMap<PlaylistId, Playlist>,
+    pub artists: HashMap<ArtistId, Arc<Artist>>,
+    pub albums: HashMap<AlbumId, Arc<Album>>,
 }
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
@@ -33,10 +37,10 @@ pub struct ImageId(pub [u8; 16]);
 pub struct PlaylistId(pub Uuid);
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct AlbumId(pub [u8; 16]);
+pub struct AlbumId(pub u64);
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct ArtistId(pub [u8; 16]);
+pub struct ArtistId(pub u64);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Track {
@@ -151,26 +155,29 @@ impl TrackId {
 }
 
 impl AlbumId {
-    pub fn generate(album: &str) -> Result<Self, io::Error> {
-        let mut hasher = XxHash3_128::with_seed(ALBUM_HASH_SEED);
+    pub fn generate(album: &str, artist: &str) -> Result<Self, io::Error> {
+        let mut hasher = XxHash3_64::with_seed(ALBUM_HASH_SEED);
 
         let album = album.trim().to_lowercase();
+        let artist = artist.trim().to_lowercase();
 
         hasher.write(album.as_bytes());
+        hasher.write(b"#");
+        hasher.write(artist.as_bytes());
 
-        Ok(AlbumId(hasher.finish_128().to_le_bytes()))
+        Ok(AlbumId(hasher.finish()))
     }
 }
 
 impl ArtistId {
     pub fn generate(artist: &str) -> Result<Self, io::Error> {
-        let mut hasher = XxHash3_128::with_seed(ARTIST_HASH_SEED);
+        let mut hasher = XxHash3_64::with_seed(ARTIST_HASH_SEED);
 
         let artist = artist.trim().to_lowercase();
 
         hasher.write(artist.as_bytes());
 
-        Ok(ArtistId(hasher.finish_128().to_le_bytes()))
+        Ok(ArtistId(hasher.finish()))
     }
 }
 
@@ -197,7 +204,7 @@ impl TrackSource {
         let meta = std::fs::metadata(path)?;
         let modified = meta
             .modified()?
-            .elapsed()
+            .duration_since(UNIX_EPOCH)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
             .as_secs();
 
