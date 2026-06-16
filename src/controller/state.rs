@@ -47,9 +47,9 @@ pub struct Track {
     pub id: TrackId,
     pub sources: Vec<TrackSource>,
 
-    pub title: String,
-    pub artist: String,
-    pub album: String,
+    pub title: Arc<str>,
+    pub artist: Vec<ArtistId>,
+    pub album: AlbumId,
 
     pub duration: Duration,
 
@@ -155,11 +155,11 @@ impl TrackId {
 }
 
 impl AlbumId {
-    pub fn generate(album: &str, artist: &str) -> Result<Self, io::Error> {
+    pub fn generate(album: &str, artists: &[&str]) -> Result<Self, io::Error> {
         let mut hasher = XxHash3_64::with_seed(ALBUM_HASH_SEED);
 
         let album = album.trim().to_lowercase();
-        let artist = artist.trim().to_lowercase();
+        let artist = artists.join("#").trim().to_lowercase();
 
         hasher.write(album.as_bytes());
         hasher.write(b"#");
