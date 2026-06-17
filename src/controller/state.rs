@@ -249,3 +249,27 @@ impl QueueState {
         self.order.iter().position(|&o| o == track_idx)
     }
 }
+
+impl LibraryState {
+    pub fn track(&self, id: TrackId) -> Option<&Arc<Track>> {
+        self.tracks.get(&id)
+    }
+
+    pub fn artist(&self, id: ArtistId) -> Option<&Arc<Artist>> {
+        self.artists.get(&id)
+    }
+
+    pub fn album(&self, id: AlbumId) -> Option<&Arc<Album>> {
+        self.albums.get(&id)
+    }
+}
+
+impl Track {
+    pub fn album<'a>(&self, lib: &'a LibraryState) -> Option<&'a Arc<Album>> {
+        lib.album(self.album)
+    }
+
+    pub fn artists<'a>(&self, lib: &'a LibraryState) -> impl Iterator<Item = &'a Arc<Artist>> {
+        self.artist.iter().filter_map(|id| lib.artist(*id))
+    }
+}
