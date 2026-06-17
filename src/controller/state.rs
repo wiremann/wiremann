@@ -102,7 +102,7 @@ pub enum PlaylistSource {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Playlist {
     pub id: PlaylistId,
-    pub name: String,
+    pub name: Arc<str>,
     pub source: PlaylistSource,
 
     pub folder_path: Option<PathBuf>,
@@ -116,7 +116,7 @@ pub struct Playlist {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Album {
     pub id: AlbumId,
-    pub name: String,
+    pub name: Arc<str>,
     pub artists: Vec<ArtistId>,
 
     pub duration: Duration,
@@ -128,7 +128,7 @@ pub struct Album {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Artist {
     pub id: ArtistId,
-    pub name: String,
+    pub name: Arc<str>,
 
     pub tracks: Vec<TrackId>,
     pub albums: Vec<AlbumId>,
