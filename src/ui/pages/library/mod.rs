@@ -131,7 +131,7 @@ impl LibraryPage {
                                     this.text_color(theme.library_track_title_text_active)
                                         .font_weight(FontWeight::MEDIUM)
                                 })
-                                .child(track.title.clone())
+                                .child(track.title.to_string())
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -145,7 +145,13 @@ impl LibraryPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.artist.clone())
+                                .child(
+                                    track
+                                        .artists(&state.library)
+                                        .map(|a| a.name.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                )
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),
@@ -159,7 +165,12 @@ impl LibraryPage {
                                 .flex()
                                 .items_center()
                                 .justify_start()
-                                .child(track.album.clone())
+                                .child(
+                                    track
+                                        .album(&state.library)
+                                        .map(|a| a.name.to_string())
+                                        .unwrap_or_default(),
+                                )
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis(),

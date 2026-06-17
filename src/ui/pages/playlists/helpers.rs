@@ -62,7 +62,7 @@ pub(super) fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App
                             .truncate()
                             .text_ellipsis()
                             .text_color(theme.playlist_header_title)
-                            .child(playlist.name.clone()),
+                            .child(playlist.name.to_string()),
                     )
                     .child(
                         div()

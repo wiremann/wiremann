@@ -252,7 +252,7 @@ impl Scanner {
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("Unnamed Playlist")
-                    .to_string(),
+                    .to_string().into(),
                 source: PlaylistSource::Folder,
                 folder_path: Some(path.clone()),
                 tracks: Vec::new(),

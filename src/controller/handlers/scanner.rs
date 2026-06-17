@@ -1,4 +1,5 @@
 use super::{Controller, App, ScannerEvent, Entity, Wiremann, ControllerError, HashSet, Arc, CacherCommand, ScanningStatus, ScannerCommand, TrackId, PathBuf, ImageProcessorCommand, ImageKind, ToastKind, ToastPhase, Instant, PlaylistId};
+use crate::controller::state::AlbumId;
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -32,8 +33,8 @@ impl Controller {
                                 existing.artist.clone_from(&track.artist);
                             }
 
-                            if existing.album.is_empty() && !track.album.is_empty() {
-                                existing.album.clone_from(&track.album);
+                            if existing.album == AlbumId::default() && track.album != AlbumId::default() {
+                                existing.album = track.album;
                             }
                         } else {
                             this.library.tracks.insert(id, Arc::new(track.clone()));

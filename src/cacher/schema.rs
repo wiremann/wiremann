@@ -11,6 +11,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::controller::state::LibraryState;
+use crate::controller::state::{Album, Artist, AlbumId, ArtistId};
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Hash)]
 pub enum ImageKind {
@@ -32,8 +33,8 @@ pub struct CachedTrack {
     pub sources: Vec<CachedTrackSource>,
 
     pub title: String,
-    pub artist: String,
-    pub album: String,
+    pub artist: Vec<u64>,
+    pub album: u64,
 
     pub duration: u64,
 
@@ -80,6 +81,27 @@ pub struct CachedPlaylist {
 pub struct CachedLibraryState {
     pub tracks: HashMap<[u8; 16], CachedTrack>,
     pub playlists: HashMap<String, CachedPlaylist>,
+    pub artists: HashMap<u64, CachedArtist>,
+    pub albums: HashMap<u64, CachedAlbum>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
+pub struct CachedAlbum {
+    pub id: u64,
+    pub name: String,
+    pub artists: Vec<u64>,
+    pub duration: u64,
+    pub tracks: Vec<[u8; 16]>,
+    pub image_id: Option<[u8; 16]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
+pub struct CachedArtist {
+    pub id: u64,
+    pub name: String,
+    pub tracks: Vec<[u8; 16]>,
+    pub albums: Vec<u64>,
+    pub image_id: Option<[u8; 16]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -110,9 +132,9 @@ impl From<&Track> for CachedTrack {
         Self {
             id: track.id.0,
             sources: track.sources.iter().map(Into::into).collect(),
-            title: track.title.clone(),
-            artist: track.artist.clone(),
-            album: track.album.clone(),
+            title: track.title.to_string(),
+            artist: track.artist.iter().map(|a| a.0).collect(),
+            album: track.album.0,
             duration: track.duration.as_millis() as u64,
             image_id: track.image_id.map(|id| id.0),
         }
@@ -124,9 +146,9 @@ impl From<CachedTrack> for Track {
         Self {
             id: TrackId(c.id),
             sources: c.sources.iter().map(Into::into).collect(),
-            title: c.title,
-            artist: c.artist,
-            album: c.album,
+            title: c.title.into(),
+            artist: c.artist.into_iter().map(ArtistId).collect(),
+            album: AlbumId(c.album),
             duration: Duration::from_millis(c.duration),
             image_id: c.image_id.map(ImageId),
         }
@@ -157,7 +179,7 @@ impl From<&Playlist> for CachedPlaylist {
     fn from(playlist: &Playlist) -> Self {
         CachedPlaylist {
             id: playlist.id.0.to_string(),
-            name: playlist.name.clone(),
+            name: playlist.name.to_string(),
             source: match playlist.source {
                 PlaylistSource::Folder => CachedPlaylistSource::Folder,
                 PlaylistSource::Generated => CachedPlaylistSource::Generated,
@@ -178,7 +200,7 @@ impl From<CachedPlaylist> for Playlist {
     fn from(cached_playlist: CachedPlaylist) -> Self {
         Playlist {
             id: PlaylistId(Uuid::from_str(cached_playlist.id.as_str()).unwrap_or_default()),
-            name: cached_playlist.name,
+            name: cached_playlist.name.into(),
             source: match cached_playlist.source {
                 CachedPlaylistSource::Folder => PlaylistSource::Folder,
                 CachedPlaylistSource::Generated => PlaylistSource::Generated,
@@ -206,7 +228,42 @@ impl From<&LibraryState> for CachedLibraryState {
             .map(|(id, playlist)| (id.0.to_string(), CachedPlaylist::from(playlist)))
             .collect();
 
-        Self { tracks, playlists }
+        let artists = state
+            .artists
+            .iter()
+            .map(|(id, artist)| {
+                (
+                    id.0,
+                    CachedArtist {
+                        id: id.0,
+                        name: artist.name.to_string(),
+                        tracks: artist.tracks.iter().map(|t| t.0).collect(),
+                        albums: artist.albums.iter().map(|a| a.0).collect(),
+                        image_id: artist.image_id.map(|i| i.0),
+                    },
+                )
+            })
+            .collect();
+
+        let albums = state
+            .albums
+            .iter()
+            .map(|(id, album)| {
+                (
+                    id.0,
+                    CachedAlbum {
+                        id: id.0,
+                        name: album.name.to_string(),
+                        artists: album.artists.iter().map(|a| a.0).collect(),
+                        duration: album.duration.as_millis() as u64,
+                        tracks: album.tracks.iter().map(|t| t.0).collect(),
+                        image_id: album.image_id.map(|i| i.0),
+                    },
+                )
+            })
+            .collect();
+
+        Self { tracks, playlists, artists, albums }
     }
 }
 
@@ -233,7 +290,42 @@ impl From<CachedLibraryState> for LibraryState {
             })
             .collect();
 
-        Self { tracks, playlists }
+        let artists = cache
+            .artists
+            .into_iter()
+            .map(|(id, a)| {
+                (
+                    ArtistId(id),
+                    Arc::new(Artist {
+                        id: ArtistId(a.id),
+                        name: a.name.into(),
+                        tracks: a.tracks.into_iter().map(TrackId).collect(),
+                        albums: a.albums.into_iter().map(AlbumId).collect(),
+                        image_id: a.image_id.map(ImageId),
+                    }),
+                )
+            })
+            .collect();
+
+        let albums = cache
+            .albums
+            .into_iter()
+            .map(|(id, a)| {
+                (
+                    AlbumId(id),
+                    Arc::new(Album {
+                        id: AlbumId(a.id),
+                        name: a.name.into(),
+                        artists: a.artists.into_iter().map(ArtistId).collect(),
+                        duration: Duration::from_millis(a.duration),
+                        tracks: a.tracks.into_iter().map(TrackId).collect(),
+                        image_id: a.image_id.map(ImageId),
+                    }),
+                )
+            })
+            .collect();
+
+        Self { tracks, playlists, artists, albums }
     }
 }
 

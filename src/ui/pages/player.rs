@@ -76,6 +76,22 @@ impl Render for PlayerPage {
             None
         };
 
+        let (current_artist_str, _current_album_str) = if let Some(track) = current {
+            (
+                track
+                    .artists(&state.library)
+                    .map(|a| a.name.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                track
+                    .album(&state.library)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default(),
+            )
+        } else {
+            (String::new(), String::new())
+        };
+
         let gradient_pos = self.album_bounds.map(|bounds| {
             let center_x = bounds.origin.x + bounds.size.width / 2.0;
             let center_y = bounds.origin.y + bounds.size.height / 2.0;
@@ -189,7 +205,7 @@ impl Render for PlayerPage {
                                             .font_weight(FontWeight(500.0))
                                             .max_w_96()
                                             .truncate()
-                                            .child(track.title.clone()),
+                                            .child(track.title.to_string()),
                                     )
                                     .child(
                                         div()
@@ -198,7 +214,7 @@ impl Render for PlayerPage {
                                             .font_weight(FontWeight(400.0))
                                             .max_w_96()
                                             .truncate()
-                                            .child(track.artist.clone()),
+                                            .child(current_artist_str),
                                     ),
                             )
                     } else {

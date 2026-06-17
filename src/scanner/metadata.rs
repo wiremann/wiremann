@@ -1,4 +1,4 @@
-use crate::controller::state::{Track, TrackId, TrackSource};
+use crate::controller::state::{Track, TrackId, TrackSource, ArtistId, AlbumId};
 use crate::errors::ScannerError;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::read_from_path;
@@ -47,12 +47,23 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
 
     let track_id = TrackId::generate(&title, &artist, &album)?;
 
+    // convert artist string into Vec<ArtistId>
+    let artist_names: Vec<&str> = artist.split(',').map(|s| s.trim()).collect();
+    let mut artist_ids = Vec::with_capacity(artist_names.len());
+    for name in &artist_names {
+        let aid = ArtistId::generate(name)?;
+        artist_ids.push(aid);
+    }
+
+    // generate album id from album name and artist names
+    let album_id = AlbumId::generate(&album, &artist_names.iter().map(|s| *s).collect::<Vec<&str>>())?;
+
     Ok(Track {
         sources: vec![track_source],
         id: track_id,
-        title,
-        artist,
-        album,
+        title: title.into(),
+        artist: artist_ids,
+        album: album_id,
         duration,
         image_id: None,
     })

@@ -179,7 +179,7 @@ pub(super) fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &m
                                 .text_base()
                                 .text_color(theme.library_playlist_title_text)
                                 .font_weight(FontWeight::MEDIUM)
-                                .child(playlist.name.clone()),
+                                .child(playlist.name.to_string()),
                         )
                         .child(
                             div()

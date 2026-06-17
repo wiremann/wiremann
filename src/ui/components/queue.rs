@@ -32,8 +32,13 @@ impl Item {
 
             let data = ItemData {
                 id: track.id,
-                title: track.title.clone(),
-                artist: track.artist.clone(),
+                title: track.title.to_string(),
+                artist: track
+                    .artist
+                    .iter()
+                    .map(|a| a.0.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
             };
 
             Self { data, idx }

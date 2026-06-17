@@ -70,11 +70,21 @@ impl Controller {
                         );
                     }
 
+                    let artist_str = track
+                        .artists(&state.library)
+                        .map(|a| a.name.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let album_str = track
+                        .album(&state.library)
+                        .map(|a| a.name.to_string())
+                        .unwrap_or_default();
+
                     self.system_integration_tx
                         .send(SystemIntegrationCommand::SetMetadata {
-                            title: track.title.clone(),
-                            artist: track.artist.clone(),
-                            album: track.album.clone(),
+                            title: track.title.to_string(),
+                            artist: artist_str,
+                            album: album_str,
                             image: None,
                             duration: track.duration.as_secs(),
                         })
