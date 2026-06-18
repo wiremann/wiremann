@@ -3,6 +3,7 @@ use crate::app::AppPaths;
 use crate::cacher::CachedTrackSource;
 use crate::controller::state::{Playlist, PlaylistId, PlaylistSource};
 use crate::controller::state::{Track, TrackSource};
+use crate::scanner::metadata::ScannedTrack;
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent, state::TrackId},
     errors::ScannerError,
@@ -123,7 +124,7 @@ impl Scanner {
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
-                let mut new: Vec<(Track, Option<PlaylistId>)> = Vec::with_capacity(32);
+                let mut new: Vec<(ScannedTrack, Option<PlaylistId>)> = Vec::with_capacity(32);
                 let mut existing: HashMap<PlaylistId, Vec<TrackId>> = HashMap::with_capacity(32);
 
                 loop {
@@ -158,7 +159,7 @@ impl Scanner {
         scan_progress: &ScanProgress,
         tx: &Sender<ScannerEvent>,
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new: &mut Vec<(Track, Option<PlaylistId>)>,
+        new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
         let mut incremented = false;
 
@@ -212,7 +213,7 @@ impl Scanner {
     fn flush_batches(
         tx: &Sender<ScannerEvent>,
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new: &mut Vec<(Track, Option<PlaylistId>)>,
+        new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
         for (pid, batch) in existing.iter_mut() {
             if !batch.is_empty() {
@@ -252,7 +253,8 @@ impl Scanner {
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("Unnamed Playlist")
-                    .to_string().into(),
+                    .to_string()
+                    .into(),
                 source: PlaylistSource::Folder,
                 folder_path: Some(path.clone()),
                 tracks: Vec::new(),

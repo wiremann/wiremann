@@ -1,13 +1,14 @@
-use crate::controller::state::TrackSource;
+use crate::controller::state::{TrackId, TrackSource};
 use crate::errors::ScannerError;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::read_from_path;
 use lofty::tag::ItemKey;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ScannedTrack {
+    pub id: TrackId,
     pub source: TrackSource,
 
     pub title: String,
@@ -55,6 +56,7 @@ pub fn read_metadata(track_source: TrackSource) -> Result<ScannedTrack, ScannerE
     }
 
     Ok(ScannedTrack {
+        id: TrackId::generate(&title, &artists.join(", "), &album)?,
         source: track_source,
         title,
         artists,
