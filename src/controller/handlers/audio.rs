@@ -1,4 +1,8 @@
-use super::{Controller, App, AudioEvent, Entity, Wiremann, ControllerError, Duration, duration_to_slider, SystemIntegrationCommand, CacherCommand, ScannerCommand, HashSet, ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus};
+use super::{
+    App, AudioEvent, CacherCommand, Controller, ControllerError, Duration, Entity, HashSet,
+    ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus, ScannerCommand,
+    SystemIntegrationCommand, Wiremann, duration_to_slider,
+};
 
 impl Controller {
     pub fn handle_audio_event(

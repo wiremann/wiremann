@@ -11,7 +11,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::controller::state::LibraryState;
-use crate::controller::state::{Album, Artist, AlbumId, ArtistId};
+use crate::controller::state::{Album, AlbumId, Artist, ArtistId};
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Hash)]
 pub enum ImageKind {
@@ -263,7 +263,12 @@ impl From<&LibraryState> for CachedLibraryState {
             })
             .collect();
 
-        Self { tracks, playlists, artists, albums }
+        Self {
+            tracks,
+            playlists,
+            artists,
+            albums,
+        }
     }
 }
 
@@ -325,7 +330,12 @@ impl From<CachedLibraryState> for LibraryState {
             })
             .collect();
 
-        Self { tracks, playlists, artists, albums }
+        Self {
+            tracks,
+            playlists,
+            artists,
+            albums,
+        }
     }
 }
 
