@@ -7,6 +7,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use twox_hash::{XxHash3_64, XxHash3_128};
 use uuid::Uuid;
 
+use crate::scanner::metadata::ScannedTrack;
+
 const AUDIO_HASH_SEED: u64 = 0x3141_5926_5358_9793;
 const IMAGE_HASH_SEED: u64 = 0x2718_2818_2845_9045;
 const ALBUM_HASH_SEED: u64 = 0x1618_0339_8874_9894;
@@ -271,5 +273,106 @@ impl Track {
 
     pub fn artists<'a>(&self, lib: &'a LibraryState) -> impl Iterator<Item = &'a Arc<Artist>> {
         self.artist.iter().filter_map(|id| lib.artist(*id))
+    }
+}
+
+impl LibraryState {
+    pub fn upsert_scanned_track(&mut self, scanned: &ScannedTrack) -> Result<TrackId, io::Error> {
+        let artist_ids: Vec<ArtistId> = scanned
+            .artists
+            .iter()
+            .map(|artist| ArtistId::generate(artist))
+            .collect::<Result<_, _>>()?;
+
+        for (name, id) in scanned.artists.iter().zip(&artist_ids) {
+            self.artists.entry(*id).or_insert_with(|| {
+                Arc::new(Artist {
+                    id: *id,
+                    name: name.clone().into(),
+                    tracks: Vec::new(),
+                    albums: Vec::new(),
+                    image_id: None,
+                })
+            });
+        }
+
+        let artist_names: Vec<&str> = scanned.artists.iter().map(String::as_str).collect();
+
+        let album_id = AlbumId::generate(&scanned.album, &artist_names)?;
+
+        self.albums.entry(album_id).or_insert_with(|| {
+            Arc::new(Album {
+                id: album_id,
+                name: scanned.album.clone().into(),
+                artists: artist_ids.clone(),
+                duration: Duration::ZERO,
+                tracks: Vec::new(),
+                image_id: None,
+            })
+        });
+
+        let track_id =
+            TrackId::generate(&scanned.title, &scanned.artists.join(", "), &scanned.album)?;
+
+        if let Some(existing) = self.tracks.get_mut(&track_id) {
+            let existing = Arc::make_mut(existing);
+
+            if !existing
+                .sources
+                .iter()
+                .any(|s| s.path == scanned.source.path)
+            {
+                existing.sources.push(scanned.source.clone());
+            }
+
+            if existing.title.is_empty() {
+                existing.title = scanned.title.clone().into();
+            }
+
+            if existing.artist.is_empty() {
+                existing.artist = artist_ids.clone();
+            }
+
+            if existing.album == AlbumId::default() {
+                existing.album = album_id;
+            }
+        } else {
+            self.tracks.insert(
+                track_id,
+                Arc::new(Track {
+                    id: track_id,
+                    sources: vec![scanned.source.clone()],
+                    title: scanned.title.clone().into(),
+                    artist: artist_ids.clone(),
+                    album: album_id,
+                    duration: scanned.duration,
+                    image_id: None,
+                }),
+            );
+        }
+
+        for artist_id in &artist_ids {
+            if let Some(artist) = self.artists.get_mut(artist_id) {
+                let artist = Arc::make_mut(artist);
+
+                if !artist.tracks.contains(&track_id) {
+                    artist.tracks.push(track_id);
+                }
+
+                if !artist.albums.contains(&album_id) {
+                    artist.albums.push(album_id);
+                }
+            }
+        }
+
+        if let Some(album) = self.albums.get_mut(&album_id) {
+            let album = Arc::make_mut(album);
+
+            if !album.tracks.contains(&track_id) {
+                album.tracks.push(track_id);
+            }
+        }
+
+        Ok(track_id)
     }
 }

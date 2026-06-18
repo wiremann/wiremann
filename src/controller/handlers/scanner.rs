@@ -1,4 +1,8 @@
-use super::{Controller, App, ScannerEvent, Entity, Wiremann, ControllerError, HashSet, Arc, CacherCommand, ScanningStatus, ScannerCommand, TrackId, PathBuf, ImageProcessorCommand, ImageKind, ToastKind, ToastPhase, Instant, PlaylistId};
+use super::{
+    App, Arc, CacherCommand, Controller, ControllerError, Entity, HashSet, ImageKind,
+    ImageProcessorCommand, Instant, PathBuf, PlaylistId, ScannerCommand, ScannerEvent,
+    ScanningStatus, ToastKind, ToastPhase, TrackId, Wiremann,
+};
 use crate::controller::state::AlbumId;
 
 impl Controller {
@@ -11,46 +15,30 @@ impl Controller {
         match event {
             ScannerEvent::UpsertTracks(tracks) => {
                 let mut modified_playlists = HashSet::new();
+
                 self.state.update(cx, |this, cx| {
                     this.library.tracks.reserve(tracks.len());
-                    for (track, playlist_id) in tracks {
-                        let id = track.id;
 
-                        if let Some(existing) = this.library.tracks.get_mut(&id) {
-                            let existing = Arc::make_mut(existing);
-
-                            for src in &track.sources {
-                                if !existing.sources.iter().any(|s| s.path == src.path) {
-                                    existing.sources.push(src.clone());
-                                }
-                            }
-
-                            if existing.title.is_empty() && !track.title.is_empty() {
-                                existing.title.clone_from(&track.title);
-                            }
-
-                            if existing.artist.is_empty() && !track.artist.is_empty() {
-                                existing.artist.clone_from(&track.artist);
-                            }
-
-                            if existing.album == AlbumId::default() && track.album != AlbumId::default() {
-                                existing.album = track.album;
-                            }
-                        } else {
-                            this.library.tracks.insert(id, Arc::new(track.clone()));
-                        }
+                    for (scanned, playlist_id) in tracks {
+                        let track_id = match this.library.upsert_scanned_track(scanned) {
+                            Ok(id) => id,
+                            Err(_) => continue,
+                        };
 
                         if let Some(pid) = playlist_id
                             && let Some(playlist) = this.library.playlists.get_mut(pid)
                         {
-                            if !playlist.tracks.contains(&id) {
-                                playlist.tracks.push(id);
+                            if !playlist.tracks.contains(&track_id) {
+                                playlist.tracks.push(track_id);
                             }
+
                             modified_playlists.insert(*pid);
                         }
                     }
+
                     cx.notify();
                 });
+
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }

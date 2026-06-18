@@ -1,8 +1,8 @@
 pub mod metadata;
 use crate::app::AppPaths;
 use crate::cacher::CachedTrackSource;
+use crate::controller::state::TrackSource;
 use crate::controller::state::{Playlist, PlaylistId, PlaylistSource};
-use crate::controller::state::{Track, TrackSource};
 use crate::scanner::metadata::ScannedTrack;
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent, state::TrackId},
