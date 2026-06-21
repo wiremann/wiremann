@@ -50,7 +50,7 @@ pub struct Track {
     pub sources: Vec<TrackSource>,
 
     pub title: Arc<str>,
-    pub artist: Vec<ArtistId>,
+    pub artists: Vec<ArtistId>,
     pub album: AlbumId,
 
     pub duration: Duration,
@@ -272,7 +272,7 @@ impl Track {
     }
 
     pub fn artists<'a>(&self, lib: &'a LibraryState) -> impl Iterator<Item = &'a Arc<Artist>> {
-        self.artist.iter().filter_map(|id| lib.artist(*id))
+        self.artists.iter().filter_map(|id| lib.artist(*id))
     }
 }
 
@@ -329,8 +329,8 @@ impl LibraryState {
                 existing.title = scanned.title.clone().into();
             }
 
-            if existing.artist.is_empty() {
-                existing.artist = artist_ids.clone();
+            if existing.artists.is_empty() {
+                existing.artists = artist_ids.clone();
             }
 
             if existing.album == AlbumId::default() {
@@ -343,7 +343,7 @@ impl LibraryState {
                     id: track_id,
                     sources: vec![scanned.source.clone()],
                     title: scanned.title.clone().into(),
-                    artist: artist_ids.clone(),
+                    artists: artist_ids.clone(),
                     album: album_id,
                     duration: scanned.duration,
                     image_id: None,

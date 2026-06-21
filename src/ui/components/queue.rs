@@ -1,4 +1,4 @@
-use crate::controller::state::TrackId;
+use crate::controller::state::{ArtistId, TrackId};
 use crate::controller::{Controller, state::Track};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
@@ -16,7 +16,7 @@ const THUMBNAIL_MARGIN: usize = 16;
 struct ItemData {
     id: TrackId,
     title: String,
-    artist: String,
+    artists: Vec<ArtistId>,
 }
 
 #[allow(unused)]
@@ -33,12 +33,7 @@ impl Item {
             let data = ItemData {
                 id: track.id,
                 title: track.title.to_string(),
-                artist: track
-                    .artist
-                    .iter()
-                    .map(|a| a.0.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
+                artists: track.artists.clone(),
             };
 
             Self { data, idx }
@@ -112,7 +107,15 @@ impl Render for Item {
                             .text_sm()
                             .truncate()
                             .text_color(theme.queue_item_artist)
-                            .child(self.data.artist.clone()),
+                            .child(
+                                self.data
+                                    .artists
+                                    .iter()
+                                    .filter_map(|id| state.library.artist(*id))
+                                    .map(|artist| artist.name.as_ref())
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
+                            ),
                     ),
             )
     }

@@ -33,7 +33,7 @@ pub struct CachedTrack {
     pub sources: Vec<CachedTrackSource>,
 
     pub title: String,
-    pub artist: Vec<u64>,
+    pub artists: Vec<u64>,
     pub album: u64,
 
     pub duration: u64,
@@ -133,7 +133,7 @@ impl From<&Track> for CachedTrack {
             id: track.id.0,
             sources: track.sources.iter().map(Into::into).collect(),
             title: track.title.to_string(),
-            artist: track.artist.iter().map(|a| a.0).collect(),
+            artists: track.artists.iter().map(|a| a.0).collect(),
             album: track.album.0,
             duration: track.duration.as_millis() as u64,
             image_id: track.image_id.map(|id| id.0),
@@ -147,7 +147,7 @@ impl From<CachedTrack> for Track {
             id: TrackId(c.id),
             sources: c.sources.iter().map(Into::into).collect(),
             title: c.title.into(),
-            artist: c.artist.into_iter().map(ArtistId).collect(),
+            artists: c.artists.into_iter().map(ArtistId).collect(),
             album: AlbumId(c.album),
             duration: Duration::from_millis(c.duration),
             image_id: c.image_id.map(ImageId),
