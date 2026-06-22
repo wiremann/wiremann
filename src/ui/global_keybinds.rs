@@ -122,8 +122,7 @@ fn cycle_next(_: &CycleNext, cx: &mut App) {
 
     let next = match current {
         Page::Library => Page::Player,
-        Page::Player => Page::Playlists,
-        Page::Playlists => Page::Library,
+        Page::Player => Page::Library,
     };
 
     *cx.global_mut::<Page>() = next;
@@ -133,9 +132,8 @@ fn cycle_prev(_: &CyclePrev, cx: &mut App) {
     let current = *cx.global::<Page>();
 
     let prev = match current {
-        Page::Library => Page::Playlists,
+        Page::Library => Page::Player,
         Page::Player => Page::Library,
-        Page::Playlists => Page::Player,
     };
 
     *cx.global_mut::<Page>() = prev;
@@ -147,8 +145,4 @@ fn library(_: &Library, cx: &mut App) {
 
 fn player(_: &Player, cx: &mut App) {
     *cx.global_mut::<Page>() = Page::Player;
-}
-
-fn playlists(_: &Playlists, cx: &mut App) {
-    *cx.global_mut::<Page>() = Page::Playlists;
 }
