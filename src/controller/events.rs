@@ -1,6 +1,6 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::{AppState, PlaybackStatus};
-use crate::controller::state::{ImageId, Track, TrackId, TrackSource};
+use crate::controller::state::{ImageId, TrackId, TrackSource};
 use crate::controller::state::{Playlist, PlaylistId};
 use crate::lyrics_manager::Lyrics;
 use crate::scanner::metadata::ScannedTrack;

@@ -3,7 +3,6 @@ use super::{
     ImageProcessorCommand, Instant, PathBuf, PlaylistId, ScannerCommand, ScannerEvent,
     ScanningStatus, ToastKind, ToastPhase, TrackId, Wiremann,
 };
-use crate::controller::state::AlbumId;
 
 impl Controller {
     pub fn handle_scanner_event(
