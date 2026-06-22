@@ -27,7 +27,6 @@ impl Render for NavBar {
         let active_highlight_offset = match page {
             Page::Library => 0.0,
             Page::Player => 96.0,
-            Page::Playlists => 192.0,
         };
 
         div()
@@ -130,30 +129,6 @@ impl Render for NavBar {
                         this.text_color(theme.switcher_text_active)
                     })
                     .child("Player"),
-            )
-            .child(
-                div()
-                    .id("playlists")
-                    .h_full()
-                    .w_24()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .text_sm()
-                    .text_color(theme.switcher_text)
-                    .font_weight(FontWeight::MEDIUM)
-                    .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Playlists)
-                    .hover(|this| {
-                        if page == Page::Playlists {
-                            this
-                        } else {
-                            this.text_color(theme.switcher_text_hover)
-                        }
-                    })
-                    .when(page == Page::Playlists, |this| {
-                        this.text_color(theme.switcher_text_active)
-                    })
-                    .child("Playlists"),
             )
     }
 }

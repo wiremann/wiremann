@@ -21,7 +21,6 @@ pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
     pub player_page: Entity<PlayerPage>,
     pub library_page: Entity<LibraryPage>,
-    pub playlists_page: Entity<PlaylistsPage>,
     pub toast_manager: Entity<ToastManager>,
 }
 
@@ -97,7 +96,6 @@ impl Wiremann {
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
-        let playlists_page = cx.new(|cx| PlaylistsPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
         cx.global::<Controller>().load_cached_app_state();
@@ -106,7 +104,6 @@ impl Wiremann {
             titlebar,
             player_page,
             library_page,
-            playlists_page,
             toast_manager,
         }
     }
@@ -122,15 +119,14 @@ impl Render for Wiremann {
         let prev_page = *page_state.read(cx);
 
         let direction = match (prev_page, page) {
-            (Page::Library, Page::Player) | (Page::Player, Page::Playlists) => 1.0,
-            (Page::Playlists, Page::Player) | (Page::Player, Page::Library) => -1.0,
+            (Page::Library, Page::Player) => 1.0,
+            (Page::Player, Page::Library) => -1.0,
             _ => 0.0,
         };
 
         let page_el = match page {
             Page::Player => div().w_full().h_full().child(self.player_page.clone()),
             Page::Library => div().w_full().h_full().child(self.library_page.clone()),
-            Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
         };
 
         div()

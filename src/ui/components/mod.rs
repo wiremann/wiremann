@@ -16,7 +16,6 @@ pub mod virtual_list;
 pub enum Page {
     Library,
     Player,
-    Playlists,
 }
 
 impl gpui::Global for Page {}
