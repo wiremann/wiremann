@@ -12,10 +12,10 @@ use crate::controller::events::{
 use crate::controller::state::PlaybackStatus;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{Track, TrackId};
-use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, duration_to_slider};
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::theme::DominantColors;
 use crate::ui::wiremann::Wiremann;
 use crate::{

@@ -1,4 +1,9 @@
-use super::{Controller, App, CacherEvent, Entity, Wiremann, ControllerError, PlaybackStatus, duration_to_slider, ImageCache, drop_image_from_app, Rgb, Rgba, rgb, SystemIntegrationCommand, DominantColors, ImageProcessorCommand, HashSet, ImageKind, pick_playlist_thumbnail_tracks, LyricsState, LyricsStatus};
+use super::{
+    App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
+    ImageKind, ImageProcessorCommand, PlaybackStatus, Rgb, Rgba, SystemIntegrationCommand,
+    Wiremann, drop_image_from_app, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
+};
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
 impl Controller {
     pub fn handle_cacher_event(
