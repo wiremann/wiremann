@@ -2,7 +2,6 @@ pub mod controlbar;
 pub mod lyrics;
 pub mod queue;
 
-use super::{controlbar::ControlBar, lyrics::LyricsView, queue::Queue};
 use crate::{
     controller::{Controller, state::PlaybackStatus},
     ui::{
@@ -15,6 +14,9 @@ use crate::{
         theme::{DominantColors, Theme},
     },
 };
+use controlbar::ControlBar;
+use lyrics::LyricsView;
+use queue::Queue;
 
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,

@@ -36,7 +36,6 @@ pub fn register_keybinds(cx: &mut App) {
     cx.on_action(cycle_prev);
     cx.on_action(library);
     cx.on_action(player);
-    cx.on_action(playlists);
 
     // Player binds
     cx.bind_keys([

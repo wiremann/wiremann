@@ -1,8 +1,9 @@
 use crate::controller::Controller;
-use crate::ui::theme::Theme;
-
-use super::slider::{Slider, SliderState};
 use crate::ui::components::icons::{Icon, Icons};
+use crate::ui::{
+    components::slider::{Slider, SliderState},
+    theme::Theme,
+};
 use gpui::{
     Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, div,
