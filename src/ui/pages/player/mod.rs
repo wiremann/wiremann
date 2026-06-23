@@ -1,18 +1,21 @@
+pub mod controlbar;
+pub mod lyrics;
+pub mod queue;
+
+use super::{controlbar::ControlBar, lyrics::LyricsView, queue::Queue};
 use crate::{
     controller::{Controller, state::PlaybackStatus},
     ui::{
         components::{
             bounds_observer::observe_bounds,
-            controlbar::ControlBar,
             icons::{Icon, Icons},
             image_cache::ImageCache,
-            lyrics::LyricsView,
-            queue::Queue,
             scrollbar::{RightPad, floating_scrollbar},
         },
         theme::{DominantColors, Theme},
     },
 };
+
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,

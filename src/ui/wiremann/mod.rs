@@ -1,7 +1,10 @@
+mod navbar;
+mod titlebar;
+
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
-use crate::ui::components::controlbar::ControlBar;
 use crate::ui::components::lyrics::{LyricsState, LyricsStateInner};
+use crate::ui::components::pages::player::controlbar::ControlBar;
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
@@ -9,13 +12,14 @@ use crate::ui::helpers::slider_to_duration;
 use crate::ui::pages::{library::LibraryPage, player::PlayerPage, playlists::PlaylistsPage};
 use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
-use components::{Page, image_cache::ImageCache, titlebar::Titlebar};
+use components::{Page, image_cache::ImageCache};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
     InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
 };
 use std::time::Duration;
+use titlebar::Titlebar;
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
