@@ -1,4 +1,5 @@
 mod helpers;
+mod sidebar;
 
 use crate::controller::Controller;
 use crate::controller::state::TrackId;
@@ -6,17 +7,38 @@ use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
+use crate::ui::pages::library::sidebar::Sidebar;
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    App, Context, Div, FontWeight, Global, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
     VirtualListScrollController, Window, div, img, vlist,
 };
-use helpers::{LibraryRow, build_rows, render_header, render_playlist_grid, render_track_table_header, HeaderKind};
+use helpers::{
+    HeaderKind, LibraryRow, build_rows, render_header, render_playlist_grid,
+    render_track_table_header,
+};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
+
+#[derive(Clone)]
+pub enum LibrarySection {
+    // Discovery
+    Home,
+    Favorites,
+
+    // Collection
+    Tracks,
+    Albums,
+    Artists,
+    Playlists,
+
+    // System
+    Settings,
+    Tools,
+}
 
 #[derive(Clone)]
 pub struct LibraryPage {
@@ -27,6 +49,8 @@ pub struct LibraryPage {
     grid_cols: usize,
     last_fp: u128,
     pub list_controller: VirtualListScrollController,
+
+    sidebar: Entity<Sidebar>,
 }
 
 impl LibraryPage {
@@ -46,6 +70,7 @@ impl LibraryPage {
             sorted_tracks: Vec::new(),
             last_fp: 0,
             list_controller: VirtualListScrollController::new(),
+            sidebar: cx.new(|cx| Sidebar),
         }
     }
     #[allow(clippy::too_many_lines)]
@@ -242,6 +267,8 @@ impl Render for LibraryPage {
             .text_color(theme.library_text)
             .px_12()
             .pt_10()
+            .flex()
+            .child(self.sidebar)
             .child(vlist(
                 cx.entity(),
                 "library",
@@ -319,3 +346,5 @@ impl Render for LibraryPage {
             ))
     }
 }
+
+impl Global for LibrarySection {}

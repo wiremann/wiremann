@@ -1,8 +1,9 @@
 use super::{
     App, AudioEvent, CacherCommand, Controller, ControllerError, Duration, Entity, HashSet,
-    ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus, ScannerCommand,
-    SystemIntegrationCommand, Wiremann, duration_to_slider,
+    ImageKind, ImageProcessorCommand, ScannerCommand, SystemIntegrationCommand, Wiremann,
+    duration_to_slider,
 };
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
 impl Controller {
     pub fn handle_audio_event(

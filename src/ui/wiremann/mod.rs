@@ -7,6 +7,7 @@ use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::helpers::slider_to_duration;
+use crate::ui::pages::library::LibrarySection;
 use crate::ui::pages::player::{
     controlbar::ControlBar,
     lyrics::{LyricsState, LyricsStateInner},
@@ -90,6 +91,7 @@ impl Wiremann {
         cx.set_global(Theme::default());
         cx.set_global(DominantColors::default());
         cx.set_global(Page::Player);
+        cx.set_global(LibrarySection::Home);
         cx.set_global(ImageCache::default());
         let scanning_status = ScanningStatus::new(cx).clone();
         cx.set_global(scanning_status);
