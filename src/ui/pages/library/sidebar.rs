@@ -9,7 +9,7 @@ use crate::ui::theme::Theme;
 pub struct Sidebar;
 
 impl Render for Sidebar {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         div()
             .w(relative(0.32))
@@ -21,6 +21,7 @@ impl Render for Sidebar {
             .child(
                 div()
                     .w_full()
+                    .px_4()
                     .py_4()
                     .child("DISCOVERY")
                     .text_sm()
