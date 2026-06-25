@@ -3,7 +3,7 @@ use crate::controller::state::LibraryState;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::TrackId;
 use crate::ui::components::Page;
-use crate::ui::components::icons::{Icon, Icons};
+use crate::ui::components::icons::{Icons, icon};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use gpui::{
@@ -90,7 +90,7 @@ pub(super) fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App
                                     .items_center()
                                     .justify_center()
                                     .gap_3()
-                                    .child(Icon::new(Icons::Play).size_4())
+                                    .child(icon(Icons::Play).size_4())
                                     .child("Play")
                                     .cursor_pointer()
                                     .hover(|this| this.bg(theme.playlist_header_button_hover))
@@ -118,7 +118,7 @@ pub(super) fn render_header(height: Pixels, id: Option<PlaylistId>, cx: &mut App
                                     .items_center()
                                     .justify_center()
                                     .gap_3()
-                                    .child(Icon::new(Icons::Shuffle).size_4())
+                                    .child(icon(Icons::Shuffle).size_4())
                                     .child("Shuffle Play")
                                     .cursor_pointer()
                                     .hover(|this| this.bg(theme.playlist_header_button_hover))

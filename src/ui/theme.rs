@@ -98,6 +98,7 @@ pub struct Theme {
     pub library_empty_text: Rgba,
 
     pub library_sidebar_bg: Rgba,
+    pub library_sidebar_item_text: Rgba,
     pub library_sidebar_group_text: Rgba,
 
     // Playlists page
@@ -245,7 +246,7 @@ impl Default for Theme {
 
             library_sidebar_bg: rgb(0x050505),
             library_sidebar_group_text: rgb(0x71717A),
-
+            library_sidebar_item_text: rgb(0xFAFAFA),
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),
 

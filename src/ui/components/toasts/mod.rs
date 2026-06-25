@@ -2,7 +2,7 @@ pub mod scanning_status;
 
 use crate::ui::{
     components::{
-        icons::{Icon, Icons},
+        icons::{icon, Icons},
         toasts::scanning_status::ScanningStatusToast,
     },
     theme::Theme,
@@ -92,13 +92,13 @@ impl Render for ToastManager {
                         ToastKind::Info(msg) | ToastKind::Success(msg) | ToastKind::Error(msg) => {
                             let (accent, icon) = match &toast.kind {
                                 ToastKind::Info(_) => {
-                                    (theme.toast_info_accent, Icon::new(Icons::ToastInfo))
+                                    (theme.toast_info_accent, icon(Icons::ToastInfo))
                                 }
                                 ToastKind::Success(_) => {
-                                    (theme.toast_success_accent, Icon::new(Icons::ToastSuccess))
+                                    (theme.toast_success_accent, icon(Icons::ToastSuccess))
                                 }
                                 ToastKind::Error(_) => {
-                                    (theme.toast_error_accent, Icon::new(Icons::ToastError))
+                                    (theme.toast_error_accent, icon(Icons::ToastError))
                                 }
                                 ToastKind::ScanProgress(_) => unreachable!(),
                             };

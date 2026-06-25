@@ -2,7 +2,7 @@ use crate::controller::Controller;
 use crate::controller::state::TrackId;
 use crate::lyrics_manager::{LyricLine, Lyrics, SyncType};
 use crate::ui::components::bounds_observer::observe_bounds;
-use crate::ui::components::icons::{Icon, Icons};
+use crate::ui::components::icons::{icon, Icons};
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
 use gpui::prelude::FluentBuilder;
@@ -339,7 +339,7 @@ impl Render for LyricsView {
                             .gap_3()
                             .items_center()
                             .child(
-                                Icon::new(Icons::Loader)
+                                icon(Icons::Loader)
                                     .size_6()
                                     .text_color(theme.lyrics_loading_icon)
                                     .with_animation(

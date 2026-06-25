@@ -1,5 +1,5 @@
 use super::navbar::NavBar;
-use crate::ui::components::icons::Icons;
+use crate::ui::components::icons::{Icons, icon};
 use crate::ui::theme::Theme;
 use gpui::{
     App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
@@ -96,7 +96,7 @@ impl Render for Titlebar {
                             .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
                             .text_color(theme.titlebar_window_icons_text)
                             .cursor_pointer()
-                            .child(Icons::WinClose)
+                            .child(icon(Icons::WinClose))
                             .window_control_area(WindowControlArea::Close),
                     ),
             )

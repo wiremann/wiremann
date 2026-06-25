@@ -1,4 +1,4 @@
-use crate::ui::components::icons::{Icon, Icons};
+use crate::ui::components::icons::{icon, Icons};
 use crate::ui::theme::Theme;
 use gpui::{
     App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
@@ -66,7 +66,7 @@ impl Render for ScanningStatusToast {
                     .items_center()
                     .justify_center()
                     .child(
-                        Icon::new(Icons::Scan)
+                        icon(Icons::Scan)
                             .size_8()
                             .text_color(theme.toast_info_accent),
                     ),

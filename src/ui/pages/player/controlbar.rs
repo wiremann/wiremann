@@ -1,5 +1,5 @@
 use crate::controller::Controller;
-use crate::ui::components::icons::{Icon, Icons};
+use crate::ui::components::icons::{Icons, icon};
 use crate::ui::{
     components::slider::{Slider, SliderState},
     theme::Theme,
@@ -125,7 +125,7 @@ impl Render for ControlBar {
                                             })
                                             .text_color(theme.volume_icon)
                                             .child(
-                                                Icon::new(if state.playback.mute {
+                                                icon(if state.playback.mute {
                                                     Icons::VolumeMute
                                                 } else {
                                                     match state.playback.volume.clamp(0.0, 1.0) {

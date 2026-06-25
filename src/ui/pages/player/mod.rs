@@ -7,7 +7,7 @@ use crate::{
     ui::{
         components::{
             bounds_observer::observe_bounds,
-            icons::{Icon, Icons},
+            icons::{icon, Icons},
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
         },
@@ -260,7 +260,7 @@ impl Render for PlayerPage {
                                         move |_, _, cx| controller.set_shuffle(cx)
                                     })
                                     .cursor_pointer()
-                                    .child(Icon::new(Icons::Shuffle).size_4()),
+                                    .child(icon(Icons::Shuffle).size_4()),
                             )
                             .child(
                                 div()
@@ -277,7 +277,7 @@ impl Render for PlayerPage {
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
                                     .text_color(theme.player_icons_text)
                                     .cursor_pointer()
-                                    .child(Icon::new(Icons::Prev).size_4()),
+                                    .child(icon(Icons::Prev).size_4()),
                             )
                             .child(
                                 div()
@@ -311,9 +311,9 @@ impl Render for PlayerPage {
                                         if cx.global::<Controller>().state.read(cx).playback.status
                                             == PlaybackStatus::Playing
                                         {
-                                            Icon::new(Icons::Pause).size_5()
+                                            icon(Icons::Pause).size_5()
                                         } else {
-                                            Icon::new(Icons::Play).size_5()
+                                            icon(Icons::Play).size_5()
                                         },
                                     ),
                             )
@@ -332,7 +332,7 @@ impl Render for PlayerPage {
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
                                     .cursor_pointer()
                                     .text_color(theme.player_icons_text)
-                                    .child(Icon::new(Icons::Next).size_4()),
+                                    .child(icon(Icons::Next).size_4()),
                             )
                             .child(
                                 div()
@@ -359,7 +359,7 @@ impl Render for PlayerPage {
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_repeat(cx)
                                     })
-                                    .child(Icon::new(Icons::Repeat).size_4()),
+                                    .child(icon(Icons::Repeat).size_4()),
                             ),
                     )
                     .child(self.controlbar.clone()),
@@ -526,7 +526,7 @@ impl Render for PlayerPage {
                             .text_color(theme.player_panel_show_hide_text_hover)
                     })
                     .on_click(move |_, _, cx| show_panel.update(cx, |this, _| *this = !*this))
-                    .child(Icon::new(Icons::PanelRight).size_5()),
+                    .child(icon(Icons::PanelRight).size_5()),
             )
     }
 }

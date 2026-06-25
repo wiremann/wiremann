@@ -28,5 +28,15 @@ impl Render for Sidebar {
                     .font_weight(FontWeight::LIGHT)
                     .text_color(theme.library_sidebar_group_text),
             )
+            .child(
+                div()
+                    .w_full()
+                    .px_6()
+                    .py_4()
+                    .child("Home")
+                    .text_base()
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(theme.library_sidebar_item_text),
+            )
     }
 }
