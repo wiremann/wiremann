@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, App, AppContext, Entity, Hsla, IntoElement, SharedString, StyleRefinement, Styled,
-    Svg, TextColor, Transformation, svg,
+    AnyElement, App, AppContext, Entity, Hsla, IntoElement, Radians, SharedString, StyleRefinement,
+    Styled, Svg, TextColor, Transformation, svg,
 };
 
 pub trait IconNamed {
@@ -38,8 +38,8 @@ impl Icon {
     }
 
     #[must_use]
-    pub fn transform(mut self, transform: Transformation) -> Self {
-        self.transform = Some(transform);
+    pub fn rotate(mut self, radians: impl Into<Radians>) -> Self {
+        self.transform = Some(Transformation::rotate(radians));
         self
     }
 }
