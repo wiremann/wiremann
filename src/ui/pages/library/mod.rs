@@ -11,9 +11,10 @@ use crate::ui::pages::library::sidebar::Sidebar;
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, Context, Div, FontWeight, Global, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
-    VirtualListScrollController, Window, div, img, vlist,
+    App, AppContext, Context, Div, Entity, FontWeight, Global, ImageSource, InteractiveElement,
+    IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle,
+    StatefulInteractiveElement, Styled, StyledImage, VirtualListScrollController, Window, div, img,
+    vlist,
 };
 use helpers::{
     HeaderKind, LibraryRow, build_rows, render_header, render_playlist_grid,
@@ -70,7 +71,7 @@ impl LibraryPage {
             sorted_tracks: Vec::new(),
             last_fp: 0,
             list_controller: VirtualListScrollController::new(),
-            sidebar: cx.new(|cx| Sidebar),
+            sidebar: cx.new(|_| Sidebar),
         }
     }
     #[allow(clippy::too_many_lines)]
@@ -265,10 +266,10 @@ impl Render for LibraryPage {
             .size_full()
             .bg(theme.library_bg)
             .text_color(theme.library_text)
-            .px_12()
-            .pt_10()
+            .px_2()
+            .pt_2()
             .flex()
-            .child(self.sidebar)
+            .child(self.sidebar.clone())
             .child(vlist(
                 cx.entity(),
                 "library",
