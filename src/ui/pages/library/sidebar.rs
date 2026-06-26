@@ -16,7 +16,7 @@ impl Sidebar {
             .pt_5()
             .pb_2()
             .child(text)
-            .text_sm()
+            .text_xs()
             .font_weight(FontWeight::LIGHT)
             .text_color(theme.library_sidebar_group_text)
     }
@@ -39,6 +39,7 @@ impl Sidebar {
             .child(
                 div()
                     .child(text)
+                    .text_sm()
                     .font_weight(FontWeight::NORMAL)
                     .text_color(theme.library_sidebar_item_text),
             )
@@ -51,8 +52,11 @@ impl Render for Sidebar {
 
         div()
             .w(relative(0.32))
+            .max_w_80()
             .h_full()
             .bg(theme.library_sidebar_bg)
+            .border_r_1()
+            .border_color(theme.border)
             .flex()
             .flex_col()
             .child(div().h_px().mx_4().bg(theme.library_sidebar_separator))
@@ -74,27 +78,6 @@ impl Render for Sidebar {
                     .mx_4()
                     .mb_3()
                     .bg(theme.library_sidebar_separator),
-            )
-            .child(
-                div()
-                    .px_5()
-                    .pb_5()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(
-                        div()
-                            .child("Library")
-                            .text_sm()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.library_sidebar_footer_title),
-                    )
-                    .child(
-                        div()
-                            .child("4,829 tracks")
-                            .text_xs()
-                            .text_color(theme.library_sidebar_footer_meta),
-                    ),
             )
     }
 }
