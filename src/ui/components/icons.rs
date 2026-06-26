@@ -169,7 +169,7 @@ impl IconNamed for Icons {
     fn path(self) -> SharedString {
         match self {
             Icons::Music => "icons/music.svg",
-            Icons::MusicList => "icons/list-music.svg",
+            Icons::MusicList => "icons/playlist.svg",
             Icons::WinClose => "icons/window-close.svg",
             Icons::WinMax => "icons/window-maximize.svg",
             Icons::WinRes => "icons/window-restore.svg",

@@ -97,9 +97,17 @@ pub struct Theme {
 
     pub library_empty_text: Rgba,
 
+    // Sidebar
     pub library_sidebar_bg: Rgba,
     pub library_sidebar_item_text: Rgba,
     pub library_sidebar_group_text: Rgba,
+    pub library_sidebar_header_text: Rgba,
+    pub library_sidebar_separator: Rgba,
+
+    pub library_sidebar_footer_title: Rgba,
+    pub library_sidebar_footer_meta: Rgba,
+
+    pub library_sidebar_item_bg: Rgba,
 
     // Playlists page
     pub playlist_page_bg: Rgba,
@@ -247,6 +255,13 @@ impl Default for Theme {
             library_sidebar_bg: rgb(0x050505),
             library_sidebar_group_text: rgb(0x71717A),
             library_sidebar_item_text: rgb(0xFAFAFA),
+
+            library_sidebar_header_text: rgb(0xFAFAFA),
+            library_sidebar_item_bg: rgba(0xFFFFFF00),
+            library_sidebar_separator: rgba(0xFFFFFF12),
+            library_sidebar_footer_title: rgb(0xFAFAFA),
+            library_sidebar_footer_meta: rgb(0x71717A),
+
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),
 
