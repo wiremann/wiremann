@@ -1,12 +1,14 @@
 use gpui::{
-    AnyElement, App, AppContext, Entity, Hsla, IntoElement, Radians, SharedString, StyleRefinement,
-    Styled, Svg, TextColor, Transformation, svg,
+    AnyElement, App, AppContext, Context, Entity, Hsla, IntoElement, Radians, Render, RenderOnce,
+    SharedString, StyleRefinement, Styled, Svg, TextColor, Transformation, Window,
+    prelude::FluentBuilder as _, svg, white,
 };
 
 pub trait IconNamed {
     fn path(self) -> SharedString;
 }
 
+#[derive(IntoElement)]
 pub struct Icon {
     path: SharedString,
     style: StyleRefinement,
@@ -25,6 +27,13 @@ impl Default for Icon {
     }
 }
 
+/// Main constructor.
+///
+/// Usage:
+/// ```rust
+/// icon(Icons::Play)
+///     .size_4()
+/// ```
 pub fn icon(icon: impl IconNamed) -> Icon {
     Icon {
         path: icon.path(),
@@ -42,6 +51,12 @@ impl Icon {
         self.transform = Some(Transformation::rotate(radians));
         self
     }
+
+    #[must_use]
+    pub fn transform(mut self, transform: Transformation) -> Self {
+        self.transform = Some(transform);
+        self
+    }
 }
 
 impl Styled for Icon {
@@ -55,25 +70,49 @@ impl Styled for Icon {
     }
 }
 
-impl IntoElement for Icon {
-    type Element = Svg;
+impl RenderOnce for Icon {
+    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let color = self
+            .color
+            .unwrap_or_else(|| window.text_style().color.to_hsla());
 
-    fn into_element(self) -> Self::Element {
+        let text_size = window.text_style().font_size.to_pixels(window.rem_size());
+
+        let has_size = self.style.size.width.is_some() || self.style.size.height.is_some();
+
         let mut svg = svg().flex_none();
 
         *svg.style() = self.style;
 
-        svg = svg.path(self.path);
+        svg.flex_shrink_0()
+            .text_color(color)
+            .when(!has_size, |this| this.size(text_size))
+            .path(self.path)
+            .when_some(self.transform, |this, transform| {
+                this.with_transformation(transform)
+            })
+    }
+}
 
-        if let Some(color) = self.color {
-            svg = svg.text_color(color);
-        }
+impl Render for Icon {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let color = self.color.unwrap_or_else(white);
 
-        if let Some(transform) = self.transform {
-            svg = svg.with_transformation(transform);
-        }
+        let text_size = window.text_style().font_size.to_pixels(window.rem_size());
 
-        svg
+        let has_size = self.style.size.width.is_some() || self.style.size.height.is_some();
+
+        let mut svg = svg().flex_none();
+
+        *svg.style() = self.style.clone();
+
+        svg.flex_shrink_0()
+            .text_color(color)
+            .when(!has_size, |this| this.size(text_size))
+            .path(self.path.clone())
+            .when_some(self.transform, |this, transform| {
+                this.with_transformation(transform)
+            })
     }
 }
 
@@ -111,6 +150,19 @@ pub enum Icons {
     Loader,
     Scan,
     PanelRight,
+    Home,
+    Disc,
+    Playlist,
+    Plugins,
+    User,
+    Heart,
+}
+
+impl Icons {
+    #[must_use]
+    pub fn icon(self) -> Icon {
+        icon(self)
+    }
 }
 
 impl IconNamed for Icons {
@@ -141,6 +193,12 @@ impl IconNamed for Icons {
             Icons::Loader => "icons/loader.svg",
             Icons::Scan => "icons/scan.svg",
             Icons::PanelRight => "icons/panel_right.svg",
+            Icons::Home => "icons/home.svg",
+            Icons::Disc => "icons/disc.svg",
+            Icons::Playlist => "icons/playlist.svg",
+            Icons::Plugins => "icons/plugins.svg",
+            Icons::User => "icons/user.svg",
+            Icons::Heart => "icons/heart.svg",
         }
         .into()
     }

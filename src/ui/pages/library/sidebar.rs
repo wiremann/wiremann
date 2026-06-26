@@ -4,7 +4,10 @@ use gpui::{
     VirtualListScrollController, Window, div, img, relative, vlist, white,
 };
 
-use crate::ui::theme::Theme;
+use crate::ui::{
+    components::icons::{Icons, icon},
+    theme::Theme,
+};
 
 pub struct Sidebar;
 
@@ -24,7 +27,7 @@ impl Render for Sidebar {
                     .px_4()
                     .py_4()
                     .child("DISCOVERY")
-                    .text_sm()
+                    .text_xs()
                     .font_weight(FontWeight::LIGHT)
                     .text_color(theme.library_sidebar_group_text),
             )
@@ -33,6 +36,14 @@ impl Render for Sidebar {
                     .w_full()
                     .px_6()
                     .py_4()
+                    .flex()
+                    .items_center()
+                    .gap_4()
+                    .child(
+                        icon(Icons::Home)
+                            .size_6()
+                            .text_color(theme.library_sidebar_item_text),
+                    )
                     .child("Home")
                     .text_base()
                     .font_weight(FontWeight::NORMAL)
