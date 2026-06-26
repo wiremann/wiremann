@@ -3,6 +3,7 @@ mod sidebar;
 
 use crate::controller::Controller;
 use crate::controller::state::TrackId;
+use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
@@ -11,10 +12,10 @@ use crate::ui::pages::library::sidebar::Sidebar;
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, AppContext, Context, Div, Entity, FontWeight, Global, ImageSource, InteractiveElement,
-    IntoElement, ObjectFit, ParentElement, Pixels, Render, ScrollHandle,
-    StatefulInteractiveElement, Styled, StyledImage, VirtualListScrollController, Window, div, img,
-    vlist,
+    Animation, AnimationExt, App, AppContext, Context, Div, ElementId, Entity, FontWeight, Global,
+    ImageSource, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
+    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, VirtualListScrollController,
+    Window, div, img, px, vlist,
 };
 use helpers::{
     HeaderKind, LibraryRow, build_rows, render_header, render_playlist_grid,
@@ -24,7 +25,8 @@ use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
 
-#[derive(Clone)]
+#[repr(u64)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LibrarySection {
     // Discovery
     Home,
@@ -52,6 +54,23 @@ pub struct LibraryPage {
     pub list_controller: VirtualListScrollController,
 
     sidebar: Entity<Sidebar>,
+}
+
+impl LibrarySection {
+    pub const fn index(self) -> i32 {
+        match self {
+            Self::Home => 0,
+            Self::Favorites => 1,
+
+            Self::Tracks => 2,
+            Self::Albums => 3,
+            Self::Artists => 4,
+            Self::Playlists => 5,
+
+            Self::Settings => 6,
+            Self::Tools => 7,
+        }
+    }
 }
 
 impl LibraryPage {
@@ -262,6 +281,23 @@ impl Render for LibraryPage {
         let rows = self.rows.clone();
         let heights = self.heights.clone();
 
+        let section = *cx.global::<LibrarySection>();
+
+        let section_el = match section {
+            LibrarySection::Home => div().w_full().h_full().child("Home Section"),
+            LibrarySection::Favorites => div().w_full().h_full().child("Favorites Section"),
+            LibrarySection::Tracks => div().w_full().h_full().child("Tracks Section"),
+            LibrarySection::Albums => div().w_full().h_full().child("Albums Section"),
+            LibrarySection::Artists => div().w_full().h_full().child("Artists Section"),
+            LibrarySection::Playlists => div().w_full().h_full().child("Playlists Section"),
+            LibrarySection::Settings => div().w_full().h_full().child("Settings Section"),
+            LibrarySection::Tools => div().w_full().h_full().child("Tools Section"),
+        };
+        let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
+        let prev_page = *section_state.read(cx);
+
+        let direction = (section.index() - prev_page.index()).signum() as f32;
+
         div()
             .size_full()
             .bg(theme.library_bg)
@@ -270,81 +306,116 @@ impl Render for LibraryPage {
             .pt_2()
             .flex()
             .child(self.sidebar.clone())
-            .child(vlist(
-                cx.entity(),
-                "library",
-                heights.clone(),
-                scroll_handle,
-                self.list_controller.clone(),
-                move |_this, range, _, cx| {
-                    let len = rows.len();
+            .child(
+                div()
+                    .id("animation_container")
+                    .w_full()
+                    .h_full()
+                    .map(move |this| {
+                        if prev_page == section {
+                            this.child(section_el).into_any_element()
+                        } else {
+                            let duration = std::time::Duration::from_millis(300);
 
-                    let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                    let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                            cx.spawn({
+                                let section_state = section_state.clone();
+                                async move |_, cx| {
+                                    cx.background_executor().timer(duration).await;
+                                    let _ = section_state.update(cx, |state, _| {
+                                        *state = section;
+                                    });
+                                }
+                            })
+                            .detach();
 
-                    let thumb_track_ids: Vec<TrackId> = (start..end)
-                        .filter_map(|idx| match &rows[idx] {
-                            LibraryRow::TrackRow(_, id) => Some(*id),
-                            _ => None,
-                        })
-                        .collect();
+                            this.child(section_el)
+                                .with_animation(
+                                    ElementId::NamedInteger("section_slide".into(), section as u64),
+                                    Animation::new(duration).with_easing(ease_in_out_expo()),
+                                    move |this, delta| {
+                                        let offset = 360.0 * direction * (1.0 - delta);
+                                        this.left(px(offset)).opacity(delta)
+                                    },
+                                )
+                                .into_any_element()
+                        }
+                    }),
+            )
+        // .child(vlist(
+        //     cx.entity(),
+        //     "library",
+        //     heights.clone(),
+        //     scroll_handle,
+        //     self.list_controller.clone(),
+        //     move |_this, range, _, cx| {
+        //         let len = rows.len();
 
-                    controller.request_track_thumbnails(&thumb_track_ids, cx);
+        //         let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+        //         let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                    range
-                        .map(|idx| match &rows[idx] {
-                            LibraryRow::Header(kind) => render_header(kind, heights[idx], cx),
+        //         let thumb_track_ids: Vec<TrackId> = (start..end)
+        //             .filter_map(|idx| match &rows[idx] {
+        //                 LibraryRow::TrackRow(_, id) => Some(*id),
+        //                 _ => None,
+        //             })
+        //             .collect();
 
-                            LibraryRow::PlaylistGridRow(ids) => {
-                                render_playlist_grid(ids, heights[idx], cx)
-                            }
+        //         controller.request_track_thumbnails(&thumb_track_ids, cx);
 
-                            LibraryRow::TrackTableHeader => {
-                                render_track_table_header(heights[idx], cx)
-                            }
+        //         range
+        //             .map(|idx| match &rows[idx] {
+        //                 LibraryRow::Header(kind) => render_header(kind, heights[idx], cx),
 
-                            LibraryRow::TrackRow(i, id) => {
-                                Self::render_track(*i, id, heights[idx], cx)
-                            }
+        //                 LibraryRow::PlaylistGridRow(ids) => {
+        //                     render_playlist_grid(ids, heights[idx], cx)
+        //                 }
 
-                            LibraryRow::Empty(kind) => match kind {
-                                HeaderKind::Playlists => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No playlists loaded."),
-                                HeaderKind::Tracks => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No tracks loaded."),
-                                HeaderKind::Albums => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No albums loaded."),
-                            },
-                        })
-                        .collect::<Vec<_>>()
-                },
-            ))
-            .child(floating_scrollbar(
-                "queue_scrollbar",
-                self.scroll_handle.clone(),
-                RightPad::Pad,
-            ))
+        //                 LibraryRow::TrackTableHeader => {
+        //                     render_track_table_header(heights[idx], cx)
+        //                 }
+
+        //                 LibraryRow::TrackRow(i, id) => {
+        //                     Self::render_track(*i, id, heights[idx], cx)
+        //                 }
+
+        //                 LibraryRow::Empty(kind) => match kind {
+        //                     HeaderKind::Playlists => div()
+        //                         .w_full()
+        //                         .h_48()
+        //                         .flex()
+        //                         .items_center()
+        //                         .justify_center()
+        //                         .text_lg()
+        //                         .text_color(theme.library_empty_text)
+        //                         .child("No playlists loaded."),
+        //                     HeaderKind::Tracks => div()
+        //                         .w_full()
+        //                         .h_48()
+        //                         .flex()
+        //                         .items_center()
+        //                         .justify_center()
+        //                         .text_lg()
+        //                         .text_color(theme.library_empty_text)
+        //                         .child("No tracks loaded."),
+        //                     HeaderKind::Albums => div()
+        //                         .w_full()
+        //                         .h_48()
+        //                         .flex()
+        //                         .items_center()
+        //                         .justify_center()
+        //                         .text_lg()
+        //                         .text_color(theme.library_empty_text)
+        //                         .child("No albums loaded."),
+        //                 },
+        //             })
+        //             .collect::<Vec<_>>()
+        //     },
+        // ))
+        // .child(floating_scrollbar(
+        //     "library_scrollbar",
+        //     self.scroll_handle.clone(),
+        //     RightPad::Pad,
+        // ))
     }
 }
 

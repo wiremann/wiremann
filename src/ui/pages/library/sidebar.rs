@@ -1,9 +1,11 @@
 use gpui::{
-    Context, FontWeight, IntoElement, ParentElement, Render, Styled, Window, div, relative,
+    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window,
+    div, relative,
 };
 
 use crate::ui::{
     components::icons::{Icons, icon},
+    pages::library::LibrarySection,
     theme::Theme,
 };
 
@@ -21,8 +23,17 @@ impl Sidebar {
             .text_color(theme.library_sidebar_group_text)
     }
 
-    fn item(icon_type: Icons, text: &'static str, theme: Theme) -> impl IntoElement {
+    fn item(
+        icon_type: Icons,
+        text: &'static str,
+        section: LibrarySection,
+        current: LibrarySection,
+        theme: Theme,
+    ) -> impl IntoElement {
+        let active = current == section;
+
         div()
+            .id(format!("library_sidebar_item_{}", text))
             .mx_3()
             .px_3()
             .py_2()
@@ -30,7 +41,13 @@ impl Sidebar {
             .flex()
             .items_center()
             .gap_3()
-            .bg(theme.library_sidebar_item_bg)
+            .cursor_pointer()
+            .when(active, |this| this.bg(theme.library_sidebar_item_bg_active))
+            .hover(|this| this.bg(theme.library_sidebar_item_bg_hover))
+            .on_click(move |_, _, cx| {
+                *cx.global_mut::<LibrarySection>() = section;
+                cx.notify();
+            })
             .child(
                 icon(icon_type)
                     .size_4()
@@ -49,7 +66,7 @@ impl Sidebar {
 impl Render for Sidebar {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
-
+        let current = *cx.global::<LibrarySection>();
         div()
             .w(relative(0.32))
             .max_w_80()
@@ -61,16 +78,64 @@ impl Render for Sidebar {
             .flex_col()
             .child(div().h_px().mx_4().bg(theme.library_sidebar_separator))
             .child(Self::section_header("DISCOVERY", theme))
-            .child(Self::item(Icons::Home, "Home", theme))
-            .child(Self::item(Icons::Heart, "Favorites", theme))
+            .child(Self::item(
+                Icons::Home,
+                "Home",
+                LibrarySection::Home,
+                current,
+                theme,
+            ))
+            .child(Self::item(
+                Icons::Heart,
+                "Favorites",
+                LibrarySection::Favorites,
+                current,
+                theme,
+            ))
             .child(Self::section_header("COLLECTION", theme))
-            .child(Self::item(Icons::Music, "Tracks", theme))
-            .child(Self::item(Icons::MusicList, "Albums", theme))
-            .child(Self::item(Icons::User, "Artists", theme))
-            .child(Self::item(Icons::Playlist, "Playlists", theme))
+            .child(Self::item(
+                Icons::Music,
+                "Tracks",
+                LibrarySection::Tracks,
+                current,
+                theme,
+            ))
+            .child(Self::item(
+                Icons::MusicList,
+                "Albums",
+                LibrarySection::Albums,
+                current,
+                theme,
+            ))
+            .child(Self::item(
+                Icons::User,
+                "Artists",
+                LibrarySection::Artists,
+                current,
+                theme,
+            ))
+            .child(Self::item(
+                Icons::Playlist,
+                "Playlists",
+                LibrarySection::Playlists,
+                current,
+                theme,
+            ))
             .child(Self::section_header("SYSTEM", theme))
-            .child(Self::item(Icons::Plugins, "Plugins", theme))
-            .child(Self::item(Icons::Settings, "Settings", theme))
+            .child(Self::item(
+                Icons::Plugins,
+                "Plugins",
+                LibrarySection::Tools,
+                current,
+                theme,
+            ))
+            .child(Self::item(
+                Icons::Settings,
+                "Settings",
+                LibrarySection::Settings,
+                current,
+                theme,
+            ))
             .child(div().flex_grow())
             .child(
                 div()
