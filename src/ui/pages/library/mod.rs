@@ -26,7 +26,7 @@ use std::rc::Rc;
 const THUMBNAIL_MARGIN: usize = 16;
 
 #[repr(u64)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum LibrarySection {
     // Discovery
     Home,
@@ -69,6 +69,21 @@ impl LibrarySection {
 
             Self::Settings => 6,
             Self::Tools => 7,
+        }
+    }
+
+ pub const fn sidebar_offset(self) -> f32 {
+        match self {
+            Self::Home => 38.0,
+            Self::Favorites => 70.0,
+
+            Self::Tracks => 136.0,
+            Self::Albums => 168.0,
+            Self::Artists => 200.0,
+            Self::Playlists => 232.0,
+
+            Self::Tools => 298.0,
+            Self::Settings => 330.0,
         }
     }
 }
@@ -254,7 +269,6 @@ impl Render for LibraryPage {
 
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
-        let scroll_handle = self.scroll_handle.clone();
 
         let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
         let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
@@ -277,10 +291,6 @@ impl Render for LibraryPage {
             self.last_fp = combined_fp;
             self.grid_cols = cols;
         }
-
-        let rows = self.rows.clone();
-        let heights = self.heights.clone();
-
         let section = *cx.global::<LibrarySection>();
 
         let section_el = match section {
@@ -334,7 +344,7 @@ impl Render for LibraryPage {
                                     Animation::new(duration).with_easing(ease_in_out_expo()),
                                     move |this, delta| {
                                         let offset = 360.0 * direction * (1.0 - delta);
-                                        this.left(px(offset)).opacity(delta)
+                                        this.top(px(offset)).opacity(delta)
                                     },
                                 )
                                 .into_any_element()

@@ -1,6 +1,7 @@
 use gpui::{
-    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window,
-    div, relative,
+    Animation, AnimationExt, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
+    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, gradient_color_stop,
+    linear_gradient, prelude::FluentBuilder, px, relative, transparent_black,
 };
 
 use crate::ui::{
@@ -33,49 +34,123 @@ impl Sidebar {
         let active = current == section;
 
         div()
-            .id(format!("library_sidebar_item_{}", text))
+            .id(format!("library_sidebar_item_{text}"))
             .mx_3()
             .px_3()
             .py_2()
-            .rounded_md()
             .flex()
             .items_center()
             .gap_3()
             .cursor_pointer()
-            .when(active, |this| this.bg(theme.library_sidebar_item_bg_active))
             .hover(|this| this.bg(theme.library_sidebar_item_bg_hover))
             .on_click(move |_, _, cx| {
                 *cx.global_mut::<LibrarySection>() = section;
-                cx.notify();
             })
-            .child(
-                icon(icon_type)
-                    .size_4()
-                    .text_color(theme.library_sidebar_item_text),
-            )
+            .child(icon(icon_type).size_4().text_color(if active {
+                theme.library_sidebar_item_text_active
+            } else {
+                theme.library_sidebar_item_text
+            }))
             .child(
                 div()
                     .child(text)
                     .text_sm()
-                    .font_weight(FontWeight::NORMAL)
-                    .text_color(theme.library_sidebar_item_text),
+                    .font_weight(if active {
+                        FontWeight::MEDIUM
+                    } else {
+                        FontWeight::NORMAL
+                    })
+                    .text_color(if active {
+                        theme.library_sidebar_item_text_active
+                    } else {
+                        theme.library_sidebar_item_text
+                    }),
             )
     }
 }
 
 impl Render for Sidebar {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let current = *cx.global::<LibrarySection>();
+        let current_offset = current.sidebar_offset();
+
+        let indicator_state =
+            window.use_keyed_state("sidebar_indicator", cx, |_, _| (current, current_offset));
+
+        let (prev_section, prev_offset) = *indicator_state.read(cx);
+
+        let duration = std::time::Duration::from_millis(250);
+
         div()
+            .relative()
             .w(relative(0.32))
-            .max_w_80()
+            .min_w_56()
+            .max_w_64()
             .h_full()
             .bg(theme.library_sidebar_bg)
             .border_r_1()
             .border_color(theme.border)
             .flex()
             .flex_col()
+            .child({
+                let indicator = div()
+                    .absolute()
+                    .right_0()
+                    .w_full()
+                    .h(px(32.0))
+                    .child(
+                        div()
+                            .absolute()
+                            .right_0()
+                            .top_0()
+                            .bottom_0()
+                            .w(px(4.0))
+                            .bg(theme.library_sidebar_indicator),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .right(px(4.0))
+                            .top_0()
+                            .bottom_0()
+                            .w(px(120.0))
+                            .bg(linear_gradient(
+                                180.0,
+                                gradient_color_stop(theme.library_sidebar_indicator_glow, 0.0),
+                                gradient_color_stop(transparent_black(), 1.0),
+                            )),
+                    );
+
+                if prev_section == current {
+                    indicator.top(px(current_offset)).into_any_element()
+                } else {
+                    cx.spawn({
+                        let indicator_state = indicator_state.clone();
+
+                        async move |_, cx| {
+                            cx.background_executor().timer(duration).await;
+
+                            let _ = indicator_state.update(cx, |state, _| {
+                                *state = (current, current_offset);
+                            });
+                        }
+                    })
+                    .detach();
+
+                    indicator
+                        .with_animation(
+                            ElementId::NamedInteger("sidebar_indicator".into(), current as u64),
+                            Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                            move |this, delta| {
+                                let y = prev_offset + (current_offset - prev_offset) * delta;
+
+                                this.top(px(y))
+                            },
+                        )
+                        .into_any_element()
+                }
+            })
             .child(div().h_px().mx_4().bg(theme.library_sidebar_separator))
             .child(Self::section_header("DISCOVERY", theme))
             .child(Self::item(
