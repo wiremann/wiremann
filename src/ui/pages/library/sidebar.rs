@@ -21,18 +21,24 @@ pub struct SidebarIndicator {
     pub height: f32,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct SidebarBounds {
+    pub top: f32,
+}
+
 impl Global for SidebarIndicator {}
+impl Global for SidebarBounds {}
 
 impl Sidebar {
     fn section_header(text: &'static str, theme: Theme) -> impl IntoElement {
         div()
-            .px_5()
-            .pt_5()
-            .pb_2()
-            .child(text)
-            .text_xs()
-            .font_weight(FontWeight::LIGHT)
+            .px_6()
+            .pt_12()
+            .pb_4()
+            .text_sm()
+            .font_weight(FontWeight::NORMAL)
             .text_color(theme.library_sidebar_group_text)
+            .child(text)
     }
 
     fn item(
@@ -48,18 +54,18 @@ impl Sidebar {
             format!("sidebar_bounds_{text}"),
             div()
                 .id(format!("library_sidebar_item_{text}"))
-                .mx_3()
+                .w_full()
                 .px_6()
                 .py_3()
                 .flex()
                 .items_center()
-                .gap_4()
+                .gap_3()
                 .cursor_pointer()
                 .hover(|this| this.bg(theme.library_sidebar_item_bg_hover))
                 .on_click(move |_, _, cx| {
                     *cx.global_mut::<LibrarySection>() = section;
                 })
-                .child(icon(icon_type).size_4().text_color(if active {
+                .child(icon(icon_type).size_5().text_color(if active {
                     theme.library_sidebar_item_text_active
                 } else {
                     theme.library_sidebar_item_text
@@ -69,7 +75,7 @@ impl Sidebar {
                         .child(text)
                         .text_sm()
                         .font_weight(if active {
-                            FontWeight::MEDIUM
+                            FontWeight::BOLD
                         } else {
                             FontWeight::NORMAL
                         })
@@ -81,9 +87,10 @@ impl Sidebar {
                 ),
             move |bounds, _, cx| {
                 if *cx.global::<LibrarySection>() == section {
+                    let sidebar_top = cx.global::<SidebarBounds>().top;
                     let indicator = cx.global_mut::<SidebarIndicator>();
 
-                    indicator.top = bounds.top().to_f64() as f32;
+                    indicator.top = bounds.top().to_f64() as f32 - sidebar_top;
                     indicator.height = bounds.size.height.to_f64() as f32;
                 }
             },
@@ -95,7 +102,6 @@ impl Render for Sidebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let current = *cx.global::<LibrarySection>();
-        let current_offset = current.sidebar_offset();
 
         let indicator_data = *cx.global::<SidebarIndicator>();
 
@@ -106,147 +112,140 @@ impl Render for Sidebar {
         let (prev_section, prev_top, prev_height) = *indicator_state.read(cx);
 
         let duration = std::time::Duration::from_millis(250);
-
-        div()
-            .relative()
-            .w(relative(0.32))
-            .min_w_56()
-            .max_w_64()
-            .h_full()
-            .bg(theme.library_sidebar_bg)
-            .border_r_1()
-            .border_color(theme.border)
-            .flex()
-            .flex_col()
-            .child({
-                let indicator = div()
-                    .absolute()
-                    .right_0()
-                    .w_full()
-                    .child(
-                        div()
-                            .absolute()
-                            .right_0()
-                            .top_0()
-                            .bottom_0()
-                            .w(px(4.0))
-                            .bg(theme.library_sidebar_indicator),
-                    )
-                    .child(
-                        div()
-                            .absolute()
-                            .left_0()
-                            .top_0()
-                            .bottom_0()
-                            .right(px(4.0))
-                            .bg(linear_gradient(
-                                90.0,
-                                gradient_color_stop(theme.library_sidebar_indicator_glow, 0.0),
-                                gradient_color_stop(transparent_black(), 1.0),
-                            )),
-                    );
-
-                if prev_section == current {
-                    indicator
-                        .top(px(indicator_data.top))
-                        .h(px(indicator_data.height))
-                        .into_any_element()
-                } else {
-                    cx.spawn({
-                        let indicator_state = indicator_state.clone();
-
-                        async move |_, cx| {
-                            cx.background_executor().timer(duration).await;
-
-                            let _ = indicator_state.update(cx, |state, _| {
-                                *state = (current, indicator_data.top, indicator_data.height);
-                            });
-                        }
-                    })
-                    .detach();
-
-                    indicator
-                        .with_animation(
-                            ElementId::NamedInteger("sidebar_indicator".into(), current as u64),
-                            Animation::new(duration).with_easing(gpui::ease_out_quint()),
-                            move |this, delta| {
-                                let y = prev_top + (indicator_data.top - prev_top) * delta;
-
-                                let h = prev_height + (indicator_data.height - prev_height) * delta;
-
-                                this.top(px(y)).h(px(h))
-                            },
+        observe_bounds(
+            "sidebar_root",
+            div()
+                .relative()
+                .min_w_64()
+                .h_full()
+                .bg(theme.library_sidebar_bg)
+                .flex()
+                .flex_col()
+                .child({
+                    let indicator = div()
+                        .absolute()
+                        .right_0()
+                        .w_full()
+                        .child(
+                            div()
+                                .absolute()
+                                .right_0()
+                                .top_0()
+                                .bottom_0()
+                                .w(px(4.0))
+                                .bg(theme.library_sidebar_indicator),
                         )
-                        .into_any_element()
-                }
-            })
-            .child(div().h_px().mx_4().bg(theme.library_sidebar_separator))
-            .child(Self::section_header("DISCOVERY", theme))
-            .child(Self::item(
-                Icons::Home,
-                "Home",
-                LibrarySection::Home,
-                current,
-                theme,
-            ))
-            .child(Self::item(
-                Icons::Heart,
-                "Favorites",
-                LibrarySection::Favorites,
-                current,
-                theme,
-            ))
-            .child(Self::section_header("COLLECTION", theme))
-            .child(Self::item(
-                Icons::Music,
-                "Tracks",
-                LibrarySection::Tracks,
-                current,
-                theme,
-            ))
-            .child(Self::item(
-                Icons::MusicList,
-                "Albums",
-                LibrarySection::Albums,
-                current,
-                theme,
-            ))
-            .child(Self::item(
-                Icons::User,
-                "Artists",
-                LibrarySection::Artists,
-                current,
-                theme,
-            ))
-            .child(Self::item(
-                Icons::Playlist,
-                "Playlists",
-                LibrarySection::Playlists,
-                current,
-                theme,
-            ))
-            .child(Self::section_header("SYSTEM", theme))
-            .child(Self::item(
-                Icons::Plugins,
-                "Plugins",
-                LibrarySection::Tools,
-                current,
-                theme,
-            ))
-            .child(Self::item(
-                Icons::Settings,
-                "Settings",
-                LibrarySection::Settings,
-                current,
-                theme,
-            ))
-            .child(div().flex_grow())
-            .child(
-                div()
-                    .h_px()
-                    .mx_4()
-                    .mb_3()
-                    .bg(theme.library_sidebar_separator),
-            )
+                        .child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .bottom_0()
+                                .right(px(4.0))
+                                .w(px(180.0))
+                                .bg(linear_gradient(
+                                    270.0,
+                                    gradient_color_stop(theme.library_sidebar_indicator_glow, 0.0),
+                                    gradient_color_stop(transparent_black(), 1.0),
+                                )),
+                        );
+                    if prev_section == current {
+                        indicator
+                            .top(px(indicator_data.top))
+                            .h(px(indicator_data.height))
+                            .into_any_element()
+                    } else {
+                        cx.spawn({
+                            let indicator_state = indicator_state.clone();
+
+                            async move |_, cx| {
+                                cx.background_executor().timer(duration).await;
+
+                                let _ = indicator_state.update(cx, |state, _| {
+                                    *state = (current, indicator_data.top, indicator_data.height);
+                                });
+                            }
+                        })
+                        .detach();
+
+                        indicator
+                            .with_animation(
+                                ElementId::NamedInteger("sidebar_indicator".into(), current as u64),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                move |this, delta| {
+                                    let y = prev_top + (indicator_data.top - prev_top) * delta;
+
+                                    let h =
+                                        prev_height + (indicator_data.height - prev_height) * delta;
+
+                                    this.top(px(y)).h(px(h))
+                                },
+                            )
+                            .into_any_element()
+                    }
+                })
+                .child(Self::section_header("DISCOVERY", theme))
+                .child(Self::item(
+                    Icons::Home,
+                    "Home",
+                    LibrarySection::Home,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::Heart,
+                    "Favorites",
+                    LibrarySection::Favorites,
+                    current,
+                    theme,
+                ))
+                .child(Self::section_header("COLLECTION", theme))
+                .child(Self::item(
+                    Icons::Music,
+                    "Tracks",
+                    LibrarySection::Tracks,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::Disc,
+                    "Albums",
+                    LibrarySection::Albums,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::User,
+                    "Artists",
+                    LibrarySection::Artists,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::Playlist,
+                    "Playlists",
+                    LibrarySection::Playlists,
+                    current,
+                    theme,
+                ))
+                .child(Self::section_header("SYSTEM", theme))
+                .child(Self::item(
+                    Icons::Plugins,
+                    "Plugins",
+                    LibrarySection::Tools,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::Settings,
+                    "Settings",
+                    LibrarySection::Settings,
+                    current,
+                    theme,
+                ))
+                .child(div().flex_grow()),
+            |bounds, _, cx| {
+                cx.global_mut::<SidebarBounds>().top = bounds.top().to_f64() as f32;
+            },
+        )
     }
 }

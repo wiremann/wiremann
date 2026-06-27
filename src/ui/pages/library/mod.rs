@@ -8,7 +8,7 @@ use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
-use crate::ui::pages::library::sidebar::{Sidebar, SidebarIndicator};
+use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -101,6 +101,8 @@ impl LibraryPage {
             top: 0.0,
             height: 32.0,
         });
+
+        cx.set_global(SidebarBounds { top: 0.0 });
 
         LibraryPage {
             scroll_handle,
