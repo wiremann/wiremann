@@ -141,7 +141,7 @@ impl Render for Sidebar {
                                 .top_0()
                                 .bottom_0()
                                 .right(px(4.0))
-                                .w(px(180.0))
+                                .w_64()
                                 .bg(linear_gradient(
                                     270.0,
                                     gradient_color_stop(theme.library_sidebar_indicator_glow, 0.0),

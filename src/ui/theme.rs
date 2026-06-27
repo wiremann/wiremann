@@ -266,7 +266,7 @@ impl Default for Theme {
             library_sidebar_header_text: rgb(0xFAFAFA),
 
             library_sidebar_indicator: rgb(0xFFFFFF),
-            library_sidebar_indicator_glow: rgba(0xFFFFFF22),
+            library_sidebar_indicator_glow: rgba(0xFFFFFF4D),
 
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),
