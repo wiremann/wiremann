@@ -8,7 +8,7 @@ use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
-use crate::ui::pages::library::sidebar::Sidebar;
+use crate::ui::pages::library::sidebar::{Sidebar, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -72,7 +72,7 @@ impl LibrarySection {
         }
     }
 
- pub const fn sidebar_offset(self) -> f32 {
+    pub const fn sidebar_offset(self) -> f32 {
         match self {
             Self::Home => 38.0,
             Self::Favorites => 70.0,
@@ -96,6 +96,11 @@ impl LibraryPage {
         let cols = 4;
 
         let (rows, heights) = build_rows(library, cols);
+
+        cx.set_global(SidebarIndicator {
+            top: 0.0,
+            height: 32.0,
+        });
 
         LibraryPage {
             scroll_handle,
