@@ -38,6 +38,7 @@ impl Sidebar {
             .text_sm()
             .font_weight(FontWeight::NORMAL)
             .text_color(theme.library_sidebar_group_text)
+            .tracking_widest()
             .child(text)
     }
 
