@@ -1,4 +1,5 @@
 mod helpers;
+mod sections;
 mod sidebar;
 
 use crate::controller::Controller;
