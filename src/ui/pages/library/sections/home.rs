@@ -23,14 +23,14 @@ impl Render for HomeSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_home_section_title)
-                        .child("Home"),
-                )
-                .child(
-                    div()
-                        .h(px(2.0))
-                        .w_2_3()
-                        .mt_1()
-                        .bg(theme.library_home_section_title),
+                        .child("Home")
+                        .child(
+                            div()
+                                .h(px(2.0))
+                                .w_16()
+                                .mt_1()
+                                .bg(theme.library_home_section_title),
+                        ),
                 ),
         )
     }
