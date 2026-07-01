@@ -111,6 +111,9 @@ pub struct Theme {
     pub library_sidebar_indicator: Rgba,
     pub library_sidebar_indicator_glow: Rgba,
 
+    // Library Page Home Section
+    pub library_home_section_title: Rgba,
+
     // Playlists page
     pub playlist_page_bg: Rgba,
     pub playlist_page_text: Rgba,
@@ -267,6 +270,8 @@ impl Default for Theme {
 
             library_sidebar_indicator: rgb(0xFFFFFF),
             library_sidebar_indicator_glow: rgba(0xFFFFFF4D),
+
+            library_home_section_title: rgb(0xFFFFFF),
 
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),

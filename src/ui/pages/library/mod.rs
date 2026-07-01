@@ -9,6 +9,7 @@ use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
+use crate::ui::pages::library::sections::home::HomeSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
@@ -302,7 +303,7 @@ impl Render for LibraryPage {
         let section = *cx.global::<LibrarySection>();
 
         let section_el = match section {
-            LibrarySection::Home => div().w_full().h_full().child("Home Section"),
+            LibrarySection::Home => div().w_full().h_full().child(cx.new(|_| HomeSection {})),
             LibrarySection::Favorites => div().w_full().h_full().child("Favorites Section"),
             LibrarySection::Tracks => div().w_full().h_full().child("Tracks Section"),
             LibrarySection::Albums => div().w_full().h_full().child("Albums Section"),
