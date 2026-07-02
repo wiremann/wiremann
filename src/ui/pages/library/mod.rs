@@ -42,7 +42,7 @@ pub enum LibrarySection {
 
     // System
     Settings,
-    Tools,
+    Plugins,
 }
 
 #[derive(Clone)]
@@ -70,7 +70,7 @@ impl LibrarySection {
             Self::Playlists => 5,
 
             Self::Settings => 6,
-            Self::Tools => 7,
+            Self::Plugins => 7,
         }
     }
 
@@ -84,7 +84,7 @@ impl LibrarySection {
             Self::Artists => 200.0,
             Self::Playlists => 232.0,
 
-            Self::Tools => 298.0,
+            Self::Plugins => 298.0,
             Self::Settings => 330.0,
         }
     }
@@ -310,7 +310,7 @@ impl Render for LibraryPage {
             LibrarySection::Artists => div().w_full().h_full().child("Artists Section"),
             LibrarySection::Playlists => div().w_full().h_full().child("Playlists Section"),
             LibrarySection::Settings => div().w_full().h_full().child("Settings Section"),
-            LibrarySection::Tools => div().w_full().h_full().child("Tools Section"),
+            LibrarySection::Plugins => div().w_full().h_full().child("Tools Section"),
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
         let prev_page = *section_state.read(cx);
