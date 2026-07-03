@@ -4,9 +4,9 @@ use gpui::{
 
 use crate::ui::theme::Theme;
 
-pub struct HomeSection;
+pub struct ArtistsSection;
 
-impl Render for HomeSection {
+impl Render for ArtistsSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
 
@@ -22,14 +22,14 @@ impl Render for HomeSection {
                         .text_size(rems(2.0))
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
-                        .text_color(theme.library_home_section_title)
-                        .child("Home")
+                        .text_color(theme.library_artists_section_title)
+                        .child("artists")
                         .child(
                             div()
                                 .h(px(2.0))
                                 .w_16()
                                 .mt_1()
-                                .bg(theme.library_home_section_title),
+                                .bg(theme.library_artists_section_title),
                         ),
                 ),
         )

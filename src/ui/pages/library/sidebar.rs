@@ -232,7 +232,7 @@ impl Render for Sidebar {
                 .child(Self::item(
                     Icons::Plugins,
                     "Plugins",
-                    LibrarySection::Tools,
+                    LibrarySection::Plugins,
                     current,
                     theme,
                 ))
