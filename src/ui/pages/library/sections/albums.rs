@@ -23,7 +23,7 @@ impl Render for AlbumsSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_albums_section_title)
-                        .child("albums")
+                        .child("Albums")
                         .child(
                             div()
                                 .h(px(2.0))

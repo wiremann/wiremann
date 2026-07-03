@@ -23,7 +23,7 @@ impl Render for FavoritesSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_favorites_section_title)
-                        .child("favorites")
+                        .child("Favorites")
                         .child(
                             div()
                                 .h(px(2.0))

@@ -23,7 +23,7 @@ impl Render for SettingsSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_settings_section_title)
-                        .child("settings")
+                        .child("Settings")
                         .child(
                             div()
                                 .h(px(2.0))

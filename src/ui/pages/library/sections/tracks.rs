@@ -23,7 +23,7 @@ impl Render for TracksSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_tracks_section_title)
-                        .child("tracks")
+                        .child("Tracks")
                         .child(
                             div()
                                 .h(px(2.0))

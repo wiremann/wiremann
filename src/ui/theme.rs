@@ -113,6 +113,13 @@ pub struct Theme {
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
+    pub library_albums_section_title: Rgba,
+    pub library_artists_section_title: Rgba,
+    pub library_playlists_section_title: Rgba,
+    pub library_favorites_section_title: Rgba,
+    pub library_settings_section_title: Rgba,
+    pub library_plugins_section_title: Rgba,
+    pub library_tracks_section_title: Rgba,
 
     // Playlists page
     pub playlist_page_bg: Rgba,
@@ -272,6 +279,13 @@ impl Default for Theme {
             library_sidebar_indicator_glow: rgba(0xFFFFFF4D),
 
             library_home_section_title: rgb(0xFFFFFF),
+            library_albums_section_title: rgb(0xFFFFFF),
+            library_artists_section_title: rgb(0xFFFFFF),
+            library_playlists_section_title: rgb(0xFFFFFF),
+            library_favorites_section_title: rgb(0xFFFFFF),
+            library_settings_section_title: rgb(0xFFFFFF),
+            library_plugins_section_title: rgb(0xFFFFFF),
+            library_tracks_section_title: rgb(0xFFFFFF),
 
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),

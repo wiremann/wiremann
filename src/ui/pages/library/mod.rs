@@ -9,7 +9,14 @@ use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
+use crate::ui::pages::library::sections::albums::AlbumsSection;
+use crate::ui::pages::library::sections::artists::ArtistsSection;
+use crate::ui::pages::library::sections::favorites::FavoritesSection;
 use crate::ui::pages::library::sections::home::HomeSection;
+use crate::ui::pages::library::sections::playlists::PlaylistsSection;
+use crate::ui::pages::library::sections::plugins::PluginsSection;
+use crate::ui::pages::library::sections::settings::SettingsSection;
+use crate::ui::pages::library::sections::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
@@ -304,13 +311,22 @@ impl Render for LibraryPage {
 
         let section_el = match section {
             LibrarySection::Home => div().w_full().h_full().child(cx.new(|_| HomeSection {})),
-            LibrarySection::Favorites => div().w_full().h_full().child("Favorites Section"),
-            LibrarySection::Tracks => div().w_full().h_full().child("Tracks Section"),
-            LibrarySection::Albums => div().w_full().h_full().child("Albums Section"),
-            LibrarySection::Artists => div().w_full().h_full().child("Artists Section"),
-            LibrarySection::Playlists => div().w_full().h_full().child("Playlists Section"),
-            LibrarySection::Settings => div().w_full().h_full().child("Settings Section"),
-            LibrarySection::Plugins => div().w_full().h_full().child("Tools Section"),
+            LibrarySection::Favorites => div()
+                .w_full()
+                .h_full()
+                .child(cx.new(|_| FavoritesSection {})),
+            LibrarySection::Tracks => div().w_full().h_full().child(cx.new(|_| TracksSection {})),
+            LibrarySection::Albums => div().w_full().h_full().child(cx.new(|_| AlbumsSection {})),
+            LibrarySection::Artists => div().w_full().h_full().child(cx.new(|_| ArtistsSection {})),
+            LibrarySection::Playlists => div()
+                .w_full()
+                .h_full()
+                .child(cx.new(|_| PlaylistsSection {})),
+            LibrarySection::Settings => div()
+                .w_full()
+                .h_full()
+                .child(cx.new(|_| SettingsSection {})),
+            LibrarySection::Plugins => div().w_full().h_full().child(cx.new(|_| PluginsSection {})),
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
         let prev_page = *section_state.read(cx);

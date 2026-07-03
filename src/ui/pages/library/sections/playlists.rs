@@ -23,7 +23,7 @@ impl Render for PlaylistsSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_playlists_section_title)
-                        .child("playlists")
+                        .child("Playlists")
                         .child(
                             div()
                                 .h(px(2.0))

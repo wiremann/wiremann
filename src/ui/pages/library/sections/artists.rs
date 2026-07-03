@@ -23,7 +23,7 @@ impl Render for ArtistsSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_artists_section_title)
-                        .child("artists")
+                        .child("Artists")
                         .child(
                             div()
                                 .h(px(2.0))

@@ -23,7 +23,7 @@ impl Render for PluginsSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_plugins_section_title)
-                        .child("plugins")
+                        .child("Plugins")
                         .child(
                             div()
                                 .h(px(2.0))
