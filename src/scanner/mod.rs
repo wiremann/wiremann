@@ -269,7 +269,7 @@ impl Scanner {
             let tx = self.tx.clone();
 
             std::thread::spawn(move || {
-                let mut paths = Vec::with_capacity(1024);
+                let mut discovered = 0usize;
 
                 for entry in WalkDir::new(&path)
                     .into_iter()
@@ -281,26 +281,21 @@ impl Scanner {
                             .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
-                    if paths.len() % 16 == 0 {
-                        tx.send(ScannerEvent::Discovered(paths.len())).ok();
+                    if discovered % 16 == 0 {
+                        tx.send(ScannerEvent::Discovered(discovered)).ok();
                     }
-                    paths.push(entry.path().to_path_buf());
+
+                    // send to workers as soon as we discover the file so they can run in parallel
+                    let _ = worker_tx.send((entry.path().to_path_buf(), Some(playlist_id)));
+
+                    discovered += 1;
                 }
 
-                let total = paths.len();
-                scan_progress.total.store(total, Ordering::Relaxed);
+                scan_progress.total.store(discovered, Ordering::Relaxed);
 
                 scan_progress.discovery_done.store(true, Ordering::Release);
-
-                for path in paths {
-                    let _ = worker_tx.send((path, Some(playlist_id)));
-                }
             });
         }
-
-        self.scan_progress
-            .discovery_done
-            .store(true, Ordering::Release);
     }
 
     fn write_scan_record(&self) {
