@@ -215,7 +215,7 @@ impl Render for TracksSection {
                 div()
                     .h_16()
                     .w_full()
-                    .mt_3()
+                    .mt_1()
                     .flex()
                     .items_center()
                     .text_xs()
@@ -273,6 +273,8 @@ impl Render for TracksSection {
                 div()
                     .flex_1()
                     .relative()
+                    .px_6()
+                    .pb_2()
                     .child(
                         div().id("tracks_list_container").size_full().child(
                             uniform_list("tracks", len, move |range, _, cx| {
