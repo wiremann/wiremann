@@ -44,7 +44,7 @@ impl TracksSection {
             let album = track
                 .album(&state.library)
                 .map(|album| album.name.to_string())
-                .unwrap_or_default();
+                .unwrap_or_else(|| "Unknown".to_string());
 
             (
                 track.clone(),
@@ -86,57 +86,69 @@ impl TracksSection {
                     })
                     .child(
                         div()
-                            .w_20()
+                            .w_10()
                             .h_full()
-                            .px_6()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_start()
+                            .justify_center()
+                            .text_color(theme.library_table_header_text)
+                            .text_sm()
+                            .font_family("JetBrains Mono")
                             .child(format!("{index:02}")),
                     )
                     .child(
                         div()
-                            .w_2_3()
-                            .max_w_2_3()
+                            .flex_1()
                             .h_full()
-                            .px_6()
-                            .py_1()
+                            .px_3()
                             .flex()
-                            .gap_x_3()
+                            .gap_x_2()
                             .items_center()
                             .justify_start()
                             .child(match thumbnail {
-                                Some(image) => div().size_11().flex_shrink_0().child(
+                                Some(image) => div().w_11().h_11().flex_shrink_0().child(
                                     img(ImageSource::Render(image.clone()))
                                         .object_fit(ObjectFit::Contain)
                                         .size_full()
                                         .border_1()
                                         .border_color(theme.border)
-                                        .rounded_sm(),
+                                        .rounded_md(),
                                 ),
-                                None => div().size_11().flex_shrink_0().child(
+                                None => div().w_11().h_11().flex_shrink_0().child(
                                     img("icons/placeholder.svg")
                                         .object_fit(ObjectFit::Contain)
                                         .size_full()
                                         .border_1()
                                         .border_color(theme.border)
-                                        .rounded_sm(),
+                                        .rounded_md(),
                                 ),
                             })
-                            .child(track.title.to_string())
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis(),
+                            .child(
+                                div().flex_1().flex().flex_col().justify_center().child(
+                                    div()
+                                        .text_color(theme.library_text)
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_sm()
+                                        .overflow_hidden()
+                                        .whitespace_nowrap()
+                                        .text_ellipsis()
+                                        .child(track.title.to_string()),
+                                ),
+                            )
+                            .overflow_hidden(),
                     )
                     .child(
                         div()
                             .w_1_3()
                             .max_w_1_3()
                             .h_full()
-                            .px_6()
+                            .px_3()
                             .flex()
                             .items_center()
                             .justify_start()
+                            .text_color(theme.library_table_header_text)
+                            .text_sm()
                             .child(artists)
                             .overflow_hidden()
                             .whitespace_nowrap()
@@ -144,13 +156,15 @@ impl TracksSection {
                     )
                     .child(
                         div()
-                            .w_1_3()
-                            .max_w_1_3()
+                            .w_1_4()
+                            .max_w_1_4()
                             .h_full()
-                            .px_6()
+                            .px_3()
                             .flex()
                             .items_center()
                             .justify_start()
+                            .text_color(theme.library_table_header_text)
+                            .text_sm()
                             .child(album)
                             .overflow_hidden()
                             .whitespace_nowrap()
@@ -158,15 +172,16 @@ impl TracksSection {
                     )
                     .child(
                         div()
-                            .w_24()
-                            .max_w_24()
+                            .w_20()
+                            .max_w_20()
                             .h_full()
-                            .px_4()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_start()
+                            .justify_end()
                             .font_family("JetBrains Mono")
                             .text_sm()
+                            .text_color(theme.library_table_header_text)
                             .child(format!(
                                 "{:02}:{:02}",
                                 track.duration.as_secs() / 60,
@@ -195,27 +210,31 @@ impl Render for TracksSection {
             .flex()
             .flex_col()
             .child(
-                div().py_4().px_8().flex().items_center().child(
-                    div()
-                        .text_size(rems(2.0))
-                        .font_weight(FontWeight::BOLD)
-                        .tracking_tight()
-                        .text_color(theme.library_tracks_section_title)
-                        .child("Tracks")
-                        .child(
-                            div()
-                                .h(px(2.0))
-                                .w_16()
-                                .mt_1()
-                                .bg(theme.library_tracks_section_title),
-                        ),
-                ),
+                div()
+                    .py_4()
+                    .px_12()
+                    .flex()
+                    .flex_col()
+                    .gap_y_1()
+                    .child(
+                        div()
+                            .text_size(rems(2.0))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .tracking_tight()
+                            .text_color(theme.library_tracks_section_title)
+                            .child("Tracks"),
+                    )
+                    .child(
+                        div()
+                            .text_size(rems(0.875))
+                            .text_color(theme.library_table_header_text)
+                            .child(format!("{} songs", len)),
+                    ),
             )
             .child(
                 div()
                     .h_16()
                     .w_full()
-                    .mt_1()
                     .flex()
                     .items_center()
                     .text_xs()
@@ -223,9 +242,10 @@ impl Render for TracksSection {
                     .text_color(theme.library_table_header_text)
                     .border_b_1()
                     .border_color(theme.library_table_border)
+                    .px_12()
                     .child(
                         div()
-                            .w_20()
+                            .w_10()
                             .h_full()
                             .flex()
                             .items_center()
@@ -234,38 +254,45 @@ impl Render for TracksSection {
                     )
                     .child(
                         div()
-                            .w_3_5()
+                            .flex_1()
                             .h_full()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_center()
+                            .justify_start()
                             .child("TITLE"),
                     )
                     .child(
                         div()
-                            .w_1_2()
+                            .w_1_3()
+                            .max_w_1_3()
                             .h_full()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_center()
+                            .justify_start()
                             .child("ARTIST"),
                     )
                     .child(
                         div()
-                            .w_1_2()
+                            .w_1_4()
+                            .max_w_1_4()
                             .h_full()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_center()
+                            .justify_start()
                             .child("ALBUM"),
                     )
                     .child(
                         div()
-                            .w_24()
+                            .w_20()
+                            .max_w_20()
                             .h_full()
+                            .px_3()
                             .flex()
                             .items_center()
-                            .justify_center()
+                            .justify_end()
                             .child("DURATION"),
                     ),
             )
@@ -273,7 +300,7 @@ impl Render for TracksSection {
                 div()
                     .flex_1()
                     .relative()
-                    .px_6()
+                    .px_12()
                     .pb_2()
                     .child(
                         div().id("tracks_list_container").size_full().child(
