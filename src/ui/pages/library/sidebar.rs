@@ -76,7 +76,7 @@ impl Sidebar {
                         .child(text)
                         .text_sm()
                         .font_weight(if active {
-                            FontWeight::BOLD
+                            FontWeight::MEDIUM
                         } else {
                             FontWeight::NORMAL
                         })

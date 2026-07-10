@@ -113,13 +113,23 @@ pub struct Theme {
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
+
     pub library_albums_section_title: Rgba,
     pub library_artists_section_title: Rgba,
     pub library_playlists_section_title: Rgba,
     pub library_favorites_section_title: Rgba,
     pub library_settings_section_title: Rgba,
     pub library_plugins_section_title: Rgba,
+
     pub library_tracks_section_title: Rgba,
+    pub library_tracks_section_track_count: Rgba,
+    pub library_tracks_section_table_header_text: Rgba,
+    pub library_tracks_section_table_header_border: Rgba,
+    pub library_tracks_section_table_slno: Rgba,
+    pub library_tracks_section_table_title: Rgba,
+    pub library_tracks_section_table_artist: Rgba,
+    pub library_tracks_section_table_album: Rgba,
+    pub library_tracks_section_table_duration: Rgba,
 
     // Playlists page
     pub playlist_page_bg: Rgba,
@@ -285,7 +295,16 @@ impl Default for Theme {
             library_favorites_section_title: rgb(0xFFFFFF),
             library_settings_section_title: rgb(0xFFFFFF),
             library_plugins_section_title: rgb(0xFFFFFF),
+
             library_tracks_section_title: rgb(0xFFFFFF),
+            library_tracks_section_track_count: rgb(0x71717A),
+            library_tracks_section_table_header_text: rgb(0x71717A),
+            library_tracks_section_table_header_border: rgba(0xFFFFFF14),
+            library_tracks_section_table_slno: rgb(0x71717A),
+            library_tracks_section_table_title: rgb(0xFAFAFA),
+            library_tracks_section_table_artist: rgb(0x71717A),
+            library_tracks_section_table_album: rgb(0x71717A),
+            library_tracks_section_table_duration: rgb(0x71717A),
 
             playlist_page_bg: rgb(0x050505),
             playlist_page_text: rgb(0xFAFAFA),
