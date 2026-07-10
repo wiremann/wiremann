@@ -54,7 +54,6 @@ pub enum LibrarySection {
 
 #[derive(Clone)]
 pub struct LibraryPage {
-    scroll_handle: ScrollHandle,
     rows: Rc<Vec<LibraryRow>>,
     heights: Rc<Vec<Pixels>>,
     pub sorted_tracks: Vec<&'static TrackId>,
@@ -63,6 +62,14 @@ pub struct LibraryPage {
     pub list_controller: VirtualListScrollController,
 
     sidebar: Entity<Sidebar>,
+    albums: Entity<AlbumsSection>,
+    artists: Entity<ArtistsSection>,
+    playlists: Entity<PlaylistsSection>,
+    favorites: Entity<FavoritesSection>,
+    home: Entity<HomeSection>,
+    tracks: Entity<TracksSection>,
+    plugins: Entity<PluginsSection>,
+    settings: Entity<SettingsSection>,
 }
 
 impl LibrarySection {
@@ -114,7 +121,6 @@ impl LibraryPage {
         cx.set_global(SidebarBounds { top: 0.0 });
 
         LibraryPage {
-            scroll_handle,
             rows: Rc::new(rows),
             heights: Rc::new(heights),
             grid_cols: cols,
@@ -122,6 +128,16 @@ impl LibraryPage {
             last_fp: 0,
             list_controller: VirtualListScrollController::new(),
             sidebar: cx.new(|_| Sidebar),
+            albums: cx.new(|_| AlbumsSection),
+            artists: cx.new(|_| ArtistsSection),
+            playlists: cx.new(|_| PlaylistsSection),
+            favorites: cx.new(|_| FavoritesSection),
+            home: cx.new(|_| HomeSection),
+            tracks: cx.new(|_| TracksSection {
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            plugins: cx.new(|_| PluginsSection),
+            settings: cx.new(|_| SettingsSection),
         }
     }
     #[allow(clippy::too_many_lines)]
@@ -310,25 +326,14 @@ impl Render for LibraryPage {
         let section = *cx.global::<LibrarySection>();
 
         let section_el = match section {
-            LibrarySection::Home => div().w_full().h_full().child(cx.new(|_| HomeSection {})),
-            LibrarySection::Favorites => div()
-                .w_full()
-                .h_full()
-                .child(cx.new(|_| FavoritesSection {})),
-            LibrarySection::Tracks => div().w_full().h_full().child(cx.new(|_| TracksSection {
-                scroll_handle: UniformListScrollHandle::new(),
-            })),
-            LibrarySection::Albums => div().w_full().h_full().child(cx.new(|_| AlbumsSection {})),
-            LibrarySection::Artists => div().w_full().h_full().child(cx.new(|_| ArtistsSection {})),
-            LibrarySection::Playlists => div()
-                .w_full()
-                .h_full()
-                .child(cx.new(|_| PlaylistsSection {})),
-            LibrarySection::Settings => div()
-                .w_full()
-                .h_full()
-                .child(cx.new(|_| SettingsSection {})),
-            LibrarySection::Plugins => div().w_full().h_full().child(cx.new(|_| PluginsSection {})),
+            LibrarySection::Home => div().w_full().h_full().child(self.home.clone()),
+            LibrarySection::Favorites => div().w_full().h_full().child(self.favorites.clone()),
+            LibrarySection::Tracks => div().w_full().h_full().child(self.tracks.clone()),
+            LibrarySection::Albums => div().w_full().h_full().child(self.albums.clone()),
+            LibrarySection::Artists => div().w_full().h_full().child(self.artists.clone()),
+            LibrarySection::Playlists => div().w_full().h_full().child(self.playlists.clone()),
+            LibrarySection::Settings => div().w_full().h_full().child(self.settings.clone()),
+            LibrarySection::Plugins => div().w_full().h_full().child(self.plugins.clone()),
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
         let prev_page = *section_state.read(cx);
