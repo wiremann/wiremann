@@ -7,7 +7,11 @@ use gpui::{
 use crate::{
     controller::{Controller, state::TrackId},
     ui::{
-        components::{Page, image_cache::ImageCache},
+        components::{
+            Page,
+            image_cache::ImageCache,
+            scrollbar::{RightPad, floating_scrollbar},
+        },
         theme::Theme,
     },
 };
@@ -181,18 +185,17 @@ impl Render for TracksSection {
         let state = controller.state.read(cx);
         let track_ids = state.library.tracks.keys().copied().collect::<Vec<_>>();
         let len = track_ids.len();
-        drop(state);
+        let _ = state;
 
         let scroll_handle = self.scroll_handle.clone();
 
-        div().w_full().h_full().flex().flex_col().child(
-            div()
-                .py_4()
-                .px_8()
-                .flex()
-                .flex_col()
-                .justify_center()
-                .child(
+        div()
+            .w_full()
+            .h_full()
+            .flex()
+            .flex_col()
+            .child(
+                div().py_4().px_8().flex().items_center().child(
                     div()
                         .text_size(rems(2.0))
                         .font_weight(FontWeight::BOLD)
@@ -206,84 +209,97 @@ impl Render for TracksSection {
                                 .mt_1()
                                 .bg(theme.library_tracks_section_title),
                         ),
-                )
-                .child(
-                    div()
-                        .h_16()
-                        .w_full()
-                        .flex()
-                        .items_center()
-                        .text_xs()
-                        .font_weight(FontWeight::NORMAL)
-                        .text_color(theme.library_table_header_text)
-                        .border_b_1()
-                        .border_color(theme.library_table_border)
-                        .child(
-                            div()
-                                .w_20()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .child("#"),
-                        )
-                        .child(
-                            div()
-                                .w_3_5()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .child("TITLE"),
-                        )
-                        .child(
-                            div()
-                                .w_1_2()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .child("ARTIST"),
-                        )
-                        .child(
-                            div()
-                                .w_1_2()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .child("ALBUM"),
-                        )
-                        .child(
-                            div()
-                                .w_24()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .child("DURATION"),
-                        ),
-                )
-                .child(
-                    uniform_list("tracks", len, move |range, _, cx| {
-                        let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                        let end = (range.end + THUMBNAIL_MARGIN).min(len);
-
-                        let thumb_tracks: Vec<TrackId> =
-                            (start..end).map(|i| track_ids[i]).collect();
-
-                        controller.request_track_thumbnails(&thumb_tracks, cx);
-
-                        range
-                            .map(|i| Self::render_track(i + 1, track_ids[i], cx))
-                            .collect()
-                    })
-                    .w_full()
-                    .h_full()
-                    .flex()
-                    .flex_col()
-                    .track_scroll(&scroll_handle),
                 ),
-        )
+            )
+            .child(
+                div()
+                    .h_16()
+                    .w_full()
+                    .mt_3()
+                    .flex()
+                    .items_center()
+                    .text_xs()
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(theme.library_table_header_text)
+                    .border_b_1()
+                    .border_color(theme.library_table_border)
+                    .child(
+                        div()
+                            .w_20()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("#"),
+                    )
+                    .child(
+                        div()
+                            .w_3_5()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("TITLE"),
+                    )
+                    .child(
+                        div()
+                            .w_1_2()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("ARTIST"),
+                    )
+                    .child(
+                        div()
+                            .w_1_2()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("ALBUM"),
+                    )
+                    .child(
+                        div()
+                            .w_24()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("DURATION"),
+                    ),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .relative()
+                    .child(
+                        div().id("tracks_list_container").size_full().child(
+                            uniform_list("tracks", len, move |range, _, cx| {
+                                let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                                let end = (range.end + THUMBNAIL_MARGIN).min(len);
+
+                                let thumb_tracks: Vec<TrackId> =
+                                    (start..end).map(|i| track_ids[i]).collect();
+
+                                controller.request_track_thumbnails(&thumb_tracks, cx);
+
+                                range
+                                    .map(|i| Self::render_track(i + 1, track_ids[i], cx))
+                                    .collect()
+                            })
+                            .w_full()
+                            .h_full()
+                            .flex()
+                            .flex_col()
+                            .track_scroll(&scroll_handle),
+                        ),
+                    )
+                    .child(floating_scrollbar(
+                        "tracks_section_scrollbar",
+                        scroll_handle,
+                        RightPad::Pad,
+                    )),
+            )
     }
 }
