@@ -21,21 +21,34 @@ pub struct TracksSection {
 impl TracksSection {
     fn render_track(index: usize, id: TrackId, cx: &mut App) -> Div {
         let controller = cx.global::<Controller>().clone();
-        let state = controller.state.read(cx);
-
         let theme = *cx.global::<Theme>();
 
-        let (track, is_current) = {
-            let controller = cx.global::<Controller>().clone();
+        let (track, is_current, artists, album, image_id) = {
             let state = controller.state.read(cx);
 
-            let Some(track) = state.library.tracks.get(&id).cloned() else {
-                return div().h_16();
+            let track = match state.library.tracks.get(&id) {
+                Some(track) => track.clone(),
+                None => return div().h_16(),
             };
 
-            let is_current = Some(&id) == state.playback.current.as_ref();
+            let artists = track
+                .artists(&state.library)
+                .map(|artist| artist.name.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
 
-            (track, is_current)
+            let album = track
+                .album(&state.library)
+                .map(|album| album.name.to_string())
+                .unwrap_or_default();
+
+            (
+                track.clone(),
+                Some(id) == state.playback.current,
+                artists,
+                album,
+                track.image_id,
+            )
         };
 
         let thumbnail = track
@@ -120,13 +133,7 @@ impl TracksSection {
                             .flex()
                             .items_center()
                             .justify_start()
-                            .child(
-                                track
-                                    .artists(&state.library)
-                                    .map(|artist| artist.name.to_string())
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                            )
+                            .child(artists)
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis(),
@@ -140,12 +147,7 @@ impl TracksSection {
                             .flex()
                             .items_center()
                             .justify_start()
-                            .child(
-                                track
-                                    .album(&state.library)
-                                    .map(|album| album.name.to_string())
-                                    .unwrap_or_default(),
-                            )
+                            .child(album)
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis(),

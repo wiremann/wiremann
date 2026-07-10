@@ -23,8 +23,8 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt, App, AppContext, Context, Div, ElementId, Entity, FontWeight, Global,
     ImageSource, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
-    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, VirtualListScrollController,
-    Window, div, img, px, vlist,
+    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle,
+    VirtualListScrollController, Window, div, img, px, vlist,
 };
 use helpers::{
     HeaderKind, LibraryRow, build_rows, render_header, render_playlist_grid,
@@ -315,7 +315,9 @@ impl Render for LibraryPage {
                 .w_full()
                 .h_full()
                 .child(cx.new(|_| FavoritesSection {})),
-            LibrarySection::Tracks => div().w_full().h_full().child(cx.new(|_| TracksSection {})),
+            LibrarySection::Tracks => div().w_full().h_full().child(cx.new(|_| TracksSection {
+                scroll_handle: UniformListScrollHandle::new(),
+            })),
             LibrarySection::Albums => div().w_full().h_full().child(cx.new(|_| AlbumsSection {})),
             LibrarySection::Artists => div().w_full().h_full().child(cx.new(|_| ArtistsSection {})),
             LibrarySection::Playlists => div()
