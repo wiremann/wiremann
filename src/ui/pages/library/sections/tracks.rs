@@ -98,7 +98,7 @@ impl TracksSection {
                         .h_full()
                         .px_3()
                         .flex()
-                        .gap_x_2()
+                        .gap_x_4()
                         .items_center()
                         .justify_start()
                         .child(match thumbnail {
