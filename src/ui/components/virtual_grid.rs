@@ -42,8 +42,6 @@ pub struct VirtualGrid {
     card_width: Pixels,
     card_height: Pixels,
     content_height: Pixels,
-    top_padding: Pixels,
-    bottom_padding: Pixels,
     scroll_state: Rc<RefCell<VirtualGridScrollState>>,
     render: Box<
         dyn for<'a> Fn(
@@ -81,7 +79,11 @@ where
         })
     };
 
-    let base = div().id(id.clone()).size_full();
+    let base = div()
+        .id(id.clone())
+        .size_full()
+        .overflow_scroll()
+        .track_scroll(&scroll_handle);
 
     VirtualGrid {
         id,
@@ -94,14 +96,6 @@ where
         scroll_state: controller.state.clone(),
         render: Box::new(render),
         overscan: 1,
-        top_padding: px(0.0),
-        bottom_padding: px(0.0),
-    }
-}
-
-impl VirtualGrid {
-    fn row_at_position(&self, pos: f32, card_h: f32) -> isize {
-        ((pos) / card_h).floor() as isize
     }
 }
 
@@ -161,8 +155,6 @@ impl Element for VirtualGrid {
         cx: &mut App,
     ) -> Self::PrepaintState {
         let viewport_height = bounds.size.height;
-        self.top_padding = viewport_height / 2.0;
-        self.bottom_padding = viewport_height / 2.0;
 
         let available_width_px: f32 = bounds.size.width.into();
         let card_width_px: f32 = self.card_width.into();
@@ -176,25 +168,19 @@ impl Element for VirtualGrid {
         let rows = (self.item_count + cols - 1) / cols;
 
         self.content_height = px(rows as f32 * card_height_px);
-
         let mut logical_scroll = self.scroll_handle.offset().y;
 
         if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {
             let target = deferred.item_index.min(self.item_count.saturating_sub(1));
             let target_row = target / cols;
             let item_top = target_row as f32 * card_height_px;
-            let item_center =
-                (self.top_padding.to_f64() as f32 + item_top + (card_height_px / 2.0)) as f32;
-            let centered = item_center - (viewport_height.to_f64() / 2.0) as f32;
-            let new_scroll = -centered.max(0.0);
+            let target_scroll = -item_top.max(0.0);
             self.scroll_handle
-                .set_offset(point(px(0.0), px(new_scroll)));
-            logical_scroll = px(new_scroll);
+                .set_offset(point(px(0.0), px(target_scroll)));
+            logical_scroll = px(target_scroll);
         }
 
-        let padded_height = self.content_height + self.top_padding + self.bottom_padding;
-
-        let max_scroll = (padded_height - viewport_height).max(px(0.0));
+        let max_scroll = (self.content_height - viewport_height).max(px(0.0));
 
         logical_scroll = logical_scroll.clamp(-max_scroll, px(0.0));
 
@@ -211,14 +197,11 @@ impl Element for VirtualGrid {
         };
 
         let visual_scroll_px: f32 = visual_scroll.into();
-        let top_padding_px: f32 = self.top_padding.into();
         let viewport_height_px: f32 = viewport_height.into();
 
-        let mut start_row =
-            ((-visual_scroll_px - top_padding_px) / card_height_px).floor() as isize;
-        let mut end_row = ((-visual_scroll_px - top_padding_px + viewport_height_px)
-            / card_height_px)
-            .ceil() as isize;
+        let mut start_row = ((-visual_scroll_px) / card_height_px).floor() as isize;
+        let mut end_row =
+            ((-visual_scroll_px + viewport_height_px) / card_height_px).ceil() as isize;
 
         if start_row < 0 {
             start_row = 0;
@@ -243,19 +226,14 @@ impl Element for VirtualGrid {
                 let row = ix / cols;
                 let col = ix % cols;
 
-                let y = self.top_padding + px(row as f32 * card_height_px) + visual_scroll;
+                let y = px(row as f32 * card_height_px) + visual_scroll;
                 let cell_width = bounds.size.width / (cols as f32);
                 let origin = bounds.origin + point(cell_width * (col as f32), y);
 
-                let available = Size {
-                    width: gpui::AvailableSpace::Definite(cell_width),
-                    height: gpui::AvailableSpace::Definite(self.card_height),
-                };
-
                 item.layout_as_root(
                     size(
-                        gpui::AvailableSpace::Definite(cell_width),
-                        gpui::AvailableSpace::Definite(self.card_height),
+                        AvailableSpace::Definite(cell_width),
+                        AvailableSpace::Definite(self.card_height),
                     ),
                     window,
                     cx,
@@ -272,7 +250,7 @@ impl Element for VirtualGrid {
             bounds,
             Size {
                 width: bounds.size.width,
-                height: padded_height,
+                height: self.content_height,
             },
             window,
             cx,

@@ -38,7 +38,7 @@ impl PlaylistsSection {
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().p_3().size_full().child(
+        div().p_4().size_full().child(
             div()
                 .id(format!("playlist_{}", playlist.id.0))
                 .size_full()
@@ -62,42 +62,51 @@ impl PlaylistsSection {
                 })
                 .flex()
                 .flex_col()
-                .p_3()
                 .child(match thumbnail {
-                    Some(image) => div().w_full().aspect_square().mb_3().child(
+                    Some(image) => div().w_full().aspect_square().child(
                         img(ImageSource::Render(image.clone()))
                             .size_full()
                             .object_fit(ObjectFit::Contain)
-                            .rounded_lg()
+                            .rounded_xl()
                             .border_1()
                             .border_color(theme.border),
                     ),
 
-                    None => div().w_full().aspect_square().mb_3().child(
+                    None => div().w_full().aspect_square().child(
                         img("icons/placeholder.svg")
                             .size_full()
                             .object_fit(ObjectFit::Contain)
-                            .rounded_lg()
+                            .rounded_xl()
                             .border_1()
                             .border_color(theme.border),
                     ),
                 })
                 .child(
                     div()
-                        .text_base()
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.library_playlist_title_text)
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .child(playlist.name.to_string()),
-                )
-                .child(
-                    div()
-                        .mt_1()
-                        .text_sm()
-                        .text_color(theme.library_playlist_meta_text)
-                        .child(format!("{} tracks", playlist.tracks.len())),
+                        .h(px(56.0))
+                        .w_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .px_3()
+                        .flex_col()
+                        .child(
+                            div()
+                                .text_base()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme.library_playlist_title_text)
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .child(playlist.name.to_string()),
+                        )
+                        .child(
+                            div()
+                                .mt_1()
+                                .text_sm()
+                                .text_color(theme.library_playlist_meta_text)
+                                .child(format!("{} Tracks", playlist.tracks.len())),
+                        ),
                 ),
         )
     }
@@ -144,12 +153,25 @@ impl Render for PlaylistsSection {
                             ),
                     ),
             )
-            .child(
+            .child(div().flex_1().relative().px_8().pb_4().child(if len == 0 {
                 div()
-                    .flex_1()
-                    .relative()
-                    .px_8()
-                    .pb_4()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .text_base()
+                    .text_color(theme.library_empty_text)
+                    .child(div().text_size(rems(1.4)).child("No playlists yet"))
+                    .child(
+                        div()
+                            .mt_2()
+                            .text_sm()
+                            .child("Create your first playlist to get started."),
+                    )
+            } else {
+                div()
+                    .size_full()
                     .child(vgrid(
                         cx.entity(),
                         "playlists_grid",
@@ -158,7 +180,7 @@ impl Render for PlaylistsSection {
                         px(340.0),
                         self.scroll_handle.clone(),
                         &self.grid_controller,
-                        move |_, range, cols, _, cx| {
+                        move |_, range, _, _, cx| {
                             controller
                                 .request_playlist_thumbnails(&playlist_ids[range.clone()], cx);
 
@@ -171,7 +193,7 @@ impl Render for PlaylistsSection {
                         "playlists_scrollbar",
                         self.scroll_handle.clone(),
                         RightPad::Pad,
-                    )),
-            )
+                    ))
+            }))
     }
 }
