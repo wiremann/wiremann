@@ -27,7 +27,7 @@ impl TracksSection {
         let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
 
-        let (track, is_current, artists, album, image_id) = {
+        let (track, is_current, artists, album, _image_id) = {
             let state = controller.state.read(cx);
 
             let track = match state.library.tracks.get(&id) {
@@ -250,6 +250,8 @@ impl Render for TracksSection {
                             .flex()
                             .items_center()
                             .justify_start()
+                            // Align header with title text after accounting for thumbnail size and padding
+                            .ml(rems(3.75))
                             .child("TITLE"),
                     )
                     .child(
@@ -287,38 +289,33 @@ impl Render for TracksSection {
                     ),
             )
             .child(
-                div()
-                    .flex_1()
-                    .relative()
-                    .px_12()
-                    .pb_2()
-                    .child(
-                        div().id("tracks_list_container").size_full().child(
-                            uniform_list("tracks", len, move |range, _, cx| {
-                                let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                                let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                div().flex_1().relative().px_12().pb_2().child(
+                    div().id("tracks_list_container").size_full().child(
+                        uniform_list("tracks", len, move |range, _, cx| {
+                            let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                            let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                                let thumb_tracks: Vec<TrackId> =
-                                    (start..end).map(|i| track_ids[i]).collect();
+                            let thumb_tracks: Vec<TrackId> =
+                                (start..end).map(|i| track_ids[i]).collect();
 
-                                controller.request_track_thumbnails(&thumb_tracks, cx);
+                            controller.request_track_thumbnails(&thumb_tracks, cx);
 
-                                range
-                                    .map(|i| Self::render_track(i + 1, track_ids[i], cx))
-                                    .collect()
-                            })
-                            .w_full()
-                            .h_full()
-                            .flex()
-                            .flex_col()
-                            .track_scroll(&scroll_handle),
-                        ),
-                    )
-                    .child(floating_scrollbar(
-                        "tracks_section_scrollbar",
-                        scroll_handle,
-                        RightPad::Pad,
-                    )),
+                            range
+                                .map(|i| Self::render_track(i + 1, track_ids[i], cx))
+                                .collect()
+                        })
+                        .w_full()
+                        .h_full()
+                        .flex()
+                        .flex_col()
+                        .track_scroll(&scroll_handle),
+                    ),
+                ),
             )
+            .child(floating_scrollbar(
+                "tracks_section_scrollbar",
+                scroll_handle,
+                RightPad::Pad,
+            ))
     }
 }

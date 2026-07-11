@@ -1,7 +1,7 @@
 use gpui::{
     Animation, AnimationExt, Context, ElementId, FontWeight, Global, InteractiveElement,
     IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    gradient_color_stop, linear_gradient, prelude::FluentBuilder, px, relative, transparent_black,
+    gradient_color_stop, linear_gradient, px, transparent_black,
 };
 
 use crate::ui::{

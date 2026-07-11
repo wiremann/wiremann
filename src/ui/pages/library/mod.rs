@@ -7,7 +7,6 @@ use crate::controller::state::TrackId;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
-use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
 use crate::ui::pages::library::sections::albums::AlbumsSection;
 use crate::ui::pages::library::sections::artists::ArtistsSection;
@@ -24,11 +23,10 @@ use gpui::{
     Animation, AnimationExt, App, AppContext, Context, Div, ElementId, Entity, FontWeight, Global,
     ImageSource, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
     ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle,
-    VirtualListScrollController, Window, div, img, px, vlist,
+    VirtualListScrollController, Window, div, img, px,
 };
 use helpers::{
-    HeaderKind, LibraryRow, build_rows, render_header, render_playlist_grid,
-    render_track_table_header,
+    LibraryRow, build_rows,
 };
 use std::rc::Rc;
 
@@ -106,7 +104,7 @@ impl LibrarySection {
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
-        let scroll_handle = ScrollHandle::new();
+        let _scroll_handle = ScrollHandle::new();
         let library = &cx.global::<Controller>().state.read(cx).library;
 
         let cols = 4;

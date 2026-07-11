@@ -1,5 +1,5 @@
 use gpui::{
-    Context, Element, FontWeight, IntoElement, ParentElement, Render, Styled, Window, div, px, rems,
+    Context, FontWeight, IntoElement, ParentElement, Render, Styled, Window, div, px, rems,
 };
 
 use crate::ui::theme::Theme;
