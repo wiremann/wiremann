@@ -106,96 +106,96 @@ pub(super) fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div 
         })
 }
 
-pub(super) fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
-    let controller = cx.global::<Controller>().clone();
-    let theme = *cx.global::<Theme>();
+// pub(super) fn render_playlist_grid(ids: &Vec<PlaylistId>, height: Pixels, cx: &mut App) -> Div {
+//     let controller = cx.global::<Controller>().clone();
+//     let theme = *cx.global::<Theme>();
 
-    div()
-        .h(height)
-        .flex()
-        .gap_8()
-        .py_2()
-        .items_center()
-        .children({
-            let state = controller.state.read(cx).clone();
+//     div()
+//         .h(height)
+//         .flex()
+//         .gap_8()
+//         .py_2()
+//         .items_center()
+//         .children({
+//             let state = controller.state.read(cx).clone();
 
-            controller.request_playlist_thumbnails(ids, cx);
+//             controller.request_playlist_thumbnails(ids, cx);
 
-            let cache = cx.global_mut::<ImageCache>();
+//             let cache = cx.global_mut::<ImageCache>();
 
-            let mut elements = Vec::new();
+//             let mut elements = Vec::new();
 
-            for pid in ids {
-                if let Some(playlist) = state.library.playlists.get(pid) {
-                    let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
+//             for pid in ids {
+//                 if let Some(playlist) = state.library.playlists.get(pid) {
+//                     let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
 
-                    let el = div()
-                        .id(format!("playlist_{}", playlist.id.0))
-                        .bg(theme.library_playlist_bg)
-                        .size_full()
-                        .max_w_64()
-                        .flex()
-                        .flex_col()
-                        .items_start()
-                        .justify_center()
-                        .text_color(theme.library_playlist_text)
-                        .p_3()
-                        .rounded_lg()
-                        .hover(|this| this.bg(theme.library_playlist_bg_hover))
-                        .cursor_pointer()
-                        .on_click({
-                            let id = playlist.id;
-                            move |_, _, cx| {
-                                let controller = cx.global::<Controller>().clone();
+//                     let el = div()
+//                         .id(format!("playlist_{}", playlist.id.0))
+//                         .bg(theme.library_playlist_bg)
+//                         .size_full()
+//                         .max_w_64()
+//                         .flex()
+//                         .flex_col()
+//                         .items_start()
+//                         .justify_center()
+//                         .text_color(theme.library_playlist_text)
+//                         .p_3()
+//                         .rounded_lg()
+//                         .hover(|this| this.bg(theme.library_playlist_bg_hover))
+//                         .cursor_pointer()
+//                         .on_click({
+//                             let id = playlist.id;
+//                             move |_, _, cx| {
+//                                 let controller = cx.global::<Controller>().clone();
 
-                                controller.load_playlist(id, cx);
-                                *cx.global_mut::<Page>() = Page::Player;
-                            }
-                        })
-                        .when(
-                            state.playback.current_playlist == Some(playlist.id),
-                            |this| this.bg(theme.library_playlist_bg_active),
-                        )
-                        .child(match thumbnail {
-                            Some(image) => div().size_full().mb_3().child(
-                                img(ImageSource::Render(image.clone()))
-                                    .object_fit(ObjectFit::Contain)
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .size_full()
-                                    .rounded_lg(),
-                            ),
-                            None => div().size_full().mb_3().child(
-                                img("icons/placeholder.svg")
-                                    .object_fit(ObjectFit::Contain)
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .size_full()
-                                    .rounded_lg(),
-                            ),
-                        })
-                        .child(
-                            div()
-                                .text_base()
-                                .text_color(theme.library_playlist_title_text)
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(playlist.name.to_string()),
-                        )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(theme.library_playlist_meta_text)
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(format!("{} tracks", playlist.tracks.len())),
-                        );
+//                                 controller.load_playlist(id, cx);
+//                                 *cx.global_mut::<Page>() = Page::Player;
+//                             }
+//                         })
+//                         .when(
+//                             state.playback.current_playlist == Some(playlist.id),
+//                             |this| this.bg(theme.library_playlist_bg_active),
+//                         )
+//                         .child(match thumbnail {
+//                             Some(image) => div().size_full().mb_3().child(
+//                                 img(ImageSource::Render(image.clone()))
+//                                     .object_fit(ObjectFit::Contain)
+//                                     .border_1()
+//                                     .border_color(theme.border)
+//                                     .size_full()
+//                                     .rounded_lg(),
+//                             ),
+//                             None => div().size_full().mb_3().child(
+//                                 img("icons/placeholder.svg")
+//                                     .object_fit(ObjectFit::Contain)
+//                                     .border_1()
+//                                     .border_color(theme.border)
+//                                     .size_full()
+//                                     .rounded_lg(),
+//                             ),
+//                         })
+//                         .child(
+//                             div()
+//                                 .text_base()
+//                                 .text_color(theme.library_playlist_title_text)
+//                                 .font_weight(FontWeight::MEDIUM)
+//                                 .child(playlist.name.to_string()),
+//                         )
+//                         .child(
+//                             div()
+//                                 .text_sm()
+//                                 .text_color(theme.library_playlist_meta_text)
+//                                 .font_weight(FontWeight::MEDIUM)
+//                                 .child(format!("{} tracks", playlist.tracks.len())),
+//                         );
 
-                    elements.push(el);
-                }
-            }
+//                     elements.push(el);
+//                 }
+//             }
 
-            elements
-        })
-}
+//             elements
+//         })
+// }
 
 pub(super) fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
     let theme = cx.global::<Theme>();

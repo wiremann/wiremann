@@ -42,13 +42,13 @@ impl PlaylistsSection {
             div()
                 .id(format!("playlist_{}", playlist.id.0))
                 .size_full()
-                .bg(theme.library_playlist_bg)
+                .bg(theme.library_playlists_section_bg)
                 .rounded_xl()
-                .hover(|this| this.bg(theme.library_playlist_bg_hover))
+                .hover(|this| this.bg(theme.library_playlists_section_bg_hover))
                 .cursor_pointer()
                 .when(
                     state.playback.current_playlist == Some(playlist.id),
-                    |this| this.bg(theme.library_playlist_bg_active),
+                    |this| this.bg(theme.library_playlists_section_bg_active),
                 )
                 .on_click({
                     let id = playlist.id;
@@ -94,7 +94,7 @@ impl PlaylistsSection {
                             div()
                                 .text_base()
                                 .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.library_playlist_title_text)
+                                .text_color(theme.library_playlists_section_title_text)
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis()
@@ -103,7 +103,7 @@ impl PlaylistsSection {
                         .child(
                             div()
                                 .text_sm()
-                                .text_color(theme.library_playlist_meta_text)
+                                .text_color(theme.library_playlists_section_meta_text)
                                 .child(format!("{} Tracks", playlist.tracks.len())),
                         ),
                 ),
@@ -160,7 +160,7 @@ impl Render for PlaylistsSection {
                     .items_center()
                     .justify_center()
                     .text_base()
-                    .text_color(theme.library_empty_text)
+                    .text_color(theme.library_playlists_section_empty_text)
                     .child(div().text_size(rems(1.4)).child("No playlists yet"))
                     .child(
                         div()
