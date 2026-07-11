@@ -177,7 +177,8 @@ impl Render for PlaylistsSection {
                         "playlists_grid",
                         len,
                         px(280.0),
-                        px(340.0),
+                        px(56.0),
+                        px(2.0),
                         self.scroll_handle.clone(),
                         &self.grid_controller,
                         move |_, range, _, _, cx| {

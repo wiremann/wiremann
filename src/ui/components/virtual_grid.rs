@@ -39,8 +39,9 @@ pub struct VirtualGrid {
     base: Stateful<Div>,
     scroll_handle: ScrollHandle,
     item_count: usize,
-    card_width: Pixels,
-    card_height: Pixels,
+    min_card_width: Pixels,
+    footer_height: Pixels,
+    cell_padding: Pixels,
     content_height: Pixels,
     scroll_state: Rc<RefCell<VirtualGridScrollState>>,
     render: Box<
@@ -58,8 +59,9 @@ pub fn vgrid<R, V>(
     view: Entity<V>,
     id: impl Into<ElementId>,
     item_count: usize,
-    card_width: Pixels,
-    card_height: Pixels,
+    min_card_width: Pixels,
+    footer_height: Pixels,
+    vertical_padding: Pixels,
     scroll_handle: ScrollHandle,
     controller: &VirtualGridScrollController,
     f: impl 'static + Fn(&mut V, Range<usize>, usize, &mut Window, &mut Context<V>) -> Vec<R>,
@@ -90,8 +92,9 @@ where
         base,
         scroll_handle,
         item_count,
-        card_width,
-        card_height,
+        min_card_width,
+        footer_height,
+        cell_padding: vertical_padding,
         content_height: px(0.0),
         scroll_state: controller.state.clone(),
         render: Box::new(render),
@@ -157,23 +160,28 @@ impl Element for VirtualGrid {
         let viewport_height = bounds.size.height;
 
         let available_width_px: f32 = bounds.size.width.into();
-        let card_width_px: f32 = self.card_width.into();
-        let card_height_px: f32 = self.card_height.into();
+        let min_card_width_px: f32 = self.min_card_width.into();
+        let footer_height_px: f32 = self.footer_height.into();
+        let cell_padding_px: f32 = self.cell_padding.into();
 
-        let mut cols = (available_width_px / card_width_px).floor() as usize;
+        let mut cols = (available_width_px / min_card_width_px).floor() as usize;
         if cols == 0 {
             cols = 1;
         }
 
+        let cell_width_px = available_width_px / (cols as f32);
+        let row_height_px = cell_width_px + footer_height_px + (cell_padding_px * 2.0);
+        let row_height = px(row_height_px);
+
         let rows = (self.item_count + cols - 1) / cols;
 
-        self.content_height = px(rows as f32 * card_height_px);
+        self.content_height = px(rows as f32 * row_height_px);
         let mut logical_scroll = self.scroll_handle.offset().y;
 
         if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {
             let target = deferred.item_index.min(self.item_count.saturating_sub(1));
             let target_row = target / cols;
-            let item_top = target_row as f32 * card_height_px;
+            let item_top = target_row as f32 * row_height_px;
             let target_scroll = -item_top.max(0.0);
             self.scroll_handle
                 .set_offset(point(px(0.0), px(target_scroll)));
@@ -199,9 +207,9 @@ impl Element for VirtualGrid {
         let visual_scroll_px: f32 = visual_scroll.into();
         let viewport_height_px: f32 = viewport_height.into();
 
-        let mut start_row = ((-visual_scroll_px) / card_height_px).floor() as isize;
+        let mut start_row = ((-visual_scroll_px) / row_height_px).floor() as isize;
         let mut end_row =
-            ((-visual_scroll_px + viewport_height_px) / card_height_px).ceil() as isize;
+            ((-visual_scroll_px + viewport_height_px) / row_height_px).ceil() as isize;
 
         if start_row < 0 {
             start_row = 0;
@@ -226,14 +234,14 @@ impl Element for VirtualGrid {
                 let row = ix / cols;
                 let col = ix % cols;
 
-                let y = px(row as f32 * card_height_px) + visual_scroll;
+                let y = px(row as f32 * row_height_px) + visual_scroll;
                 let cell_width = bounds.size.width / (cols as f32);
                 let origin = bounds.origin + point(cell_width * (col as f32), y);
 
                 item.layout_as_root(
                     size(
                         AvailableSpace::Definite(cell_width),
-                        AvailableSpace::Definite(self.card_height),
+                        AvailableSpace::Definite(row_height),
                     ),
                     window,
                     cx,
