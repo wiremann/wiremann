@@ -26,7 +26,6 @@ use gpui::{
     ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle,
     VirtualListScrollController, Window, div, img, px,
 };
-use helpers::{LibraryRow, build_rows};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -51,13 +50,6 @@ pub enum LibrarySection {
 
 #[derive(Clone)]
 pub struct LibraryPage {
-    rows: Rc<Vec<LibraryRow>>,
-    heights: Rc<Vec<Pixels>>,
-    pub sorted_tracks: Vec<&'static TrackId>,
-    grid_cols: usize,
-    last_fp: u128,
-    pub list_controller: VirtualListScrollController,
-
     sidebar: Entity<Sidebar>,
     albums: Entity<AlbumsSection>,
     artists: Entity<ArtistsSection>,
@@ -103,13 +95,6 @@ impl LibrarySection {
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
-        let _scroll_handle = ScrollHandle::new();
-        let library = &cx.global::<Controller>().state.read(cx).library;
-
-        let cols = 4;
-
-        let (rows, heights) = build_rows(library, cols);
-
         cx.set_global(SidebarIndicator {
             top: 0.0,
             height: 32.0,
@@ -118,12 +103,6 @@ impl LibraryPage {
         cx.set_global(SidebarBounds { top: 0.0 });
 
         LibraryPage {
-            rows: Rc::new(rows),
-            heights: Rc::new(heights),
-            grid_cols: cols,
-            sorted_tracks: Vec::new(),
-            last_fp: 0,
-            list_controller: VirtualListScrollController::new(),
             sidebar: cx.new(|_| Sidebar),
             albums: cx.new(|_| AlbumsSection),
             artists: cx.new(|_| ArtistsSection),
@@ -140,158 +119,6 @@ impl LibraryPage {
             settings: cx.new(|_| SettingsSection),
         }
     }
-    #[allow(clippy::too_many_lines)]
-    fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
-        let image_id = {
-            let state = cx.global::<Controller>().state.read(cx);
-            state.library.tracks.get(id).and_then(|t| t.image_id)
-        };
-
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
-
-        let controller = cx.global::<Controller>().clone();
-        let theme = *cx.global::<Theme>();
-        let state = controller.state.read(cx).clone();
-        let is_current = Some(id) == state.playback.current.as_ref();
-
-        if let Some(track) = state.library.tracks.get(id) {
-            div()
-                .h(height)
-                .py_1()
-                .border_b_1()
-                .border_color(theme.library_track_border)
-                .child(
-                    div()
-                        .id(format!("track_{:?}", track.id.0))
-                        .size_full()
-                        .flex()
-                        .items_center()
-                        .rounded_md()
-                        .cursor_pointer()
-                        .hover(|this| this.bg(theme.library_track_bg_hover))
-                        .when(is_current, |this| this.bg(theme.library_track_bg_active))
-                        .on_click({
-                            let id = *id;
-                            move |_, _, cx| {
-                                let controller = cx.global::<Controller>().clone();
-
-                                controller.load_track(id, cx);
-
-                                *cx.global_mut::<Page>() = Page::Player;
-                            }
-                        })
-                        .child(
-                            div()
-                                .w_20()
-                                .h_full()
-                                .flex()
-                                .px_6()
-                                .items_center()
-                                .justify_start()
-                                .child(format! {"{i:02}"}),
-                        )
-                        .child(
-                            div()
-                                .w_2_3()
-                                .max_w_2_3()
-                                .h_full()
-                                .px_6()
-                                .py_1()
-                                .flex()
-                                .gap_x_3()
-                                .items_center()
-                                .justify_start()
-                                .child(match thumbnail {
-                                    Some(image) => div().size_11().flex_shrink_0().child(
-                                        img(ImageSource::Render(image.clone()))
-                                            .object_fit(ObjectFit::Contain)
-                                            .size_full()
-                                            .border_1()
-                                            .border_color(theme.border)
-                                            .rounded_sm(),
-                                    ),
-                                    None => div().size_11().flex_shrink_0().child(
-                                        img("icons/placeholder.svg")
-                                            .object_fit(ObjectFit::Contain)
-                                            .size_full()
-                                            .border_1()
-                                            .border_color(theme.border)
-                                            .rounded_sm(),
-                                    ),
-                                })
-                                .when(is_current, |this| {
-                                    this.text_color(theme.library_track_title_text_active)
-                                        .font_weight(FontWeight::MEDIUM)
-                                })
-                                .child(track.title.to_string())
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_1_3()
-                                .px_6()
-                                .max_w_1_3()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .child(
-                                    track
-                                        .artists(&state.library)
-                                        .map(|a| a.name.to_string())
-                                        .collect::<Vec<_>>()
-                                        .join(", "),
-                                )
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_1_3()
-                                .max_w_1_3()
-                                .px_6()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .child(
-                                    track
-                                        .album(&state.library)
-                                        .map(|a| a.name.to_string())
-                                        .unwrap_or_default(),
-                                )
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_24()
-                                .max_w_24()
-                                .h_full()
-                                .px_4()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .text_sm()
-                                .font_family("JetBrains Mono")
-                                .child(format!(
-                                    "{:02}:{:02}",
-                                    track.duration.as_secs() / 60,
-                                    track.duration.as_secs() % 60
-                                ))
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        ),
-                )
-        } else {
-            div().h(height).py_2()
-        }
-    }
 }
 
 impl Render for LibraryPage {
@@ -302,27 +129,11 @@ impl Render for LibraryPage {
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
 
-        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
-        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
+        // let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
+        // let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
 
-        let combined_fp = tracks_fp ^ playlists_fp;
+        // let combined_fp = tracks_fp ^ playlists_fp;
 
-        let width = window.bounds().size.width;
-        let tile = 256.0;
-
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let cols = ((width.to_f64() / tile) as usize).max(1);
-
-        if cols != self.grid_cols || combined_fp != self.last_fp {
-            let library = &state.library;
-
-            let (rows, heights) = build_rows(library, cols);
-
-            self.rows = Rc::new(rows);
-            self.heights = Rc::new(heights);
-            self.last_fp = combined_fp;
-            self.grid_cols = cols;
-        }
         let section = *cx.global::<LibrarySection>();
 
         let section_el = match section {
@@ -383,81 +194,6 @@ impl Render for LibraryPage {
                         }
                     }),
             )
-        // .child(vlist(
-        //     cx.entity(),
-        //     "library",
-        //     heights.clone(),
-        //     scroll_handle,
-        //     self.list_controller.clone(),
-        //     move |_this, range, _, cx| {
-        //         let len = rows.len();
-
-        //         let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-        //         let end = (range.end + THUMBNAIL_MARGIN).min(len);
-
-        //         let thumb_track_ids: Vec<TrackId> = (start..end)
-        //             .filter_map(|idx| match &rows[idx] {
-        //                 LibraryRow::TrackRow(_, id) => Some(*id),
-        //                 _ => None,
-        //             })
-        //             .collect();
-
-        //         controller.request_track_thumbnails(&thumb_track_ids, cx);
-
-        //         range
-        //             .map(|idx| match &rows[idx] {
-        //                 LibraryRow::Header(kind) => render_header(kind, heights[idx], cx),
-
-        //                 LibraryRow::PlaylistGridRow(ids) => {
-        //                     render_playlist_grid(ids, heights[idx], cx)
-        //                 }
-
-        //                 LibraryRow::TrackTableHeader => {
-        //                     render_track_table_header(heights[idx], cx)
-        //                 }
-
-        //                 LibraryRow::TrackRow(i, id) => {
-        //                     Self::render_track(*i, id, heights[idx], cx)
-        //                 }
-
-        //                 LibraryRow::Empty(kind) => match kind {
-        //                     HeaderKind::Playlists => div()
-        //                         .w_full()
-        //                         .h_48()
-        //                         .flex()
-        //                         .items_center()
-        //                         .justify_center()
-        //                         .text_lg()
-        //                         .text_color(theme.library_empty_text)
-        //                         .child("No playlists loaded."),
-        //                     HeaderKind::Tracks => div()
-        //                         .w_full()
-        //                         .h_48()
-        //                         .flex()
-        //                         .items_center()
-        //                         .justify_center()
-        //                         .text_lg()
-        //                         .text_color(theme.library_empty_text)
-        //                         .child("No tracks loaded."),
-        //                     HeaderKind::Albums => div()
-        //                         .w_full()
-        //                         .h_48()
-        //                         .flex()
-        //                         .items_center()
-        //                         .justify_center()
-        //                         .text_lg()
-        //                         .text_color(theme.library_empty_text)
-        //                         .child("No albums loaded."),
-        //                 },
-        //             })
-        //             .collect::<Vec<_>>()
-        //     },
-        // ))
-        // .child(floating_scrollbar(
-        //     "library_scrollbar",
-        //     self.scroll_handle.clone(),
-        //     RightPad::Pad,
-        // ))
     }
 }
 

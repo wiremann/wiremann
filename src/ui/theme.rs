@@ -112,6 +112,7 @@ pub struct Theme {
     pub library_tracks_section_table_artist: Rgba,
     pub library_tracks_section_table_album: Rgba,
     pub library_tracks_section_table_duration: Rgba,
+    pub library_tracks_section_bg_hover: Rgba,
 
     // Library Page Playlists Section
     pub library_playlists_section_title: Rgba,
@@ -243,6 +244,7 @@ impl Default for Theme {
             library_tracks_section_table_artist: rgb(0x71717A),
             library_tracks_section_table_album: rgb(0x71717A),
             library_tracks_section_table_duration: rgb(0x71717A),
+            library_tracks_section_bg_hover: rgba(0xFFFFFF14),
 
             library_playlists_section_title: rgb(0xFFFFFF),
             library_playlists_section_bg: rgba(0xFFFFFF00),

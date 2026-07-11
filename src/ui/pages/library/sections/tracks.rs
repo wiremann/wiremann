@@ -27,7 +27,7 @@ impl TracksSection {
         let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
 
-        let (track, is_current, artists, album, _image_id) = {
+        let (track, _, artists, album, _image_id) = {
             let state = controller.state.read(cx);
 
             let track = match state.library.tracks.get(&id) {
@@ -67,12 +67,7 @@ impl TracksSection {
                 .items_center()
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|this| this.bg(theme.library_track_bg_hover))
-                .when(is_current, |this| {
-                    this.bg(theme.library_track_bg_active)
-                        .text_color(theme.library_track_title_text_active)
-                        .font_weight(FontWeight::MEDIUM)
-                })
+                .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
                 .on_click(move |_, _, cx| {
                     let controller = cx.global::<Controller>().clone();
 
