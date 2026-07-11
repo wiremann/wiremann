@@ -54,12 +54,9 @@ pub struct Theme {
     // Lyrics
     pub lyrics_text_active: Rgba,
     pub lyrics_text_inactive: Rgba,
-
     pub lyrics_loading_icon: Rgba,
     pub lyrics_loading_text: Rgba,
-
     pub lyrics_empty_text: Rgba,
-
     pub lyrics_fade_top: Rgba,
     pub lyrics_fade_bottom: Rgba,
 
@@ -75,41 +72,34 @@ pub struct Theme {
     pub library_bg: Rgba,
     pub library_text: Rgba,
 
-    pub library_header_text: Rgba,
-    pub library_header_button_border: Rgba,
-    pub library_header_button_text: Rgba,
-    pub library_header_button_bg_hover: Rgba,
-
-    pub library_table_header_text: Rgba,
-    pub library_table_border: Rgba,
-
-    pub library_track_border: Rgba,
-    pub library_track_bg_hover: Rgba,
-    pub library_track_bg_active: Rgba,
-    pub library_track_title_text_active: Rgba,
-
     // Sidebar
     pub library_sidebar_bg: Rgba,
     pub library_sidebar_item_text: Rgba,
     pub library_sidebar_group_text: Rgba,
     pub library_sidebar_header_text: Rgba,
-
     pub library_sidebar_item_bg: Rgba,
     pub library_sidebar_item_bg_hover: Rgba,
     pub library_sidebar_item_bg_active: Rgba,
     pub library_sidebar_item_text_active: Rgba,
-
     pub library_sidebar_indicator: Rgba,
     pub library_sidebar_indicator_glow: Rgba,
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
 
+    // Library Page Albums Section
     pub library_albums_section_title: Rgba,
+
+    // Library Page Artists Section
     pub library_artists_section_title: Rgba,
-    pub library_playlists_section_title: Rgba,
+
+    // Library Page Favorites Section
     pub library_favorites_section_title: Rgba,
+
+    // Library Page Settings Section
     pub library_settings_section_title: Rgba,
+
+    // Library Page Plugins Section
     pub library_plugins_section_title: Rgba,
 
     // Library Page Tracks Section
@@ -124,6 +114,7 @@ pub struct Theme {
     pub library_tracks_section_table_duration: Rgba,
 
     // Library Page Playlists Section
+    pub library_playlists_section_title: Rgba,
     pub library_playlists_section_bg: Rgba,
     pub library_playlists_section_bg_hover: Rgba,
     pub library_playlists_section_bg_active: Rgba,
@@ -131,35 +122,6 @@ pub struct Theme {
     pub library_playlists_section_title_text: Rgba,
     pub library_playlists_section_meta_text: Rgba,
     pub library_playlists_section_empty_text: Rgba,
-
-    // Playlists page
-    pub playlist_page_bg: Rgba,
-    pub playlist_page_text: Rgba,
-
-    pub playlist_header_title: Rgba,
-    pub playlist_header_meta: Rgba,
-
-    pub playlist_header_button_text: Rgba,
-    pub playlist_header_button_bg: Rgba,
-    pub playlist_header_button_border: Rgba,
-    pub playlist_header_button_hover: Rgba,
-
-    pub playlist_table_header_text: Rgba,
-    pub playlist_table_header_border: Rgba,
-
-    pub playlist_track_border: Rgba,
-    pub playlist_track_bg_hover: Rgba,
-    pub playlist_track_bg_current: Rgba,
-    pub playlist_track_title_current: Rgba,
-
-    pub playlist_sidebar_item_title: Rgba,
-    pub playlist_sidebar_item_title_current: Rgba,
-    pub playlist_sidebar_item_meta: Rgba,
-
-    pub playlist_sidebar_item_bg_hover: Rgba,
-    pub playlist_sidebar_item_bg_current: Rgba,
-
-    pub playlist_empty_text: Rgba,
 
     // Toasts
     pub toast_bg: Rgba,
@@ -251,20 +213,6 @@ impl Default for Theme {
             library_bg: rgb(0x050505),
             library_text: rgb(0xFAFAFA),
 
-            library_header_text: rgb(0xFAFAFA),
-
-            library_header_button_border: rgba(0xFFFFFF14),
-            library_header_button_text: rgb(0xFAFAFA),
-            library_header_button_bg_hover: rgba(0xFFFFFF0A),
-
-            library_table_header_text: rgb(0x71717A),
-            library_table_border: rgba(0xFFFFFF1A),
-
-            library_track_border: rgba(0xFFFFFF12),
-            library_track_bg_hover: rgba(0xFFFFFF08),
-            library_track_bg_active: rgba(0xFFFFFF10),
-            library_track_title_text_active: rgb(0xFFFFFF),
-
             library_sidebar_bg: rgb(0x050505),
             library_sidebar_group_text: rgb(0x71717A),
 
@@ -305,34 +253,6 @@ impl Default for Theme {
             library_playlists_section_title_text: rgb(0xFAFAFA),
             library_playlists_section_meta_text: rgb(0x71717A),
             library_playlists_section_empty_text: rgb(0x71717A),
-
-            playlist_page_bg: rgb(0x050505),
-            playlist_page_text: rgb(0xFAFAFA),
-
-            playlist_header_title: rgb(0xFAFAFA),
-            playlist_header_meta: rgb(0x71717A),
-
-            playlist_header_button_text: rgb(0xFAFAFA),
-            playlist_header_button_bg: rgba(0xFFFFFF08),
-            playlist_header_button_border: rgba(0xFFFFFF0F),
-            playlist_header_button_hover: rgba(0xFFFFFF12),
-
-            playlist_table_header_text: rgb(0x71717A),
-            playlist_table_header_border: rgba(0xFFFFFF14),
-
-            playlist_track_border: rgba(0xFFFFFF12),
-            playlist_track_bg_hover: rgba(0xFFFFFF08),
-            playlist_track_bg_current: rgba(0xFFFFFF10),
-            playlist_track_title_current: rgb(0xFFFFFF),
-
-            playlist_sidebar_item_title: rgb(0xFAFAFA),
-            playlist_sidebar_item_title_current: rgb(0xFFFFFF),
-            playlist_sidebar_item_meta: rgb(0x71717A),
-
-            playlist_sidebar_item_bg_hover: rgba(0xFFFFFF08),
-            playlist_sidebar_item_bg_current: rgba(0xFFFFFF10),
-
-            playlist_empty_text: rgb(0x71717A),
 
             toast_bg: rgb(0x111113),
             toast_border: rgba(0xFFFFFF0F),
