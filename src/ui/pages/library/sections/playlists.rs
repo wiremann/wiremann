@@ -86,10 +86,10 @@ impl PlaylistsSection {
                         .h(px(56.0))
                         .w_full()
                         .flex()
-                        .items_center()
+                        .items_start()
                         .justify_center()
-                        .px_3()
                         .flex_col()
+                        .mt_1()
                         .child(
                             div()
                                 .text_base()
@@ -102,7 +102,6 @@ impl PlaylistsSection {
                         )
                         .child(
                             div()
-                                .mt_1()
                                 .text_sm()
                                 .text_color(theme.library_playlist_meta_text)
                                 .child(format!("{} Tracks", playlist.tracks.len())),
