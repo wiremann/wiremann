@@ -5,6 +5,7 @@ pub mod image_cache;
 pub mod scrollbar;
 pub mod slider;
 pub mod toasts;
+pub mod virtual_grid;
 pub mod virtual_list;
 
 #[derive(Clone, Copy, PartialEq)]

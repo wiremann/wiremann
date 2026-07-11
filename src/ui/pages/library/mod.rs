@@ -7,6 +7,7 @@ use crate::controller::state::TrackId;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::Page;
 use crate::ui::components::image_cache::ImageCache;
+use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
 use crate::ui::pages::library::sections::albums::AlbumsSection;
 use crate::ui::pages::library::sections::artists::ArtistsSection;
@@ -25,9 +26,7 @@ use gpui::{
     ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle,
     VirtualListScrollController, Window, div, img, px,
 };
-use helpers::{
-    LibraryRow, build_rows,
-};
+use helpers::{LibraryRow, build_rows};
 use std::rc::Rc;
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -128,7 +127,10 @@ impl LibraryPage {
             sidebar: cx.new(|_| Sidebar),
             albums: cx.new(|_| AlbumsSection),
             artists: cx.new(|_| ArtistsSection),
-            playlists: cx.new(|_| PlaylistsSection),
+            playlists: cx.new(|_| PlaylistsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
             favorites: cx.new(|_| FavoritesSection),
             home: cx.new(|_| HomeSection),
             tracks: cx.new(|_| TracksSection {

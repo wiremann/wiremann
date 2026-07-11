@@ -34,7 +34,7 @@ impl Sidebar {
         div()
             .px_6()
             .pt_8()
-            .pb_2()
+            .pb_4()
             .text_xs()
             .font_weight(FontWeight::MEDIUM)
             .text_color(theme.library_sidebar_group_text)
