@@ -9,7 +9,7 @@ use crate::ui::{
         bounds_observer::observe_bounds,
         icons::{Icons, icon},
     },
-    pages::library::LibrarySection,
+    pages::library::LibraryRoutes,
     theme::Theme,
 };
 
@@ -45,8 +45,8 @@ impl Sidebar {
     fn item(
         icon_type: Icons,
         text: &'static str,
-        section: LibrarySection,
-        current: LibrarySection,
+        section: LibraryRoutes,
+        current: LibraryRoutes,
         theme: Theme,
     ) -> impl IntoElement {
         let active = current == section;
@@ -64,7 +64,7 @@ impl Sidebar {
                 .cursor_pointer()
                 .hover(|this| this.bg(theme.library_sidebar_item_bg_hover))
                 .on_click(move |_, _, cx| {
-                    *cx.global_mut::<LibrarySection>() = section;
+                    *cx.global_mut::<LibraryRoutes>() = section;
                 })
                 .child(icon(icon_type).size_5().text_color(if active {
                     theme.library_sidebar_item_text_active
@@ -87,7 +87,7 @@ impl Sidebar {
                         }),
                 ),
             move |bounds, _, cx| {
-                if *cx.global::<LibrarySection>() == section {
+                if *cx.global::<LibraryRoutes>() == section {
                     let sidebar_top = cx.global::<SidebarBounds>().top;
                     let indicator = cx.global_mut::<SidebarIndicator>();
 
@@ -102,7 +102,7 @@ impl Sidebar {
 impl Render for Sidebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
-        let current = *cx.global::<LibrarySection>();
+        let current = *cx.global::<LibraryRoutes>();
 
         let indicator_data = *cx.global::<SidebarIndicator>();
 
@@ -188,14 +188,14 @@ impl Render for Sidebar {
                 .child(Self::item(
                     Icons::Home,
                     "Home",
-                    LibrarySection::Home,
+                    LibraryRoutes::Home,
                     current,
                     theme,
                 ))
                 .child(Self::item(
                     Icons::Heart,
                     "Favorites",
-                    LibrarySection::Favorites,
+                    LibraryRoutes::Favorites,
                     current,
                     theme,
                 ))
@@ -203,28 +203,28 @@ impl Render for Sidebar {
                 .child(Self::item(
                     Icons::Music,
                     "Tracks",
-                    LibrarySection::Tracks,
+                    LibraryRoutes::Tracks,
                     current,
                     theme,
                 ))
                 .child(Self::item(
                     Icons::Disc,
                     "Albums",
-                    LibrarySection::Albums,
+                    LibraryRoutes::Albums,
                     current,
                     theme,
                 ))
                 .child(Self::item(
                     Icons::User,
                     "Artists",
-                    LibrarySection::Artists,
+                    LibraryRoutes::Artists,
                     current,
                     theme,
                 ))
                 .child(Self::item(
                     Icons::Playlist,
                     "Playlists",
-                    LibrarySection::Playlists,
+                    LibraryRoutes::Playlists,
                     current,
                     theme,
                 ))
@@ -232,14 +232,14 @@ impl Render for Sidebar {
                 .child(Self::item(
                     Icons::Plugins,
                     "Plugins",
-                    LibrarySection::Plugins,
+                    LibraryRoutes::Plugins,
                     current,
                     theme,
                 ))
                 .child(Self::item(
                     Icons::Settings,
                     "Settings",
-                    LibrarySection::Settings,
+                    LibraryRoutes::Settings,
                     current,
                     theme,
                 ))

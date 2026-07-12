@@ -1,38 +1,30 @@
 mod helpers;
-mod sections;
+mod routes;
 mod sidebar;
 
 use crate::controller::Controller;
-use crate::controller::state::TrackId;
 use crate::ui::animations::ease_in_out_expo;
-use crate::ui::components::Page;
-use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
-use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
-use crate::ui::pages::library::sections::albums::AlbumsSection;
-use crate::ui::pages::library::sections::artists::ArtistsSection;
-use crate::ui::pages::library::sections::favorites::FavoritesSection;
-use crate::ui::pages::library::sections::home::HomeSection;
-use crate::ui::pages::library::sections::playlists::PlaylistsSection;
-use crate::ui::pages::library::sections::plugins::PluginsSection;
-use crate::ui::pages::library::sections::settings::SettingsSection;
-use crate::ui::pages::library::sections::tracks::TracksSection;
+use crate::ui::pages::library::routes::albums::AlbumsSection;
+use crate::ui::pages::library::routes::artists::ArtistsSection;
+use crate::ui::pages::library::routes::favorites::FavoritesSection;
+use crate::ui::pages::library::routes::home::HomeSection;
+use crate::ui::pages::library::routes::playlists::PlaylistsSection;
+use crate::ui::pages::library::routes::plugins::PluginsSection;
+use crate::ui::pages::library::routes::settings::SettingsSection;
+use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, Div, ElementId, Entity, FontWeight, Global,
-    ImageSource, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
-    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle,
-    VirtualListScrollController, Window, div, img, px,
+    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
+    InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
+    UniformListScrollHandle, Window, div, img, px,
 };
-use std::rc::Rc;
-
-const THUMBNAIL_MARGIN: usize = 16;
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum LibrarySection {
+pub enum LibraryRoutes {
     // Discovery
     Home,
     Favorites,
@@ -61,7 +53,7 @@ pub struct LibraryPage {
     settings: Entity<SettingsSection>,
 }
 
-impl LibrarySection {
+impl LibraryRoutes {
     pub const fn index(self) -> i32 {
         match self {
             Self::Home => 0,
@@ -134,17 +126,17 @@ impl Render for LibraryPage {
 
         // let combined_fp = tracks_fp ^ playlists_fp;
 
-        let section = *cx.global::<LibrarySection>();
+        let section = *cx.global::<LibraryRoutes>();
 
         let section_el = match section {
-            LibrarySection::Home => div().w_full().h_full().child(self.home.clone()),
-            LibrarySection::Favorites => div().w_full().h_full().child(self.favorites.clone()),
-            LibrarySection::Tracks => div().w_full().h_full().child(self.tracks.clone()),
-            LibrarySection::Albums => div().w_full().h_full().child(self.albums.clone()),
-            LibrarySection::Artists => div().w_full().h_full().child(self.artists.clone()),
-            LibrarySection::Playlists => div().w_full().h_full().child(self.playlists.clone()),
-            LibrarySection::Settings => div().w_full().h_full().child(self.settings.clone()),
-            LibrarySection::Plugins => div().w_full().h_full().child(self.plugins.clone()),
+            LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
+            LibraryRoutes::Favorites => div().w_full().h_full().child(self.favorites.clone()),
+            LibraryRoutes::Tracks => div().w_full().h_full().child(self.tracks.clone()),
+            LibraryRoutes::Albums => div().w_full().h_full().child(self.albums.clone()),
+            LibraryRoutes::Artists => div().w_full().h_full().child(self.artists.clone()),
+            LibraryRoutes::Playlists => div().w_full().h_full().child(self.playlists.clone()),
+            LibraryRoutes::Settings => div().w_full().h_full().child(self.settings.clone()),
+            LibraryRoutes::Plugins => div().w_full().h_full().child(self.plugins.clone()),
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
         let prev_page = *section_state.read(cx);
@@ -197,4 +189,4 @@ impl Render for LibraryPage {
     }
 }
 
-impl Global for LibrarySection {}
+impl Global for LibraryRoutes {}
