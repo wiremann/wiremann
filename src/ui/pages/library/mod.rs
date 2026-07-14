@@ -2,7 +2,7 @@ mod helpers;
 mod routes;
 mod sidebar;
 
-use crate::controller::Controller;
+use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::albums::AlbumsSection;
@@ -19,11 +19,11 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
     InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
-    UniformListScrollHandle, Window, div, img, px,
+    UniformListScrollHandle, Window, div, px,
 };
 
 #[repr(u64)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LibraryRoutes {
     // Discovery
     Home,
@@ -34,6 +34,11 @@ pub enum LibraryRoutes {
     Albums,
     Artists,
     Playlists,
+
+    // Individual item views
+    Album(AlbumId),
+    Artist(ArtistId),
+    Playlist(PlaylistId),
 
     // System
     Settings,
@@ -64,23 +69,12 @@ impl LibraryRoutes {
             Self::Artists => 4,
             Self::Playlists => 5,
 
-            Self::Settings => 6,
-            Self::Plugins => 7,
-        }
-    }
+            Self::Album(_) => 6,
+            Self::Artist(_) => 7,
+            Self::Playlist(_) => 8,
 
-    pub const fn sidebar_offset(self) -> f32 {
-        match self {
-            Self::Home => 38.0,
-            Self::Favorites => 70.0,
-
-            Self::Tracks => 136.0,
-            Self::Albums => 168.0,
-            Self::Artists => 200.0,
-            Self::Playlists => 232.0,
-
-            Self::Plugins => 298.0,
-            Self::Settings => 330.0,
+            Self::Settings => 9,
+            Self::Plugins => 10,
         }
     }
 }
@@ -118,8 +112,8 @@ impl Render for LibraryPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
 
-        let controller = cx.global::<Controller>().clone();
-        let state = controller.state.read(cx);
+        // let controller = cx.global::<Controller>().clone();
+        // let state = controller.state.read(cx);
 
         // let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
         // let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
@@ -175,7 +169,7 @@ impl Render for LibraryPage {
 
                             this.child(section_el)
                                 .with_animation(
-                                    ElementId::NamedInteger("section_slide".into(), section as u64),
+                                    ElementId::Name(format!("section_slide_{:?}", section).into()),
                                     Animation::new(duration).with_easing(ease_in_out_expo()),
                                     move |this, delta| {
                                         let offset = 360.0 * direction * (1.0 - delta);

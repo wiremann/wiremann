@@ -170,7 +170,7 @@ impl Render for Sidebar {
 
                         indicator
                             .with_animation(
-                                ElementId::NamedInteger("sidebar_indicator".into(), current as u64),
+                                ElementId::Name(format!("sidebar_indicator_{:?}", current).into()),
                                 Animation::new(duration).with_easing(gpui::ease_out_quint()),
                                 move |this, delta| {
                                     let y = prev_top + (indicator_data.top - prev_top) * delta;
