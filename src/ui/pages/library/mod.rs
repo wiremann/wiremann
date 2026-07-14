@@ -5,10 +5,13 @@ mod sidebar;
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
+use crate::ui::pages::library::routes::album::AlbumViewSection;
 use crate::ui::pages::library::routes::albums::AlbumsSection;
+use crate::ui::pages::library::routes::artist::ArtistViewSection;
 use crate::ui::pages::library::routes::artists::ArtistsSection;
 use crate::ui::pages::library::routes::favorites::FavoritesSection;
 use crate::ui::pages::library::routes::home::HomeSection;
+use crate::ui::pages::library::routes::playlist::PlaylistViewSection;
 use crate::ui::pages::library::routes::playlists::PlaylistsSection;
 use crate::ui::pages::library::routes::plugins::PluginsSection;
 use crate::ui::pages::library::routes::settings::SettingsSection;
@@ -48,8 +51,11 @@ pub enum LibraryRoutes {
 #[derive(Clone)]
 pub struct LibraryPage {
     sidebar: Entity<Sidebar>,
+    album: Entity<AlbumViewSection>,
     albums: Entity<AlbumsSection>,
+    artist: Entity<ArtistViewSection>,
     artists: Entity<ArtistsSection>,
+    playlist: Entity<PlaylistViewSection>,
     playlists: Entity<PlaylistsSection>,
     favorites: Entity<FavoritesSection>,
     home: Entity<HomeSection>,
@@ -90,8 +96,17 @@ impl LibraryPage {
 
         LibraryPage {
             sidebar: cx.new(|_| Sidebar),
+            album: cx.new(|_| AlbumViewSection {
+                album_id: cx.new(|_| None),
+            }),
             albums: cx.new(|_| AlbumsSection),
+            artist: cx.new(|_| ArtistViewSection {
+                artist_id: cx.new(|_| None),
+            }),
             artists: cx.new(|_| ArtistsSection),
+            playlist: cx.new(|_| PlaylistViewSection {
+                playlist_id: cx.new(|_| None),
+            }),
             playlists: cx.new(|_| PlaylistsSection {
                 scroll_handle: ScrollHandle::new(),
                 grid_controller: VirtualGridScrollController::new(),
@@ -131,6 +146,27 @@ impl Render for LibraryPage {
             LibraryRoutes::Playlists => div().w_full().h_full().child(self.playlists.clone()),
             LibraryRoutes::Settings => div().w_full().h_full().child(self.settings.clone()),
             LibraryRoutes::Plugins => div().w_full().h_full().child(self.plugins.clone()),
+            LibraryRoutes::Album(id) => {
+                self.album.update(cx, |this, cx| {
+                    this.album_id.update(cx, |this, _| *this = Some(id));
+                    cx.notify()
+                });
+                div().w_full().h_full().child(self.album.clone())
+            }
+            LibraryRoutes::Artist(id) => {
+                self.artist.update(cx, |this, cx| {
+                    this.artist_id.update(cx, |this, _| *this = Some(id));
+                    cx.notify()
+                });
+                div().w_full().h_full().child(self.artist.clone())
+            }
+            LibraryRoutes::Playlist(id) => {
+                self.playlist.update(cx, |this, cx| {
+                    this.playlist_id.update(cx, |this, _| *this = Some(id));
+                    cx.notify()
+                });
+                div().w_full().h_full().child(self.playlist.clone())
+            }
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
         let prev_page = *section_state.read(cx);
