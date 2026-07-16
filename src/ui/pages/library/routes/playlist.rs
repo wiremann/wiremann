@@ -1,7 +1,7 @@
 use crate::{
     controller::{
         Controller,
-        state::{PlaylistId, TrackId},
+        state::{Playlist, PlaylistId, TrackId},
     },
     ui::{
         components::{
@@ -192,11 +192,23 @@ impl Render for PlaylistViewSection {
         let controller = cx.global::<Controller>().clone();
 
         let state = controller.state.read(cx);
-        let track_ids = state.library.tracks.keys().copied().collect::<Vec<_>>();
+
+        let Some(playlist) = self
+            .playlist_id
+            .read(cx)
+            .as_ref()
+            .and_then(|id| state.library.playlists.get(id))
+        else {
+            return div();
+        };
+
+        let track_ids = playlist.tracks.clone();
         let len = track_ids.len();
         let _ = state;
 
         let scroll_handle = self.scroll_handle.clone();
+
+        let playlist_name = playlist.name.to_string();
 
         div()
             .w_full()
@@ -210,7 +222,7 @@ impl Render for PlaylistViewSection {
                         .font_weight(FontWeight::BOLD)
                         .tracking_tight()
                         .text_color(theme.library_playlist_section_title)
-                        .child("Tracks")
+                        .child(playlist_name)
                         .child(
                             div()
                                 .h(px(2.0))

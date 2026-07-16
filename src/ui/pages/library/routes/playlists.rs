@@ -13,6 +13,7 @@ use crate::{
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},
         },
+        pages::library::LibraryRoutes,
         theme::Theme,
     },
 };
@@ -54,10 +55,10 @@ impl PlaylistsSection {
                     let id = playlist.id;
 
                     move |_, _, cx| {
-                        let controller = cx.global::<Controller>().clone();
+                        // let controller = cx.global::<Controller>().clone();
 
-                        controller.load_playlist(id, cx);
-                        *cx.global_mut::<Page>() = Page::Player;
+                        // controller.load_playlist(id, cx);
+                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Playlist(id);
                     }
                 })
                 .flex()
