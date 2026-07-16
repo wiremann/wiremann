@@ -96,15 +96,15 @@ impl LibraryPage {
 
         LibraryPage {
             sidebar: cx.new(|_| Sidebar),
-            album: cx.new(|_| AlbumViewSection {
+            album: cx.new(|cx| AlbumViewSection {
                 album_id: cx.new(|_| None),
             }),
             albums: cx.new(|_| AlbumsSection),
-            artist: cx.new(|_| ArtistViewSection {
+            artist: cx.new(|cx| ArtistViewSection {
                 artist_id: cx.new(|_| None),
             }),
             artists: cx.new(|_| ArtistsSection),
-            playlist: cx.new(|_| PlaylistViewSection {
+            playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
             }),
             playlists: cx.new(|_| PlaylistsSection {
