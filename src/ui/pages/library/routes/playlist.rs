@@ -202,6 +202,11 @@ impl Render for PlaylistViewSection {
             return div();
         };
 
+        controller.request_playlist_thumbnails(&[id], cx);
+
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
+
         let track_ids = playlist.tracks.clone();
         let len = track_ids.len();
         let _ = state;
@@ -216,21 +221,93 @@ impl Render for PlaylistViewSection {
             .flex()
             .flex_col()
             .child(
-                div().py_4().px_12().flex().gap_x_4().child(
-                    div()
-                        .text_size(rems(2.0))
-                        .font_weight(FontWeight::BOLD)
-                        .tracking_tight()
-                        .text_color(theme.library_playlist_section_title)
-                        .child(playlist_name)
-                        .child(
-                            div()
-                                .h(px(2.0))
-                                .w_16()
-                                .mt_1()
-                                .bg(theme.library_playlist_section_title),
-                        ),
-                ),
+                div()
+                    .px_12()
+                    .py_8()
+                    .flex()
+                    .gap_8()
+                    .items_end()
+                    .child(
+                        div()
+                            .size(px(240.0))
+                            .flex_shrink_0()
+                            .child(match thumbnail {
+                                Some(image) => img(ImageSource::Render(image.clone()))
+                                    .size_full()
+                                    .object_fit(ObjectFit::Contain)
+                                    .rounded_xl()
+                                    .border_1()
+                                    .border_color(theme.border),
+
+                                None => img("icons/placeholder.svg")
+                                    .size_full()
+                                    .object_fit(ObjectFit::Contain)
+                                    .rounded_xl()
+                                    .border_1()
+                                    .border_color(theme.border),
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .justify_end()
+                            .gap_2()
+                            .pb_2()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(theme.library_playlist_header_label)
+                                    .child("Playlist"),
+                            )
+                            .child(
+                                div()
+                                    .text_size(rems(3.2))
+                                    .font_weight(FontWeight::BLACK)
+                                    .tracking_tight()
+                                    .truncate()
+                                    .text_ellipsis()
+                                    .text_color(theme.library_playlist_header_title)
+                                    .child(playlist_name),
+                            )
+                            .child(
+                                div()
+                                    .text_base()
+                                    .text_color(theme.library_playlist_header_meta)
+                                    .child(format!("{} Tracks", len)),
+                            )
+                            .child(
+                                div()
+                                    .mt_3()
+                                    .flex()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .px_5()
+                                            .py_2()
+                                            .rounded_lg()
+                                            .bg(theme.library_playlist_header_button_bg)
+                                            .text_color(theme.library_playlist_header_button_text)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .cursor_pointer()
+                                            .child("Play"),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_5()
+                                            .py_2()
+                                            .rounded_lg()
+                                            .bg(theme.library_playlist_header_button_secondary_bg)
+                                            .text_color(
+                                                theme.library_playlist_header_button_secondary_text,
+                                            )
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .cursor_pointer()
+                                            .child("Shuffle"),
+                                    ),
+                            ),
+                    ),
             )
             .child(
                 div()

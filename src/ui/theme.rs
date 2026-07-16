@@ -135,6 +135,12 @@ pub struct Theme {
     pub library_playlist_section_table_album: Rgba,
     pub library_playlist_section_table_duration: Rgba,
     pub library_playlist_section_bg_hover: Rgba,
+    pub library_playlist_section_header_label: Rgba,
+    pub library_playlist_section_header_meta: Rgba,
+    pub library_playlist_section_button_bg: Rgba,
+    pub library_playlist_section_button_text: Rgba,
+    pub library_playlist_section_button_secondary_bg: Rgba,
+    pub library_playlist_section_button_secondary_text: Rgba,
 
     // Toasts
     pub toast_bg: Rgba,
@@ -277,6 +283,12 @@ impl Default for Theme {
             library_playlist_section_table_album: rgb(0x71717A),
             library_playlist_section_table_duration: rgb(0x71717A),
             library_playlist_section_bg_hover: rgba(0xFFFFFF14),
+            library_playlist_section_header_label: rgb(0xA1A1AA),
+            library_playlist_section_header_meta: rgb(0x71717A),
+            library_playlist_section_button_bg: rgb(0xFAFAFA),
+            library_playlist_section_button_text: rgb(0x09090B),
+            library_playlist_section_button_secondary_bg: rgba(0xFFFFFF14),
+            library_playlist_section_button_secondary_text: rgb(0xFAFAFA),
 
             toast_bg: rgb(0x111113),
             toast_border: rgba(0xFFFFFF0F),
