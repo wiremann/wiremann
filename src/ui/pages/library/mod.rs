@@ -106,6 +106,7 @@ impl LibraryPage {
             artists: cx.new(|_| ArtistsSection),
             playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
+                scroll_handle: UniformListScrollHandle::new(),
             }),
             playlists: cx.new(|_| PlaylistsSection {
                 scroll_handle: ScrollHandle::new(),

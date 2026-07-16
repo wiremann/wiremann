@@ -124,6 +124,18 @@ pub struct Theme {
     pub library_playlists_section_meta_text: Rgba,
     pub library_playlists_section_empty_text: Rgba,
 
+    // Library Page Playlist View Section
+    pub library_playlist_section_title: Rgba,
+    pub library_playlist_section_track_count: Rgba,
+    pub library_playlist_section_table_header_text: Rgba,
+    pub library_playlist_section_table_header_border: Rgba,
+    pub library_playlist_section_table_slno: Rgba,
+    pub library_playlist_section_table_title: Rgba,
+    pub library_playlist_section_table_artist: Rgba,
+    pub library_playlist_section_table_album: Rgba,
+    pub library_playlist_section_table_duration: Rgba,
+    pub library_playlist_section_bg_hover: Rgba,
+
     // Toasts
     pub toast_bg: Rgba,
     pub toast_border: Rgba,
@@ -250,11 +262,21 @@ impl Default for Theme {
             library_playlists_section_bg: rgba(0xFFFFFF00),
             library_playlists_section_bg_hover: rgba(0xFFFFFF08),
             library_playlists_section_bg_active: rgba(0xFFFFFF10),
-
             library_playlists_section_text: rgb(0xFAFAFA),
             library_playlists_section_title_text: rgb(0xFAFAFA),
             library_playlists_section_meta_text: rgb(0x71717A),
             library_playlists_section_empty_text: rgb(0x71717A),
+
+            library_playlist_section_title: rgb(0xFFFFFF),
+            library_playlist_section_track_count: rgb(0x71717A),
+            library_playlist_section_table_header_text: rgb(0x71717A),
+            library_playlist_section_table_header_border: rgba(0xFFFFFF14),
+            library_playlist_section_table_slno: rgb(0x71717A),
+            library_playlist_section_table_title: rgb(0xFAFAFA),
+            library_playlist_section_table_artist: rgb(0x71717A),
+            library_playlist_section_table_album: rgb(0x71717A),
+            library_playlist_section_table_duration: rgb(0x71717A),
+            library_playlist_section_bg_hover: rgba(0xFFFFFF14),
 
             toast_bg: rgb(0x111113),
             toast_border: rgba(0xFFFFFF0F),

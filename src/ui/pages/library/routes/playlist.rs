@@ -1,6 +1,8 @@
-use crate::{controller::state::PlaylistId, ui::theme::Theme};
 use crate::{
-    controller::{Controller, state::TrackId},
+    controller::{
+        Controller,
+        state::{PlaylistId, TrackId},
+    },
     ui::{
         components::{
             Page,
@@ -10,10 +12,11 @@ use crate::{
         theme::Theme,
     },
 };
+use gpui::Entity;
 use gpui::{
-    App, Context, Div, Element, FontWeight, ImageSource, InteractiveElement, IntoElement,
-    ObjectFit, ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, prelude::FluentBuilder, px, rems, uniform_list,
+    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
+    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
 
 const THUMBNAIL_MARGIN: usize = 16;
