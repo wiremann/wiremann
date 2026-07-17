@@ -6,6 +6,7 @@ use crate::{
     ui::{
         components::{
             Page,
+            icons::{Icon, Icons, icon},
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
         },
@@ -191,7 +192,7 @@ impl Render for PlaylistViewSection {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
 
-        let state = controller.state.read(cx);
+        let state = controller.state.read(cx).clone();
 
         let Some(playlist) = self
             .playlist_id
@@ -202,7 +203,7 @@ impl Render for PlaylistViewSection {
             return div();
         };
 
-        controller.request_playlist_thumbnails(&[id], cx);
+        controller.request_playlist_thumbnails(&[playlist.id], cx);
 
         let cache = cx.global_mut::<ImageCache>();
         let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
@@ -220,6 +221,7 @@ impl Render for PlaylistViewSection {
             .h_full()
             .flex()
             .flex_col()
+            .font_family("Space Grotesk")
             .child(
                 div()
                     .px_12()
@@ -228,24 +230,21 @@ impl Render for PlaylistViewSection {
                     .gap_8()
                     .items_end()
                     .child(
-                        div()
-                            .size(px(240.0))
-                            .flex_shrink_0()
-                            .child(match thumbnail {
-                                Some(image) => img(ImageSource::Render(image.clone()))
-                                    .size_full()
-                                    .object_fit(ObjectFit::Contain)
-                                    .rounded_xl()
-                                    .border_1()
-                                    .border_color(theme.border),
+                        div().size_64().flex_shrink_0().child(match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_xl()
+                                .border_1()
+                                .border_color(theme.border),
 
-                                None => img("icons/placeholder.svg")
-                                    .size_full()
-                                    .object_fit(ObjectFit::Contain)
-                                    .rounded_xl()
-                                    .border_1()
-                                    .border_color(theme.border),
-                            }),
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_xl()
+                                .border_1()
+                                .border_color(theme.border),
+                        }),
                     )
                     .child(
                         div()
@@ -256,25 +255,19 @@ impl Render for PlaylistViewSection {
                             .pb_2()
                             .child(
                                 div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.library_playlist_header_label)
-                                    .child("Playlist"),
-                            )
-                            .child(
-                                div()
                                     .text_size(rems(3.2))
-                                    .font_weight(FontWeight::BLACK)
+                                    .font_family("Space Grotesk")
+                                    .font_weight(FontWeight::BOLD)
                                     .tracking_tight()
                                     .truncate()
                                     .text_ellipsis()
-                                    .text_color(theme.library_playlist_header_title)
+                                    .text_color(theme.library_playlist_section_header_title)
                                     .child(playlist_name),
                             )
                             .child(
                                 div()
                                     .text_base()
-                                    .text_color(theme.library_playlist_header_meta)
+                                    .text_color(theme.library_playlist_section_header_meta)
                                     .child(format!("{} Tracks", len)),
                             )
                             .child(
@@ -284,27 +277,59 @@ impl Render for PlaylistViewSection {
                                     .gap_3()
                                     .child(
                                         div()
-                                            .px_5()
+                                            .id("playlist_play_button")
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .gap_x_3()
+                                            .px_8()
                                             .py_2()
                                             .rounded_lg()
-                                            .bg(theme.library_playlist_header_button_bg)
-                                            .text_color(theme.library_playlist_header_button_text)
+                                            .bg(theme.library_playlist_section_button_bg)
+                                            .text_color(theme.library_playlist_section_button_text)
                                             .font_weight(FontWeight::MEDIUM)
                                             .cursor_pointer()
-                                            .child("Play"),
+                                            .child(icon(Icons::Play).size_4())
+                                            .child("Play")
+                                            .on_click({
+                                                let id = playlist.id;
+                                                move |_, _, cx| {
+                                                    let controller =
+                                                        cx.global::<Controller>().clone();
+                                                    controller.load_playlist(id, cx);
+                                                    *cx.global_mut::<Page>() = Page::Player;
+                                                }
+                                            }),
                                     )
                                     .child(
                                         div()
-                                            .px_5()
+                                            .id("playlist_shuffle_button")
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .gap_x_3()
+                                            .px_8()
                                             .py_2()
                                             .rounded_lg()
-                                            .bg(theme.library_playlist_header_button_secondary_bg)
+                                            .bg(theme.library_playlist_section_button_secondary_bg)
                                             .text_color(
-                                                theme.library_playlist_header_button_secondary_text,
+                                                theme
+                                                    .library_playlist_section_button_secondary_text,
                                             )
                                             .font_weight(FontWeight::MEDIUM)
                                             .cursor_pointer()
-                                            .child("Shuffle"),
+                                            .child(icon(Icons::Shuffle).size_4())
+                                            .child("Shuffle")
+                                            .on_click({
+                                                let id = playlist.id;
+                                                move |_, _, cx| {
+                                                    let controller =
+                                                        cx.global::<Controller>().clone();
+                                                    controller.load_playlist(id, cx);
+                                                    controller.set_shuffle(cx);
+                                                    *cx.global_mut::<Page>() = Page::Player;
+                                                }
+                                            }),
                                     ),
                             ),
                     ),

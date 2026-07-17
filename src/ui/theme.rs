@@ -125,7 +125,6 @@ pub struct Theme {
     pub library_playlists_section_empty_text: Rgba,
 
     // Library Page Playlist View Section
-    pub library_playlist_section_title: Rgba,
     pub library_playlist_section_track_count: Rgba,
     pub library_playlist_section_table_header_text: Rgba,
     pub library_playlist_section_table_header_border: Rgba,
@@ -135,7 +134,7 @@ pub struct Theme {
     pub library_playlist_section_table_album: Rgba,
     pub library_playlist_section_table_duration: Rgba,
     pub library_playlist_section_bg_hover: Rgba,
-    pub library_playlist_section_header_label: Rgba,
+    pub library_playlist_section_header_title: Rgba,
     pub library_playlist_section_header_meta: Rgba,
     pub library_playlist_section_button_bg: Rgba,
     pub library_playlist_section_button_text: Rgba,
@@ -273,7 +272,6 @@ impl Default for Theme {
             library_playlists_section_meta_text: rgb(0x71717A),
             library_playlists_section_empty_text: rgb(0x71717A),
 
-            library_playlist_section_title: rgb(0xFFFFFF),
             library_playlist_section_track_count: rgb(0x71717A),
             library_playlist_section_table_header_text: rgb(0x71717A),
             library_playlist_section_table_header_border: rgba(0xFFFFFF14),
@@ -283,7 +281,7 @@ impl Default for Theme {
             library_playlist_section_table_album: rgb(0x71717A),
             library_playlist_section_table_duration: rgb(0x71717A),
             library_playlist_section_bg_hover: rgba(0xFFFFFF14),
-            library_playlist_section_header_label: rgb(0xA1A1AA),
+            library_playlist_section_header_title: rgb(0xFFFFFF),
             library_playlist_section_header_meta: rgb(0x71717A),
             library_playlist_section_button_bg: rgb(0xFAFAFA),
             library_playlist_section_button_text: rgb(0x09090B),
