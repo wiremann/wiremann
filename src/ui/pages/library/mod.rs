@@ -98,12 +98,20 @@ impl LibraryPage {
             sidebar: cx.new(|_| Sidebar),
             album: cx.new(|cx| AlbumViewSection {
                 album_id: cx.new(|_| None),
+                scroll_handle: UniformListScrollHandle::new(),
             }),
-            albums: cx.new(|_| AlbumsSection),
+            albums: cx.new(|_| AlbumsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
             artist: cx.new(|cx| ArtistViewSection {
                 artist_id: cx.new(|_| None),
+                scroll_handle: UniformListScrollHandle::new(),
             }),
-            artists: cx.new(|_| ArtistsSection),
+            artists: cx.new(|_| ArtistsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
             playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
