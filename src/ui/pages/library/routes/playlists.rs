@@ -135,8 +135,8 @@ impl Render for PlaylistsSection {
                     .py_4()
                     .px_8()
                     .flex()
-                    .flex_col()
-                    .justify_center()
+                    .items_center()
+                    .justify_between()
                     .child(
                         div()
                             .text_size(rems(2.0))
@@ -151,6 +151,56 @@ impl Render for PlaylistsSection {
                                     .mt_1()
                                     .bg(theme.library_playlists_section_title),
                             ),
+                    )
+                    .child(
+                        div().flex()
+                            .items_center()
+                            .child(
+                                div()
+                                .id("library_playlists_section_create_button")
+                                    .ml_4()
+                                    .px_6()
+                                    .py_2()
+                                    .rounded_md()
+                                    .bg(theme.library_playlists_section_create_button_bg)
+                                    .hover(|this| {
+                                        this.bg(theme.library_playlists_section_create_button_bg_hover)
+                                    })
+                                    .cursor_pointer()
+                                    .on_click({
+                                        move |_, _, cx| {
+                    let controller = cx.global::<Controller>().clone();
+                    cx.spawn(async move |_| {
+                        if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
+                            controller.scan_dir(folder.path().into());
+                        }
+                    })
+                    .detach();
+                                        }
+                                    })
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            // .child(
+                                            //     img("icons/plus.svg")
+                                            //         .size(px(16.0), px(16.0))
+                                            //         .object_fit(ObjectFit::Contain),
+                                            // )
+                                            .child(
+                                                div()
+                                                    .ml_2()
+                                                    .text_sm()
+                                                    .font_weight(FontWeight::MEDIUM)
+                                                    .text_color(
+                                                        theme
+                                                            .library_playlists_section_create_button_text,
+                                                    )
+                                                    .child("Create Playlist"),
+                                            ),
+                                    ),
+                            )
                     ),
             )
             .child(div().flex_1().relative().px_8().pb_4().child(if len == 0 {

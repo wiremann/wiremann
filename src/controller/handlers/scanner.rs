@@ -3,6 +3,7 @@ use super::{
     ImageProcessorCommand, Instant, PathBuf, PlaylistId, ScannerCommand, ScannerEvent,
     ScanningStatus, ToastKind, ToastPhase, TrackId, Wiremann,
 };
+use tracing::{info, trace};
 
 impl Controller {
     pub fn handle_scanner_event(
@@ -14,6 +15,9 @@ impl Controller {
         match event {
             ScannerEvent::UpsertTracks(tracks) => {
                 let mut modified_playlists = HashSet::new();
+                let start = Instant::now();
+
+                trace!(thread_id = ?std::thread::current().id(), "controller handling UpsertTracks batch size={}", tracks.len());
 
                 self.state.update(cx, |this, cx| {
                     this.library.tracks.reserve(tracks.len());
@@ -42,6 +46,8 @@ impl Controller {
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::InsertTracksIntoPlaylist(pid, tids) => {
+                let start = Instant::now();
+                trace!(thread_id = ?std::thread::current().id(), "controller handling InsertTracksIntoPlaylist pid={:?} count={}", pid, tids.len());
                 self.state.update(cx, |this, cx| {
                     if let Some(playlist) = this.library.playlists.get_mut(pid) {
                         for tid in tids {
@@ -138,6 +144,8 @@ impl Controller {
                 });
             }
             ScannerEvent::ScanFinished => {
+                let start = Instant::now();
+                trace!(thread_id = ?std::thread::current().id(), "controller handling ScanFinished");
                 self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
                 let tracks = self.state.read(cx).library.tracks.clone();
 
@@ -157,6 +165,7 @@ impl Controller {
                         to_request,
                         ImageKind::ThumbnailSmall,
                     ));
+                trace!(thread_id = ?std::thread::current().id(), elapsed_ms = ?start.elapsed().as_millis(), "controller finished ScanFinished work");
 
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {

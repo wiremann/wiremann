@@ -16,7 +16,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tracing::{info, trace};
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -124,6 +125,7 @@ impl Scanner {
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
+                info!("scanner metadata worker started");
                 let mut new: Vec<(ScannedTrack, Option<PlaylistId>)> = Vec::with_capacity(32);
                 let mut existing: HashMap<PlaylistId, Vec<TrackId>> = HashMap::with_capacity(32);
 
@@ -131,6 +133,8 @@ impl Scanner {
                     select! {
                         recv(worker_rx) -> job => {
                             if let Ok((path, pid)) = job {
+                                let start = std::time::Instant::now();
+                                trace!(thread_id = ?std::thread::current().id(), worker = "scanner", "received job {}", path.display());
                                 Self::handle_job(
                                     path.as_path(),
                                     pid,
@@ -140,6 +144,7 @@ impl Scanner {
                                     &mut existing,
                                     &mut new,
                                 );
+                                trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "finished job {}", path.display());
                             }
                         }
 
@@ -161,10 +166,12 @@ impl Scanner {
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
         new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
+        let start = Instant::now();
         let mut incremented = false;
 
         let Ok(ts) = TrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+            trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "handle_job early return: invalid TrackSource: {}", path.display());
             return;
         };
 
@@ -208,6 +215,8 @@ impl Scanner {
         if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
             tx.send(ScannerEvent::ScanFinished).ok();
         }
+
+        trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "handle_job finished: {}", path.display());
     }
 
     fn flush_batches(

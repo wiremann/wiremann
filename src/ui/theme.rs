@@ -169,6 +169,9 @@ pub struct Theme {
     pub library_playlists_section_title_text: Rgba,
     pub library_playlists_section_meta_text: Rgba,
     pub library_playlists_section_empty_text: Rgba,
+    pub library_playlists_section_create_button_bg: Rgba,
+    pub library_playlists_section_create_button_bg_hover: Rgba,
+    pub library_playlists_section_create_button_text: Rgba,
 
     // Library Page Playlist View Section
     pub library_playlist_section_track_count: Rgba,
@@ -363,6 +366,9 @@ impl Default for Theme {
             library_playlists_section_title_text: rgb(0xFAFAFA),
             library_playlists_section_meta_text: rgb(0x71717A),
             library_playlists_section_empty_text: rgb(0x71717A),
+            library_playlists_section_create_button_bg: rgb(0xFAFAFA),
+            library_playlists_section_create_button_bg_hover: rgb(0xFFFFFF),
+            library_playlists_section_create_button_text: rgb(0x050505),
 
             library_playlist_section_track_count: rgb(0x71717A),
             library_playlist_section_table_header_text: rgb(0x71717A),
