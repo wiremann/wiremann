@@ -169,13 +169,13 @@ impl Render for PlaylistsSection {
                                     .cursor_pointer()
                                     .on_click({
                                         move |_, _, cx| {
-                    let controller = cx.global::<Controller>().clone();
-                    cx.spawn(async move |_| {
-                        if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
-                            controller.scan_dir(folder.path().into());
-                        }
-                    })
-                    .detach();
+                                            let controller = cx.global::<Controller>().clone();
+                                            cx.spawn(async move |_| {
+                                                if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
+                                                    controller.scan_dir(folder.path().into());
+                                                }
+                                            })
+                                            .detach();
                                         }
                                     })
                                     .child(
