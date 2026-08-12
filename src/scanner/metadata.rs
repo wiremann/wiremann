@@ -45,6 +45,10 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
         duration = tagged_file.properties().duration();
     }
 
+    // YouTube rips and bad tags often store "Artist - Title" as the title field
+    // while leaving the artist tag empty or wrong. Try to repair this.
+    clean_title_from_artist(&mut title, &mut artist);
+
     let track_id = TrackId::generate(&title, &artist, &album)?;
 
     Ok(Track {
@@ -70,6 +74,26 @@ pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
         return Ok(tag.pictures().first().map(|data| Box::from(data.data())));
     }
     Ok(None)
+}
+
+/// If the title looks like "Artist - Title" but the artist field is empty or
+/// mismatched, split it apart. This is common for YouTube rips and poor tags.
+fn clean_title_from_artist(title: &mut String, artist: &mut String) {
+    if let Some(idx) = title.find(" - ") {
+        let prefix = title[..idx].trim();
+        let suffix = title[idx + 3..].trim();
+
+        if !prefix.is_empty() && !suffix.is_empty() {
+            let artist_is_unknown = artist.is_empty()
+                || artist.eq_ignore_ascii_case("Unknown Artist")
+                || artist.eq_ignore_ascii_case(prefix);
+
+            if artist_is_unknown {
+                *artist = prefix.to_string();
+                *title = suffix.to_string();
+            }
+        }
+    }
 }
 
 fn fallback_metadata(path: &Path) -> (String, String, String) {

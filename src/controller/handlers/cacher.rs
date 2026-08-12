@@ -248,13 +248,22 @@ impl Controller {
             }
             CacherEvent::MissingLyrics(id) => {
                 if let Some(track) = self.state.read(cx).library.tracks.get(id) {
-                    self.get_lyrics(
-                        *id,
-                        &track.title,
-                        &track.artist,
-                        &track.album,
-                        track.duration,
-                    );
+                    let mut title = track.title.clone();
+                    let mut artist = track.artist.clone();
+                    // YouTube rips often have "Artist - Title" as the title field.
+                    if let Some(idx) = title.find(" - ") {
+                        let prefix = title[..idx].trim().to_string();
+                        let suffix = title[idx + 3..].trim().to_string();
+                        if !prefix.is_empty() && !suffix.is_empty()
+                            && (artist.is_empty()
+                                || artist.eq_ignore_ascii_case("Unknown Artist")
+                                || artist.eq_ignore_ascii_case(&prefix))
+                        {
+                            artist = prefix;
+                            title = suffix;
+                        }
+                    }
+                    self.get_lyrics(*id, &title, &artist, &track.album, track.duration);
                 }
             }
         }

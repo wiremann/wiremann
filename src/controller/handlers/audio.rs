@@ -1,5 +1,23 @@
 use super::{Controller, App, AudioEvent, Entity, Wiremann, ControllerError, Duration, duration_to_slider, SystemIntegrationCommand, CacherCommand, ScannerCommand, HashSet, ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus};
 
+/// Helper: if the title looks like "Artist - RealTitle" and the artist is
+/// unknown or matches the prefix, split it apart.
+fn clean_track_title(title: &mut String, artist: &mut String) {
+    if let Some(idx) = title.find(" - ") {
+        let prefix = title[..idx].trim().to_string();
+        let suffix = title[idx + 3..].trim().to_string();
+        if !prefix.is_empty() && !suffix.is_empty() {
+            let do_clean = artist.is_empty()
+                || artist.eq_ignore_ascii_case("Unknown Artist")
+                || artist.eq_ignore_ascii_case(&prefix);
+            if do_clean {
+                *artist = prefix;
+                *title = suffix;
+            }
+        }
+    }
+}
+
 impl Controller {
     pub fn handle_audio_event(
         &mut self,
@@ -74,6 +92,19 @@ impl Controller {
                             HashSet::from([image_id]),
                             ImageKind::AlbumArt,
                         ));
+                    } else {
+                        // No known album art — try online fallback
+                        let mut t = track.title.clone();
+                        let mut a = track.artist.clone();
+                        clean_track_title(&mut t, &mut a);
+                        self.image_processor_tx
+                            .send(ImageProcessorCommand::FetchAlbumArtOnline {
+                                id: *track_id,
+                                title: t,
+                                artist: a,
+                                album: track.album.clone(),
+                            })
+                            .ok();
                     }
 
                     self.system_integration_tx
