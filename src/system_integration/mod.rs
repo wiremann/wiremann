@@ -160,7 +160,10 @@ impl SystemIntegration {
                     }
 
                     let cover_url = if wrote_cover {
-                        Some(format!("file://{}?v={}", path.display(), version))
+                        // SMTC on Windows requires proper file:/// URI with forward slashes.
+                        let abs = std::fs::canonicalize(&path).unwrap_or(path);
+                        let uri = abs.to_string_lossy().replace('\\', "/");
+                        Some(format!("file:///{}?v={}", uri, version))
                     } else {
                         None
                     };
