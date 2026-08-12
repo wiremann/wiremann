@@ -58,16 +58,22 @@ impl Controller {
                         .send(ScannerCommand::ScanTrack(path.clone()));
                 }
 
+                // Always send album art extraction — the path is valid even if the track
+                // hasn't been scanned into the library yet (race condition fix).
+                self.image_processor_tx
+                    .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                        *track_id,
+                        path.clone(),
+                    ))
+                    .ok();
+
                 if let Some(track) = state.library.tracks.get(track_id) {
+                    // Also request cached album art if image_id is already known
                     if let Some(image_id) = track.image_id {
                         let _ = self.cacher_tx.send(CacherCommand::GetImage(
                             HashSet::from([image_id]),
                             ImageKind::AlbumArt,
                         ));
-                    } else {
-                        let _ = self.image_processor_tx.send(
-                            ImageProcessorCommand::GetCurrentAlbumArt(*track_id, path.clone()),
-                        );
                     }
 
                     self.system_integration_tx

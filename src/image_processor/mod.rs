@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 pub struct ImageProcessor {
     pub tx: Sender<ImageProcessorEvent>,
@@ -82,6 +82,7 @@ impl ImageProcessor {
                     }
                 }
                 ImageProcessorCommand::GetCurrentAlbumArt(id, path) => {
+                    info!(track_id = ?id, ?path, "Received GetCurrentAlbumArt command");
                     let _ = album_art_tx.send(ImageJob::AlbumArt(id, path));
                 }
                 ImageProcessorCommand::PlaylistThumbnail { id, tracks } => {
@@ -181,7 +182,7 @@ impl ImageProcessor {
                         }
                     }
                     Err(err) => warn!(error = ?err, "Failed to read album art"),
-                    _ => {}
+                    Ok(None) => info!(track_id = ?id, path = ?path, "No embedded album art found in file"),
                 }
             }
         });

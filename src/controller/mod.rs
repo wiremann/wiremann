@@ -25,6 +25,7 @@ use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
 use gpui::{App, Entity, Global, Rgba, rgb};
+use tracing::info;
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -116,10 +117,17 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
+        info!(
+            current_index = state.playback.current_index,
+            queue_len = state.queue.tracks.len(),
+            "load_queue_current called"
+        );
+
         if let Some(track_id) = state.queue.get_id(state.playback.current_index)
             && let Some(track) = state.library.tracks.get(&track_id)
             && let Some(source) = track.get_valid_source()
         {
+            info!(?track_id, path = ?source.path, "load_queue_current sending commands");
             self.audio_tx
                 .send(AudioCommand::Load(track_id, source.path.clone()))
                 .ok();
@@ -129,6 +137,8 @@ impl Controller {
                     source.path.clone(),
                 ))
                 .ok();
+        } else {
+            info!("load_queue_current: condition failed — check index/track/exists");
         }
     }
 

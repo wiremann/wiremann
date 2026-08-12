@@ -73,14 +73,27 @@ pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
 }
 
 fn fallback_metadata(path: &Path) -> (String, String, String) {
-    let title = path
+    let stem = path
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
+        .unwrap_or("Unknown");
+
+    // Try to parse "Artist - Title" convention from the filename.
+    if let Some(idx) = stem.find(" - ") {
+        let (artist, title) = stem.split_at(idx);
+        let title = title.trim_start_matches(" - ").trim();
+        let artist = artist.trim();
+        if !artist.is_empty() && !title.is_empty() {
+            return (
+                title.to_string(),
+                artist.to_string(),
+                "Unknown Album".to_string(),
+            );
+        }
+    }
 
     (
-        title,
+        stem.to_string(),
         "Unknown Artist".to_string(),
         "Unknown Album".to_string(),
     )

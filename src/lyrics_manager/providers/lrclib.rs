@@ -16,24 +16,55 @@ impl LyricsProvider for LrcLib {
         _album: &str,
         duration: Duration,
     ) -> Result<Option<Lyrics>, LyricsError> {
-        let endpoint = self.endpoint();
         let client = reqwest::blocking::Client::builder()
             .user_agent(APP_USER_AGENT)
             .build()?;
-        let duration = duration.as_secs().to_string();
-        let query = vec![
-            ("track_name", title),
-            ("artist_name", artist),
-            // lrclib allows filtering by album, but doing so can be too restrictive.
-            // In practice, specifying an album may exclude valid synced lyrics
-            // if they are indexed under a different or missing album entry.
-            // We intentionally pass an empty string to broaden the search.
-            ("album_name", ""),
-            ("duration", duration.as_str()),
-        ];
+
+        // First try exact match by track_name + artist_name
+        let exact = self.search(&client, title, Some(artist), duration, "api/get")?;
+        if exact.is_some() {
+            return Ok(exact);
+        }
+
+        // Fallback: search by track_name only — the artist field may differ
+        // (e.g. YouTube rips, compilation albums, featuring artists).
+        self.search(&client, title, None, duration, "api/search")
+    }
+
+    fn endpoint(&self) -> &'static str {
+        "https://lrclib.net"
+    }
+
+    fn name(&self) -> &'static str {
+        "LRCLIB"
+    }
+
+    fn priority(&self) -> u8 {
+        20
+    }
+}
+
+impl LrcLib {
+    fn search(
+        &self,
+        client: &reqwest::blocking::Client,
+        title: &str,
+        artist: Option<&str>,
+        duration: Duration,
+        endpoint: &str,
+    ) -> Result<Option<Lyrics>, LyricsError> {
+        let dur_secs = duration.as_secs().to_string();
+
+        let mut query: Vec<(&str, &str)> = vec![("track_name", title)];
+        if let Some(a) = artist {
+            query.push(("artist_name", a));
+        }
+        query.push(("duration", &dur_secs));
+
+        let url = format!("https://lrclib.net/{}", endpoint);
 
         let resp = match client
-            .get(endpoint)
+            .get(&url)
             .query(&query)
             .timeout(Duration::from_secs(32))
             .send()
@@ -57,23 +88,79 @@ impl LyricsProvider for LrcLib {
             }
         };
 
-        self.parse(&text)
+        // api/get returns a single JSON object; api/search returns an array.
+        if endpoint == "api/search" {
+            Self::parse_search_results(&text, dur_secs.parse().unwrap_or(0))
+        } else {
+            self.parse(&text)
+        }
     }
 
-    fn endpoint(&self) -> &'static str {
-        "https://lrclib.net/api/get"
+    /// Parse the search endpoint response (array of results). Picks the best
+    /// match by comparing the duration difference.
+    fn parse_search_results(data: &str, target_secs: u64) -> Result<Option<Lyrics>, LyricsError> {
+        let items: Vec<Value> = match serde_json::from_str(data) {
+            Ok(a) => a,
+            Err(_) => return Ok(None),
+        };
+
+        if items.is_empty() {
+            return Ok(None);
+        }
+
+        // Score each result by how close its duration is to the target.
+        let mut scored: Vec<(i64, &Value)> = items
+            .iter()
+            .filter_map(|item| {
+                let dur = item
+                    .get("duration")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as u64;
+                let diff = (dur as i64 - target_secs as i64).abs();
+                if diff > 10 {
+                    return None; // skip anything more than 10s off
+                }
+                Some((diff, item))
+            })
+            .collect();
+
+        scored.sort_by_key(|(diff, _)| *diff);
+
+        if let Some((_, best)) = scored.first() {
+            Self::parse_single(best)
+        } else {
+            // fallback: return the first result even if duration doesn't match
+            Self::parse_single(&items[0])
+        }
     }
 
-    fn name(&self) -> &'static str {
-        "LRCLIB"
+    fn parse_single(item: &Value) -> Result<Option<Lyrics>, LyricsError> {
+        let synced = item.get("syncedLyrics").and_then(|v| v.as_str());
+        let plain = item.get("plainLyrics").and_then(|v| v.as_str());
+
+        if let Some(lrc) = synced {
+            Self::parse_lrc(lrc)
+        } else if let Some(p) = plain {
+            let lines: Vec<LyricLine> = p
+                .lines()
+                .map(|line| LyricLine {
+                    text: line.to_string().into(),
+                    start: None,
+                    end: None,
+                    words: None,
+                })
+                .collect();
+
+            Ok(Some(Lyrics {
+                lines: lines.into(),
+                sync_type: SyncType::Unsynced,
+            }))
+        } else {
+            warn!(provider = "LRCLIB", "search result has no lyrics field");
+            Ok(None)
+        }
     }
 
-    fn priority(&self) -> u8 {
-        20
-    }
-}
-
-impl LrcLib {
     pub fn parse(&self, data: &str) -> Result<Option<Lyrics>, LyricsError> {
         let json: Value = match serde_json::from_str(data) {
             Ok(j) => j,

@@ -34,6 +34,7 @@ impl Render for NavBar {
             .flex()
             .w_auto()
             .h_full()
+            .py_1()
             .rounded_full()
             .items_center()
             .justify_center()
