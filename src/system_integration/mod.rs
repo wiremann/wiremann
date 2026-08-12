@@ -160,16 +160,16 @@ impl SystemIntegration {
                     }
 
                     let cover_url = if wrote_cover {
-                        format!("file://{}?v={}", path.display(), version)
+                        Some(format!("file://{}?v={}", path.display(), version))
                     } else {
-                        String::new()
+                        None
                     };
 
                     if let Err(e) = controls.set_metadata(MediaMetadata {
                         title: Some(title.as_str()),
-                        album: Some(album.as_str()),
-                        artist: Some(artist.as_str()),
-                        cover_url: Some(&cover_url),
+                        album: if album.is_empty() { None } else { Some(album.as_str()) },
+                        artist: if artist.is_empty() { None } else { Some(artist.as_str()) },
+                        cover_url: cover_url.as_deref(),
                         duration: Some(Duration::from_secs(duration)),
                     }) {
                         eprintln!("[wiremann] set_metadata failed: {e}");
