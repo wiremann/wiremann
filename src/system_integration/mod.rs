@@ -1,8 +1,4 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::time::Duration;
 
 use crate::{
     app::AppPaths,
@@ -12,8 +8,6 @@ use crate::{
     errors::SystemIntegrationError,
 };
 use crossbeam_channel::{Receiver, Sender, select};
-use garb::bytes::bgra_to_rgb;
-use image::{ExtendedColorType, codecs::jpeg::JpegEncoder};
 use raw_window_handle::RawWindowHandle;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -86,6 +80,7 @@ impl SystemIntegration {
                 eprintln!("[wiremann] MediaControls attach failed: {e}");
                 return Ok(());
             }
+            eprintln!("[wiremann] MediaControls attached successfully");
 
             loop {
                 select! {
@@ -115,71 +110,22 @@ impl SystemIntegration {
                     title,
                     artist,
                     album,
-                    image,
+                    image: _,
                     duration,
                 } => {
-                    let version = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                        Ok(v) => v.as_millis(),
-                        Err(e) => {
-                            eprintln!("[wiremann] SystemTime error: {e}");
-                            return Ok(());
-                        }
-                    };
-                    let name = format!("current_album_art_{version}.jpg");
+                    // souvlaki's Windows path masking has a bug with file:/// URIs,
+                    // so we skip the cover image for now. Metadata still works.
+                    let cover_url: Option<&str> = None;
 
-                    let path = self.app_paths.cache.join(&name);
-                    let mut wrote_cover = false;
-
-                    if let Some((width, height, bytes)) = image {
-                        let mut rgb = vec![0u8; (width * height * 3) as usize];
-
-                        if let Err(e) = bgra_to_rgb(&bytes, &mut rgb) {
-                            eprintln!("[wiremann] bgra_to_rgb failed: {e}");
-                        } else {
-                            let tmp_path = path.with_extension("jpg.tmp");
-
-                            let write_result = (|| -> std::io::Result<()> {
-                                let file = File::create(&tmp_path)?;
-                                let mut writer = BufWriter::new(file);
-
-                                let mut encoder = JpegEncoder::new_with_quality(&mut writer, 80);
-                                if let Err(e) = encoder.encode(&rgb, width, height, ExtendedColorType::Rgb8) {
-                                    eprintln!("[wiremann] JPEG encode failed: {e}");
-                                    return Ok(());
-                                }
-                                writer.flush()?;
-                                std::fs::rename(&tmp_path, &path)?;
-                                Ok(())
-                            })();
-
-                            match write_result {
-                                Ok(()) => wrote_cover = true,
-                                Err(e) => eprintln!("[wiremann] cover write failed: {e}"),
-                            }
-                        }
-                    }
-
-                    let cover_url = if wrote_cover {
-                        // SMTC on Windows requires proper file:/// URI with forward slashes.
-                        let abs = std::fs::canonicalize(&path).unwrap_or(path);
-                        let uri = abs.to_string_lossy().replace('\\', "/");
-                        Some(format!("file:///{}?v={}", uri, version))
-                    } else {
-                        None
-                    };
-
-                    if let Err(e) = controls.set_metadata(MediaMetadata {
+                    match controls.set_metadata(MediaMetadata {
                         title: Some(title.as_str()),
                         album: if album.is_empty() { None } else { Some(album.as_str()) },
                         artist: if artist.is_empty() { None } else { Some(artist.as_str()) },
                         cover_url: cover_url.as_deref(),
                         duration: Some(Duration::from_secs(duration)),
                     }) {
-                        eprintln!("[wiremann] set_metadata failed: {e}");
-                    }
-
-                    if wrote_cover {
-                        let _ = self.cleanup_images(&name);
+                        Ok(()) => eprintln!("[wiremann] set_metadata OK"),
+                        Err(e) => eprintln!("[wiremann] set_metadata failed: {e}"),
                     }
 
                     Ok(())
@@ -259,22 +205,4 @@ impl SystemIntegration {
         }
     }
 
-    fn cleanup_images(&self, current_name: &str) -> std::io::Result<()> {
-        let path = &self.app_paths.cache;
-        for entry in std::fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            #[allow(clippy::case_sensitive_file_extension_comparisons)]
-            if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && name.starts_with("current_album_art_")
-                && name.ends_with(".jpg")
-                && name != current_name
-            {
-                let _ = std::fs::remove_file(path);
-            }
-        }
-
-        Ok(())
-    }
 }

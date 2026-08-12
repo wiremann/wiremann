@@ -16,9 +16,9 @@ use crate::{
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
-    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, rgba,
+    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative, rgba,
 };
-use gpui::{prelude::FluentBuilder, relative};
+use gpui::prelude::FluentBuilder;
 
 #[derive(Clone)]
 pub struct PlayerPage {
@@ -87,6 +87,8 @@ impl Render for PlayerPage {
         });
         let (gx, gy) = gradient_pos.unwrap_or((0.5, 0.4));
 
+        let is_portrait = window.bounds().size.height > window.bounds().size.width;
+
         div()
             .size_full()
             .flex()
@@ -108,13 +110,15 @@ impl Render for PlayerPage {
                 gradient_color_stop(dominant_colors.color1.blend(dominant_colors.color2), 0.0),
                 gradient_color_stop(rgba(0x00000000), 1.0),
             )))
+            .when(is_portrait, |parent| parent.flex_col())
             .child(
+                // Main content: album art + title + controls + controlbar
                 div()
-                    .h_full()
                     .w_full()
                     .flex()
                     .flex_col()
-                    .flex_1()
+                    .when(is_portrait, |this| this.h(relative(0.5)))
+                    .when(!is_portrait, |this| this.flex_1().h_full())
                     .px_16()
                     .pt_8()
                     .pb_2()
@@ -372,8 +376,9 @@ impl Render for PlayerPage {
             .child(if *show_panel.read(cx) {
                 div()
                     .h_full()
-                    .w(relative(0.46))
-                    .when(*self.current_panel.read(cx) == Panel::Queue, |this| {
+                    .when(is_portrait, |this| this.w_full().flex_1())
+                    .when(!is_portrait, |this| this.w(relative(0.46)).h_full())
+                    .when(*self.current_panel.read(cx) == Panel::Queue && !is_portrait, |this| {
                         this.max_w_128()
                     })
                     .flex_shrink_0()
