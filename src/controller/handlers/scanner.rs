@@ -170,6 +170,36 @@ impl Controller {
                         ImageKind::ThumbnailSmall,
                     ));
 
+                // Batch fetch online album art for every track that has no image_id.
+                // This fills in covers for all songs without requiring them to be played first.
+                for (id, track) in &tracks {
+                    if track.image_id.is_some() {
+                        continue;
+                    }
+                    let mut title = track.title.clone();
+                    let mut artist = track.artist.clone();
+                    if let Some(idx) = title.find(" - ") {
+                        let prefix = title[..idx].trim().to_string();
+                        let suffix = title[idx + 3..].trim().to_string();
+                        if !prefix.is_empty() && !suffix.is_empty()
+                            && (artist.is_empty()
+                                || artist.eq_ignore_ascii_case("Unknown Artist")
+                                || artist.eq_ignore_ascii_case(&prefix))
+                        {
+                            artist = prefix;
+                            title = suffix;
+                        }
+                    }
+                    let _ = self.image_processor_tx.send(
+                        ImageProcessorCommand::FetchAlbumArtOnline {
+                            id: *id,
+                            title,
+                            artist,
+                            album: track.album.clone(),
+                        },
+                    );
+                }
+
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {
                         this.toasts.update(cx, |list, _| {
