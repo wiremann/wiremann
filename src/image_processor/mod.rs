@@ -252,17 +252,22 @@ fn fetch_album_art_online(
     artist: &str,
     album: &str,
 ) {
-    // Try artist + title first — most reliable for finding the right track.
-    // Fall back to artist + album only when album is a real name.
-    if let Some(cover_url) = deezer_search(&format!("{} {}", artist, title), 3) {
+    // Build search query. Skip artist when it's unset — "Unknown Artist" pollutes the search.
+    let query = if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
+        title.to_string()
+    } else {
+        format!("{} {}", artist, title)
+    };
+
+    if let Some(cover_url) = deezer_search(&query, 3) {
         download_and_send_album_art(events_tx, id, &cover_url);
         return;
     }
 
+    // Fallback: try artist + album when the album name is real.
     if !album.is_empty() && album != "Unknown Album" {
-        if let Some(cover_url) =
-            deezer_search(&format!(r#"artist:"{}" album:"{}""#, artist, album), 1)
-        {
+        let q2 = format!("{} {}", artist, album);
+        if let Some(cover_url) = deezer_search(&q2, 1) {
             download_and_send_album_art(events_tx, id, &cover_url);
             return;
         }

@@ -49,6 +49,31 @@ pub fn read_metadata(track_source: TrackSource) -> Result<Track, ScannerError> {
     // while leaving the artist tag empty or wrong. Try to repair this.
     clean_title_from_artist(&mut title, &mut artist);
 
+    // If the artist is still unknown after tag reading and title cleaning,
+    // attempt to parse it from the filename (the fallback may have had it
+    // before tags overwrote it).
+    if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
+        if let Some(idx) = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|stem| stem.find(" - "))
+        {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            let parsed_artist = stem[..idx].trim();
+            let parsed_title = stem[idx + 3..].trim();
+            if !parsed_artist.is_empty() && !parsed_title.is_empty() {
+                artist = parsed_artist.to_string();
+                // If the tag had a correct title (no "Artist - " prefix), keep it.
+                // Otherwise use the parsed title from filename.
+                if title.eq_ignore_ascii_case(&format!("{} - {}", parsed_artist, parsed_title))
+                    || title.is_empty()
+                {
+                    title = parsed_title.to_string();
+                }
+            }
+        }
+    }
+
     let track_id = TrackId::generate(&title, &artist, &album)?;
 
     Ok(Track {
