@@ -10,22 +10,98 @@ use gpui::{
     App, Div, FontWeight, ImageSource, InteractiveElement, ObjectFit, ParentElement, Pixels,
     StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
+use std::collections::BTreeMap;
 
-#[allow(dead_code)]
+#[derive(Clone, PartialEq, Debug)]
+pub(super) struct AlbumEntry {
+    pub name: String,
+    pub artist: String,
+    pub track_ids: Vec<TrackId>,
+    pub image_id: Option<crate::controller::state::ImageId>,
+}
+
 #[derive(Clone, PartialEq)]
 pub(super) enum HeaderKind {
     Playlists,
-    Tracks,
     Albums,
+    Tracks,
 }
 
-#[allow(dead_code)]
 pub(super) enum LibraryRow {
     Header(HeaderKind),
     PlaylistGridRow(Vec<PlaylistId>),
+    AlbumRow(AlbumEntry),
     TrackTableHeader,
     TrackRow(usize, TrackId),
     Empty(HeaderKind),
+}
+
+pub(super) fn collect_albums(library: &LibraryState) -> Vec<AlbumEntry> {
+    let mut albums: BTreeMap<String, AlbumEntry> = BTreeMap::new();
+
+    for track in library.tracks.values() {
+        let entry = albums.entry(track.album.clone()).or_insert_with(|| AlbumEntry {
+            name: track.album.clone(),
+            artist: track.artist.clone(),
+            track_ids: Vec::new(),
+            image_id: None,
+        });
+        entry.track_ids.push(track.id);
+        if entry.image_id.is_none() {
+            entry.image_id = track.image_id;
+        }
+    }
+
+    albums.into_values().collect()
+}
+
+pub(super) fn render_album_row(album: &AlbumEntry, height: Pixels, cx: &mut App) -> Div {
+    let theme = *cx.global::<Theme>();
+    let cache = cx.global_mut::<ImageCache>();
+    let thumbnail = album.image_id.and_then(|id| cache.get(&id));
+
+    div()
+        .h(height)
+        .flex()
+        .gap_x_4()
+        .py_2()
+        .items_center()
+        .child(match thumbnail {
+            Some(image) => div().size_24().flex_shrink_0().child(
+                img(ImageSource::Render(image.clone()))
+                    .object_fit(ObjectFit::Contain)
+                    .size_full()
+                    .border_1()
+                    .border_color(theme.border)
+                    .rounded_lg(),
+            ),
+            None => div().size_24().flex_shrink_0().child(
+                img("icons/placeholder.svg")
+                    .object_fit(ObjectFit::Contain)
+                    .size_full()
+                    .border_1()
+                    .border_color(theme.border)
+                    .rounded_lg(),
+            ),
+        })
+        .child(
+            div()
+                .flex_col()
+                .flex_1()
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.library_text)
+                        .child(album.name.clone()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.library_playlist_meta_text)
+                        .child(format!("{} · {}", album.artist, album.track_ids.len())),
+                ),
+        )
 }
 
 pub(super) fn render_header(kind: &HeaderKind, height: Pixels, cx: &App) -> Div {
@@ -257,7 +333,11 @@ pub(super) fn render_track_table_header(height: Pixels, cx: &mut App) -> Div {
         )
 }
 
-pub(super) fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow>, Vec<Pixels>) {
+pub(super) fn build_rows(
+    library: &LibraryState,
+    cols: usize,
+    search_query: &str,
+) -> (Vec<LibraryRow>, Vec<Pixels>) {
     let mut rows = Vec::new();
     let mut heights = Vec::new();
 
@@ -285,6 +365,22 @@ pub(super) fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow
             heights.push(px(280.0));
         }
     }
+
+    rows.push(LibraryRow::Header(HeaderKind::Albums));
+    heights.push(px(60.0));
+
+    let albums = collect_albums(library);
+
+    if albums.is_empty() {
+        rows.push(LibraryRow::Empty(HeaderKind::Albums));
+        heights.push(px(192.0));
+    } else {
+        for album in albums {
+            rows.push(LibraryRow::AlbumRow(album));
+            heights.push(px(100.0));
+        }
+    }
+
     rows.push(LibraryRow::Header(HeaderKind::Tracks));
     heights.push(px(60.0));
 
@@ -292,16 +388,32 @@ pub(super) fn build_rows(library: &LibraryState, cols: usize) -> (Vec<LibraryRow
         rows.push(LibraryRow::Empty(HeaderKind::Tracks));
         heights.push(px(192.0));
     } else {
-        let mut sorted_tracks: Vec<_> = library.tracks.values().collect();
+        let mut all_tracks: Vec<_> = library.tracks.values().collect();
 
-        sorted_tracks.sort_by(|a, b| a.title.cmp(&b.title));
+        all_tracks.sort_by(|a, b| a.title.cmp(&b.title));
 
-        rows.push(LibraryRow::TrackTableHeader);
-        heights.push(px(40.0));
+        let query = search_query.trim().to_lowercase();
+        let filtered_tracks: Vec<_> = if query.is_empty() {
+            all_tracks
+        } else {
+            all_tracks.into_iter().filter(|t| {
+                t.title.to_lowercase().contains(&query)
+                    || t.artist.to_lowercase().contains(&query)
+                    || t.album.to_lowercase().contains(&query)
+            }).collect()
+        };
 
-        for (i, track) in sorted_tracks.iter().enumerate() {
-            rows.push(LibraryRow::TrackRow(i + 1, track.id));
-            heights.push(px(60.0));
+        if filtered_tracks.is_empty() {
+            rows.push(LibraryRow::Empty(HeaderKind::Tracks));
+            heights.push(px(192.0));
+        } else {
+            rows.push(LibraryRow::TrackTableHeader);
+            heights.push(px(40.0));
+
+            for (i, track) in filtered_tracks.iter().enumerate() {
+                rows.push(LibraryRow::TrackRow(i + 1, track.id));
+                heights.push(px(60.0));
+            }
         }
     }
     (rows, heights)

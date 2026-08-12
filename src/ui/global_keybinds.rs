@@ -20,6 +20,7 @@ actions!(
     ]
 );
 actions!(pages, [CycleNext, CyclePrev, Library, Player, Playlists]);
+actions!(help, [ToggleKeybinds]);
 
 pub fn register_keybinds(cx: &mut App) {
     // Player actions
@@ -38,11 +39,15 @@ pub fn register_keybinds(cx: &mut App) {
     cx.on_action(player);
     cx.on_action(playlists);
 
+    // Keybinds overlay toggle
+    cx.on_action(toggle_keybinds);
+
     // Player binds
     cx.bind_keys([
         KeyBinding::new("space", PlayPause, None),
         KeyBinding::new("k", PlayPause, None),
     ]);
+    cx.bind_keys([KeyBinding::new("?", ToggleKeybinds, None)]);
 
     if cfg!(target_os = "macos") {
         cx.bind_keys([KeyBinding::new("cmd-left", Prev, None)]);
@@ -151,4 +156,13 @@ fn player(_: &Player, cx: &mut App) {
 
 fn playlists(_: &Playlists, cx: &mut App) {
     *cx.global_mut::<Page>() = Page::Playlists;
+}
+
+fn toggle_keybinds(_: &ToggleKeybinds, cx: &mut App) {
+    use crate::ui::components::keybinds_overlay::KeybindsOverlayHandle;
+
+    let handle = cx.try_global::<KeybindsOverlayHandle>().cloned();
+    if let Some(handle) = handle {
+        handle.0.update(cx, |overlay, cx| overlay.toggle(cx));
+    }
 }

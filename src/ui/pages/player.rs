@@ -203,6 +203,32 @@ impl Render for PlayerPage {
                             )
                     } else {
                         div()
+                            .w_auto()
+                            .h_auto()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .justify_center()
+                            .gap_y_4()
+                            .flex_shrink_0()
+                            .flex_1()
+                            .child(
+                                Icon::new(Icons::Music)
+                                    .size_16()
+                                    .text_color(theme.player_artist_text),
+                            )
+                            .child(
+                                div()
+                                    .text_xl()
+                                    .text_color(theme.player_artist_text)
+                                    .child("No track selected"),
+                            )
+                            .child(
+                                div()
+                                    .text_base()
+                                    .text_color(theme.player_artist_text)
+                                    .child("Browse your library to find music"),
+                            )
                     })
                     .child(
                         div()

@@ -195,7 +195,7 @@ impl Default for Theme {
             queue_item_bg_current: rgba(0xFFFFFF10),
 
             lyrics_text_active: rgb(0xFFFFFF),
-            lyrics_text_inactive: rgb(0xFFFFFF),
+            lyrics_text_inactive: rgba(0xFFFFFF66),
 
             lyrics_loading_icon: rgba(0xFFFFFFA3),
             lyrics_loading_text: rgba(0xFFFFFFA3),

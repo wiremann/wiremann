@@ -1,6 +1,7 @@
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::controlbar::ControlBar;
+use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
 use crate::ui::components::lyrics::{LyricsState, LyricsStateInner};
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
@@ -9,7 +10,7 @@ use crate::ui::helpers::slider_to_duration;
 use crate::ui::pages::{library::LibraryPage, player::PlayerPage, playlists::PlaylistsPage};
 use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
-use components::{Page, image_cache::ImageCache, titlebar::Titlebar};
+use components::{Page, image_cache::ImageCache, titlebar::Titlebar, window_border::window_border};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
@@ -23,6 +24,7 @@ pub struct Wiremann {
     pub library_page: Entity<LibraryPage>,
     pub playlists_page: Entity<PlaylistsPage>,
     pub toast_manager: Entity<ToastManager>,
+    pub keybinds_overlay: Entity<KeybindsOverlay>,
 }
 
 impl Wiremann {
@@ -91,6 +93,9 @@ impl Wiremann {
         let lyrics_state = LyricsState(cx.new(|_| LyricsStateInner::new()));
         cx.set_global(lyrics_state);
 
+        let keybinds_overlay = KeybindsOverlay::new(cx);
+        cx.set_global(KeybindsOverlayHandle(keybinds_overlay.clone()));
+
         global_keybinds::register_keybinds(cx);
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));
@@ -108,6 +113,7 @@ impl Wiremann {
             library_page,
             playlists_page,
             toast_manager,
+            keybinds_overlay,
         }
     }
 }
@@ -133,8 +139,9 @@ impl Render for Wiremann {
             Page::Playlists => div().w_full().h_full().child(self.playlists_page.clone()),
         };
 
-        div()
-            .id("main_container")
+        window_border().child(
+            div()
+                .id("main_container")
             .size_full()
             .font_family("Space Grotesk")
             .relative()
@@ -180,5 +187,8 @@ impl Render for Wiremann {
                     }),
             )
             .child(self.toast_manager.clone())
+            .child(self.keybinds_overlay.clone())
+            .into_any_element(),
+        )
     }
 }
