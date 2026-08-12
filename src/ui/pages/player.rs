@@ -87,7 +87,7 @@ impl Render for PlayerPage {
         });
         let (gx, gy) = gradient_pos.unwrap_or((0.5, 0.4));
 
-        let is_portrait = window.bounds().size.height > window.bounds().size.width;
+        let is_portrait = window.bounds().size.width < px(1000.0);
 
         div()
             .size_full()
