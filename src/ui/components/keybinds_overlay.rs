@@ -119,7 +119,7 @@ impl Render for KeybindsOverlay {
                                     .child(
                                         div()
                                             .text_sm()
-                                            .text_color(theme.library_empty_text)
+                                            .text_color(theme.library_text)
                                             .child(action),
                                     )
                                     .child(
@@ -141,7 +141,7 @@ impl Render for KeybindsOverlay {
                             .id("keybinds_close_hint")
                             .flex_shrink_0()
                             .text_sm()
-                            .text_color(theme.library_empty_text)
+                            .text_color(theme.library_text)
                             .child("Click anywhere outside to close"),
                     ),
             )

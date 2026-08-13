@@ -10,9 +10,8 @@ use crate::controller::events::{
     CacherEvent, ImageProcessorEvent, LyricsEvent, SystemIntegrationEvent,
 };
 use crate::controller::state::PlaybackStatus;
-use crate::controller::state::PlaylistId;
+use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::controller::state::{Track, TrackId};
-use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, duration_to_slider};
@@ -156,6 +155,44 @@ impl Controller {
                 this.playback.current_playlist = Some(playlist.id);
                 this.queue.tracks.clone_from(&playlist.tracks);
                 this.queue.order = (0..playlist.tracks.len()).collect();
+                this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
+
+                cx.notify();
+            }
+        });
+
+        self.load_queue_current(cx);
+        let state = self.state.read(cx).queue.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+    }
+
+    pub fn load_album(&self, id: AlbumId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            if let Some(album) = this.library.albums.get(&id) {
+                this.playback.current_playlist = None;
+                this.queue.tracks.clone_from(&album.tracks);
+                this.queue.order = (0..album.tracks.len()).collect();
+                this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
+
+                cx.notify();
+            }
+        });
+
+        self.load_queue_current(cx);
+        let state = self.state.read(cx).queue.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+    }
+
+    pub fn load_artist(&self, id: ArtistId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            if let Some(artist) = this.library.artists.get(&id) {
+                this.playback.current_playlist = None;
+                this.queue.tracks.clone_from(&artist.tracks);
+                this.queue.order = (0..artist.tracks.len()).collect();
                 this.playback.current_index = 0;
                 this.playback.shuffling = false;
                 this.playback.repeat = false;
@@ -406,6 +443,62 @@ impl Controller {
 
         cx.global_mut::<ImageCache>()
             .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
+    }
+
+    pub fn request_album_thumbnails(&self, album_ids: &[AlbumId], cx: &mut App) {
+        let mut cache_ids = Vec::new();
+
+        let state = self.state.read(cx);
+        let albums = &state.library.albums;
+        let tracks = &state.library.tracks;
+
+        for aid in album_ids {
+            if let Some(album) = albums.get(aid) {
+                if let Some(image_id) = album.image_id {
+                    cache_ids.push(image_id);
+                } else if let Some(image_id) = album
+                    .tracks
+                    .iter()
+                    .find_map(|id| tracks.get(id).and_then(|t| t.image_id))
+                {
+                    cache_ids.push(image_id);
+                }
+            }
+        }
+
+        cx.global_mut::<ImageCache>().request(
+            cache_ids,
+            &self.cacher_tx,
+            ImageKind::ThumbnailLarge,
+        );
+    }
+
+    pub fn request_artist_thumbnails(&self, artist_ids: &[ArtistId], cx: &mut App) {
+        let mut cache_ids = Vec::new();
+
+        let state = self.state.read(cx);
+        let artists = &state.library.artists;
+        let tracks = &state.library.tracks;
+
+        for aid in artist_ids {
+            if let Some(artist) = artists.get(aid) {
+                if let Some(image_id) = artist.image_id {
+                    cache_ids.push(image_id);
+                } else if let Some(track_id) = artist.tracks.first() {
+                    if let Some(track) = tracks.get(track_id) {
+                        if let Some(image_id) = track.image_id {
+                            cache_ids.push(image_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        cx.global_mut::<ImageCache>().request(
+            cache_ids,
+            &self.cacher_tx,
+            ImageKind::ThumbnailLarge,
+        );
     }
 
     pub fn get_lyrics(

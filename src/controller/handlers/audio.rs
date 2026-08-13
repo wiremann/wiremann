@@ -1,4 +1,9 @@
-use super::{Controller, App, AudioEvent, Entity, Wiremann, ControllerError, Duration, duration_to_slider, SystemIntegrationCommand, CacherCommand, ScannerCommand, HashSet, ImageKind, ImageProcessorCommand, LyricsState, LyricsStatus};
+use super::{
+    App, AudioEvent, CacherCommand, Controller, ControllerError, Duration, Entity, HashSet,
+    ImageKind, ImageProcessorCommand, ScannerCommand, SystemIntegrationCommand, Wiremann,
+    duration_to_slider,
+};
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
 /// Helper: if the title looks like "Artist - RealTitle" and the artist is
 /// unknown or matches the prefix, split it apart.
@@ -94,24 +99,42 @@ impl Controller {
                         ));
                     } else {
                         // No known album art — try online fallback
-                        let mut t = track.title.clone();
-                        let mut a = track.artist.clone();
+                        let mut t = track.title.to_string();
+                        let mut a = track
+                            .artists(&state.library)
+                            .map(|a| a.name.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let album = track
+                            .album(&state.library)
+                            .map(|a| a.name.to_string())
+                            .unwrap_or_default();
                         clean_track_title(&mut t, &mut a);
                         self.image_processor_tx
                             .send(ImageProcessorCommand::FetchAlbumArtOnline {
                                 id: *track_id,
                                 title: t,
                                 artist: a,
-                                album: track.album.clone(),
+                                album,
                             })
                             .ok();
                     }
 
+                    let artist_str = track
+                        .artists(&state.library)
+                        .map(|a| a.name.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let album_str = track
+                        .album(&state.library)
+                        .map(|a| a.name.to_string())
+                        .unwrap_or_default();
+
                     self.system_integration_tx
                         .send(SystemIntegrationCommand::SetMetadata {
-                            title: track.title.clone(),
-                            artist: track.artist.clone(),
-                            album: track.album.clone(),
+                            title: track.title.to_string(),
+                            artist: artist_str,
+                            album: album_str,
                             image: None,
                             duration: track.duration.as_secs(),
                         })

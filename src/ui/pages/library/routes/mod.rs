@@ -1,0 +1,11 @@
+pub mod album;
+pub mod albums;
+pub mod artist;
+pub mod artists;
+pub mod favorites;
+pub mod home;
+pub mod playlist;
+pub mod playlists;
+pub mod plugins;
+pub mod settings;
+pub mod tracks;

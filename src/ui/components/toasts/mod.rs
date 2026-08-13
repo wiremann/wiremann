@@ -2,7 +2,7 @@ pub mod scanning_status;
 
 use crate::ui::{
     components::{
-        icons::{Icon, Icons},
+        icons::{Icons, icon},
         toasts::scanning_status::ScanningStatusToast,
     },
     theme::Theme,
@@ -92,13 +92,13 @@ impl Render for ToastManager {
                         ToastKind::Info(msg) | ToastKind::Success(msg) | ToastKind::Error(msg) => {
                             let (accent, icon) = match &toast.kind {
                                 ToastKind::Info(_) => {
-                                    (theme.toast_info_accent, Icon::new(Icons::ToastInfo))
+                                    (theme.toast_info_accent, icon(Icons::ToastInfo))
                                 }
                                 ToastKind::Success(_) => {
-                                    (theme.toast_success_accent, Icon::new(Icons::ToastSuccess))
+                                    (theme.toast_success_accent, icon(Icons::ToastSuccess))
                                 }
                                 ToastKind::Error(_) => {
-                                    (theme.toast_error_accent, Icon::new(Icons::ToastError))
+                                    (theme.toast_error_accent, icon(Icons::ToastError))
                                 }
                                 ToastKind::ScanProgress(_) => unreachable!(),
                             };
@@ -168,15 +168,13 @@ impl Render for ToastManager {
                                 let toasts = self.toasts.clone();
                                 async move |_, cx| {
                                     cx.background_executor().timer(duration).await;
-                                    toasts
-                                        .update(cx, |list, _| {
-                                            for t in list.iter_mut() {
-                                                if t.id == id {
-                                                    t.anim_phase = t.phase;
-                                                }
+                                    toasts.update(cx, |list, _| {
+                                        for t in list.iter_mut() {
+                                            if t.id == id {
+                                                t.anim_phase = t.phase;
                                             }
-                                        })
-                                        .ok();
+                                        }
+                                    });
                                 }
                             })
                             .detach();
@@ -220,34 +218,32 @@ impl ToastManager {
                     .timer(Duration::from_millis(128))
                     .await;
 
-                toasts_clone
-                    .update(cx, |toasts, _| {
-                        toasts.retain_mut(|t| {
-                            let now = Instant::now();
+                toasts_clone.update(cx, |toasts, _| {
+                    toasts.retain_mut(|t| {
+                        let now = Instant::now();
 
-                            if t.phase == ToastPhase::Entering
-                                && now.duration_since(t.created_at) > Duration::from_millis(250)
-                            {
-                                t.phase = ToastPhase::Idle;
-                            }
-                            if let Some(duration) = t.duration
-                                && now.duration_since(t.created_at) >= duration
-                                && t.phase != ToastPhase::Exiting
-                            {
-                                t.phase = ToastPhase::Exiting;
-                                t.exiting_at = Some(now);
-                            }
+                        if t.phase == ToastPhase::Entering
+                            && now.duration_since(t.created_at) > Duration::from_millis(250)
+                        {
+                            t.phase = ToastPhase::Idle;
+                        }
+                        if let Some(duration) = t.duration
+                            && now.duration_since(t.created_at) >= duration
+                            && t.phase != ToastPhase::Exiting
+                        {
+                            t.phase = ToastPhase::Exiting;
+                            t.exiting_at = Some(now);
+                        }
 
-                            if let Some(exit_time) = t.exiting_at
-                                && now.duration_since(exit_time) >= Duration::from_millis(250)
-                            {
-                                return false;
-                            }
+                        if let Some(exit_time) = t.exiting_at
+                            && now.duration_since(exit_time) >= Duration::from_millis(250)
+                        {
+                            return false;
+                        }
 
-                            true
-                        });
-                    })
-                    .ok();
+                        true
+                    });
+                });
             }
         })
         .detach();

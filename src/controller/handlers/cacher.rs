@@ -1,4 +1,9 @@
-use super::{Controller, App, CacherEvent, Entity, Wiremann, ControllerError, PlaybackStatus, duration_to_slider, ImageCache, drop_image_from_app, Rgb, Rgba, rgb, SystemIntegrationCommand, DominantColors, ImageProcessorCommand, HashSet, ImageKind, pick_playlist_thumbnail_tracks, LyricsState, LyricsStatus};
+use super::{
+    App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
+    ImageKind, ImageProcessorCommand, PlaybackStatus, Rgb, Rgba, SystemIntegrationCommand,
+    Wiremann, drop_image_from_app, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
+};
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
 impl Controller {
     pub fn handle_cacher_event(
@@ -84,11 +89,21 @@ impl Controller {
                     if let Some(track_id) = &state.playback.current
                         && let Some(track) = state.library.tracks.get(track_id)
                     {
+                        let artist_str = track
+                            .artists(&state.library)
+                            .map(|a| a.name.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let album_str = track
+                            .album(&state.library)
+                            .map(|a| a.name.to_string())
+                            .unwrap_or_default();
+
                         self.system_integration_tx
                             .send(SystemIntegrationCommand::SetMetadata {
-                                title: track.title.clone(),
-                                artist: track.artist.clone(),
-                                album: track.album.clone(),
+                                title: track.title.to_string(),
+                                artist: artist_str,
+                                album: album_str,
                                 image: Some((width, height, image.clone())),
                                 duration: track.duration.as_secs(),
                             })
@@ -248,8 +263,18 @@ impl Controller {
             }
             CacherEvent::MissingLyrics(id) => {
                 if let Some(track) = self.state.read(cx).library.tracks.get(id) {
-                    let mut title = track.title.clone();
-                    let mut artist = track.artist.clone();
+                    let artist_str = track
+                        .artists(&self.state.read(cx).library)
+                        .map(|a| a.name.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let album_str = track
+                        .album(&self.state.read(cx).library)
+                        .map(|a| a.name.to_string())
+                        .unwrap_or_default();
+
+                    let mut title = track.title.to_string();
+                    let mut artist = artist_str;
                     // YouTube rips often have "Artist - Title" as the title field.
                     if let Some(idx) = title.find(" - ") {
                         let prefix = title[..idx].trim().to_string();
@@ -263,7 +288,7 @@ impl Controller {
                             title = suffix;
                         }
                     }
-                    self.get_lyrics(*id, &title, &artist, &track.album, track.duration);
+                    self.get_lyrics(*id, &title, &artist, &album_str, track.duration);
                 }
             }
         }

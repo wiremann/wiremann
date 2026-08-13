@@ -4,14 +4,14 @@ use std::{
     io::{Cursor, Write},
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam_channel::{Receiver, select, tick};
 use gpui::RenderImage;
 use image::Frame;
 use smallvec::smallvec;
-use tracing::error;
+use tracing::{error, info, trace};
 use walkdir::WalkDir;
 
 use crate::{
@@ -93,6 +93,7 @@ impl Cacher {
             let thumb_rx = rx.clone();
 
             std::thread::spawn(move || {
+                info!("cacher thumbnail worker started");
                 let mut batch = HashMap::with_capacity(16);
                 let mut missing = Vec::new();
 
@@ -112,6 +113,8 @@ impl Cacher {
                                     }
                                 }
                                 Ok(CacheJob::LoadThumbnails(ids, kind)) => {
+                                    let job_start = Instant::now();
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "cacher", "processing LoadThumbnails count={}", ids.len());
                                     for id in ids {
                                         match cacher.read_cached_image(id, kind) {
                                             Ok(Some(image)) => { batch.insert(id, image); },
@@ -126,6 +129,7 @@ impl Cacher {
                                             let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
                                         }
                                     }
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "cacher", elapsed_ms = ?job_start.elapsed().as_millis(), "finished LoadThumbnails processed");
                                 }
                                 _ => {}
                             }

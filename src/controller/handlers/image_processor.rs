@@ -28,11 +28,21 @@ impl Controller {
                     if let Some(track_id) = &state.playback.current
                         && let Some(track) = state.library.tracks.get(track_id)
                     {
+                        let artist_str = track
+                            .artists(&state.library)
+                            .map(|a| a.name.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let album_str = track
+                            .album(&state.library)
+                            .map(|a| a.name.to_string())
+                            .unwrap_or_default();
+
                         self.system_integration_tx
                             .send(SystemIntegrationCommand::SetMetadata {
-                                title: track.title.clone(),
-                                artist: track.artist.clone(),
-                                album: track.album.clone(),
+                                title: track.title.to_string(),
+                                artist: artist_str,
+                                album: album_str,
                                 image: Some((width, height, image)),
                                 duration: track.duration.as_secs(),
                             })

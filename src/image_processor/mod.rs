@@ -13,8 +13,8 @@ use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use tracing::{error, info, warn};
+use std::time::{Duration, Instant};
+use tracing::{error, info, trace, warn};
 
 pub struct ImageProcessor {
     pub tx: Sender<ImageProcessorEvent>,
@@ -112,6 +112,7 @@ impl ImageProcessor {
             let seen_images = self.seen_images.clone();
 
             std::thread::spawn(move || {
+                info!("image processor thumbnail worker started");
                 let mut image_batch = HashMap::with_capacity(64);
                 let mut lookup_batch = HashMap::with_capacity(64);
                 let mut last_kind = ImageKind::ThumbnailSmall;
@@ -119,8 +120,10 @@ impl ImageProcessor {
                 loop {
                     select! {
                         recv(thumb_rx) -> job => {
+                            let job_start = Instant::now();
                             if let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job &&
-                                 let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                                let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", "received job {:?} {}", id, path.display());
                                     lookup_batch.insert(id, hash);
                                     last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
@@ -139,7 +142,10 @@ impl ImageProcessor {
                                             }
                                         }
                                     }
-                            }
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "finished job {:?} {}", id, path.display());
+                                } else {
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "skipped/invalid thumbnail job");
+                                }
                         }
 
                         recv(ticker) -> _ => {
@@ -238,7 +244,9 @@ impl ImageProcessor {
                     let _ = events_tx.send(ImageProcessorEvent::InsertPlaylistThumbnail(
                         id, hash, thumbnail,
                     ));
-                } else { warn!("Failed to generate playlist thumbnail") }
+                } else {
+                    warn!("Failed to generate playlist thumbnail")
+                }
             }
         });
     }
