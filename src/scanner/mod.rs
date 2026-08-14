@@ -26,7 +26,7 @@ pub struct Scanner {
     pub rx: Receiver<ScannerCommand>,
 
     state: State,
-    queue: VecDeque<PathBuf>,
+    queue: VecDeque<(PathBuf, Option<PlaylistId>)>,
 
     app_paths: AppPaths,
 
@@ -83,13 +83,23 @@ impl Scanner {
         loop {
             match self.rx.recv()? {
                 ScannerCommand::ScanDir(path) => {
-                    self.queue.push_back(path);
+                    self.queue.push_back((path, None));
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
+                    }
+                }
+                ScannerCommand::ScanDirRescan { path, playlist } => {
+                    self.queue.push_back((path, Some(playlist)));
+
+                    if self.state == State::Idle
+                        && let Some((path, playlist)) = self.queue.pop_front()
+                    {
+                        self.state = State::Scanning;
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::StartNextScan => {
@@ -97,10 +107,10 @@ impl Scanner {
                     self.write_scan_record();
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::ScanTrack(path) => {
@@ -240,7 +250,12 @@ impl Scanner {
         }
     }
 
-    fn scan_folder(&self, path: PathBuf, worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>) {
+    fn scan_folder(
+        &self,
+        path: PathBuf,
+        playlist_id: Option<PlaylistId>,
+        worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>,
+    ) {
         self.scan_progress.total.store(0, Ordering::Relaxed);
         self.scan_progress.processed.store(0, Ordering::Relaxed);
         self.scan_progress
@@ -254,7 +269,7 @@ impl Scanner {
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
-            let playlist_id = PlaylistId(Uuid::new_v4());
+            let playlist_id = playlist_id.unwrap_or_else(|| PlaylistId(Uuid::new_v4()));
 
             let playlist = Playlist {
                 id: playlist_id,

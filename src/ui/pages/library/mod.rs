@@ -114,6 +114,9 @@ impl LibraryPage {
             }),
             playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
+                menu_open: cx.new(|_| false),
+                menu_button_bounds: None,
+                root_bounds: None,
                 scroll_handle: UniformListScrollHandle::new(),
             }),
             playlists: cx.new(|_| PlaylistsSection {
@@ -171,7 +174,13 @@ impl Render for LibraryPage {
             }
             LibraryRoutes::Playlist(id) => {
                 self.playlist.update(cx, |this, cx| {
-                    this.playlist_id.update(cx, |this, _| *this = Some(id));
+                    if *this.playlist_id.read(cx) != Some(id) {
+                        this.playlist_id.update(cx, |this, _| *this = Some(id));
+                        this.menu_open.update(cx, |open, cx| {
+                            *open = false;
+                            cx.notify();
+                        });
+                    }
                     cx.notify()
                 });
                 div().w_full().h_full().child(self.playlist.clone())

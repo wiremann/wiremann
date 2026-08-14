@@ -20,6 +20,10 @@ pub enum AudioCommand {
 
 pub enum ScannerCommand {
     ScanDir(PathBuf),
+    ScanDirRescan {
+        path: PathBuf,
+        playlist: PlaylistId,
+    },
     ScanTrack(PathBuf),
     StartNextScan,
 }

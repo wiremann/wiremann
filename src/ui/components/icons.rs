@@ -143,6 +143,7 @@ pub enum Icons {
     Volume2,
     VolumeMute,
     Menu,
+    Ellipsis,
     Search,
     ToastInfo,
     ToastSuccess,
@@ -156,6 +157,7 @@ pub enum Icons {
     Plugins,
     User,
     Heart,
+    Trash,
 }
 
 impl Icons {
@@ -186,6 +188,7 @@ impl IconNamed for Icons {
             Icons::Volume2 => "icons/volume-2.svg",
             Icons::VolumeMute => "icons/volume-mute.svg",
             Icons::Menu => "icons/menu.svg",
+            Icons::Ellipsis => "icons/ellipsis.svg",
             Icons::Search => "icons/search.svg",
             Icons::ToastInfo => "icons/toast_info.svg",
             Icons::ToastSuccess => "icons/toast_success.svg",
@@ -199,6 +202,7 @@ impl IconNamed for Icons {
             Icons::Plugins => "icons/plugins.svg",
             Icons::User => "icons/user.svg",
             Icons::Heart => "icons/heart.svg",
+            Icons::Trash => "icons/trash.svg",
         }
         .into()
     }

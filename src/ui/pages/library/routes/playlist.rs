@@ -1,29 +1,35 @@
 use crate::{
     controller::{
         Controller,
-        state::{Playlist, PlaylistId, TrackId},
+        state::{PlaylistId, TrackId},
     },
     ui::{
         components::{
             Page,
-            icons::{Icon, Icons, icon},
+            bounds_observer::observe_bounds,
+            icons::{Icons, icon},
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
         },
+        pages::library::LibraryRoutes,
         theme::Theme,
     },
 };
 use gpui::Entity;
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
+    App, Bounds, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledImage,
+    UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,
 };
+use gpui::prelude::FluentBuilder;
 
 const THUMBNAIL_MARGIN: usize = 16;
 
 pub struct PlaylistViewSection {
     pub playlist_id: Entity<Option<PlaylistId>>,
+    pub menu_open: Entity<bool>,
+    pub menu_button_bounds: Option<Bounds<Pixels>>,
+    pub root_bounds: Option<Bounds<Pixels>>,
     pub scroll_handle: UniformListScrollHandle,
 }
 
@@ -200,7 +206,7 @@ impl Render for PlaylistViewSection {
             .as_ref()
             .and_then(|id| state.library.playlists.get(id))
         else {
-            return div();
+            return div().into_any_element();
         };
 
         controller.request_playlist_thumbnails(&[playlist.id], cx);
@@ -216,12 +222,51 @@ impl Render for PlaylistViewSection {
 
         let playlist_name = playlist.name.to_string();
 
-        div()
-            .w_full()
-            .h_full()
-            .flex()
-            .flex_col()
-            .font_family("Space Grotesk")
+        let menu_open = *self.menu_open.read(cx);
+        let menu_open_handle = self.menu_open.clone();
+        let has_folder = playlist.folder_path.is_some();
+        let playlist_id = playlist.id;
+
+        let dropdown_position = match (self.menu_button_bounds, self.root_bounds) {
+            (Some(button), Some(root)) => {
+                let top = button.origin.y + button.size.height - root.origin.y;
+                let right = root.origin.x + root.size.width - (button.origin.x + button.size.width);
+                Some((top, right))
+            }
+            _ => None,
+        };
+
+        let entity = cx.entity();
+
+        observe_bounds(
+            "playlist_section_root",
+            div()
+                .w_full()
+                .h_full()
+                .relative()
+                .flex()
+                .flex_col()
+                .font_family("Space Grotesk")
+            .when(menu_open, {
+                let menu_open_handle = menu_open_handle.clone();
+                move |this| {
+                    this.child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .size_full()
+                            .bg(rgba(0x00000000))
+                            .block_mouse_except_scroll()
+                            .on_click(move |_, _, cx| {
+                                menu_open_handle.update(cx, |open, cx| {
+                                    *open = false;
+                                    cx.notify();
+                                });
+                            }),
+                    )
+                }
+            })
             .child(
                 div()
                     .px_12()
@@ -264,6 +309,18 @@ impl Render for PlaylistViewSection {
                                     .text_color(theme.library_playlist_section_header_title)
                                     .child(playlist_name),
                             )
+                            .when_some(playlist.folder_path.clone(), |this, path| {
+                                this.child(
+                                    div()
+                                        .text_base()
+                                        .text_color(theme.library_playlist_section_header_meta)
+                                        .overflow_hidden()
+                                        .whitespace_nowrap()
+                                        .text_ellipsis()
+                                        .max_w_96()
+                                        .child(path.to_string_lossy().to_string()),
+                                )
+                            })
                             .child(
                                 div()
                                     .text_base()
@@ -330,6 +387,45 @@ impl Render for PlaylistViewSection {
                                                     *cx.global_mut::<Page>() = Page::Player;
                                                 }
                                             }),
+                                    )
+                                    .child(
+                                        observe_bounds(
+                                            "playlist_more_button_bounds",
+                                            div()
+                                                .id("playlist_more_button")
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .px_4()
+                                                .py_2()
+                                                .rounded_lg()
+                                                .bg(theme.library_playlist_section_button_secondary_bg)
+                                                .text_color(
+                                                    theme
+                                                        .library_playlist_section_button_secondary_text,
+                                                )
+                                                .cursor_pointer()
+                                                .hover(|this| this.bg(rgba(0xFFFFFF1F)))
+                                                .child(icon(Icons::Ellipsis).size_4())
+                                                .on_click({
+                                                    let menu_open_handle = menu_open_handle.clone();
+                                                    move |_, _, cx| {
+                                                        menu_open_handle.update(cx, |open, cx| {
+                                                            *open = !*open;
+                                                            cx.notify();
+                                                        });
+                                                    }
+                                                }),
+                                            {
+                                                let entity = entity.clone();
+                                                move |bounds, _, cx| {
+                                                    entity.update(cx, |this, cx| {
+                                                        this.menu_button_bounds = Some(bounds);
+                                                        cx.notify();
+                                                    });
+                                                }
+                                            },
+                                        )
                                     ),
                             ),
                     ),
@@ -430,5 +526,108 @@ impl Render for PlaylistViewSection {
                 scroll_handle,
                 RightPad::Pad,
             ))
+            .when(menu_open, {
+                let menu_open_handle = menu_open_handle.clone();
+                move |this| {
+                    let Some((top, right)) = dropdown_position else {
+                        return this;
+                    };
+
+                    this.child(
+                        div()
+                            .id("playlist_more_dropdown")
+                            .absolute()
+                            .top(top)
+                            .right(right)
+                            .min_w(px(180.0))
+                            .bg(theme.toast_bg)
+                            .border_1()
+                            .border_color(theme.border)
+                            .rounded_md()
+                            .py_1()
+                            .overflow_hidden()
+                            .when(has_folder, {
+                                let menu_open_handle = menu_open_handle.clone();
+                                move |this| {
+                                    this.child(
+                                        div()
+                                            .id("playlist_rescan")
+                                            .flex()
+                                            .items_center()
+                                            .gap_x_2()
+                                            .px_3()
+                                            .py_2()
+                                            .text_sm()
+                                            .text_color(
+                                                theme
+                                                    .library_playlist_section_button_secondary_text,
+                                            )
+                                            .hover(|this| this.bg(rgba(0xFFFFFF14)))
+                                            .cursor_pointer()
+                                            .child(icon(Icons::Scan).size_4())
+                                            .child("Refresh / Rescan")
+                                            .on_click({
+                                                let menu_open_handle = menu_open_handle.clone();
+                                                let id = playlist_id;
+                                                move |_, _, cx| {
+                                                    let controller =
+                                                        cx.global::<Controller>().clone();
+                                                    controller.rescan_playlist(id, cx);
+                                                    menu_open_handle.update(cx, |open, cx| {
+                                                        *open = false;
+                                                        cx.notify();
+                                                    });
+                                                }
+                                            }),
+                                    )
+                                }
+                            })
+                            .when(has_folder, |this| {
+                                this.child(div().w_full().h(px(1.0)).my_1().bg(theme.border))
+                            })
+                            .child(
+                                div()
+                                    .id("playlist_delete")
+                                    .flex()
+                                    .items_center()
+                                    .gap_x_2()
+                                    .px_3()
+                                    .py_2()
+                                    .text_sm()
+                                    .text_color(theme.toast_error_accent)
+                                    .hover(|this| this.bg(rgba(0xEF44440F)))
+                                    .cursor_pointer()
+                                    .child(icon(Icons::Trash).size_4())
+                                    .child("Delete Playlist")
+                                    .on_click({
+                                        let menu_open_handle = menu_open_handle.clone();
+                                        let id = playlist_id;
+                                        move |_, _, cx| {
+                                            let controller =
+                                                cx.global::<Controller>().clone();
+                                            controller.delete_playlist(id, cx);
+                                            menu_open_handle.update(cx, |open, cx| {
+                                                *open = false;
+                                                cx.notify();
+                                            });
+                                            *cx.global_mut::<LibraryRoutes>() =
+                                                LibraryRoutes::Playlists;
+                                        }
+                                    }),
+                            ),
+                    )
+                }
+            }),
+            {
+                let entity = entity.clone();
+                move |bounds, _, cx| {
+                    entity.update(cx, |this, cx| {
+                        this.root_bounds = Some(bounds);
+                        cx.notify();
+                    });
+                }
+            },
+        )
+        .into_any_element()
     }
 }
