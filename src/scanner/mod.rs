@@ -304,7 +304,7 @@ impl Scanner {
 
         self.tx.send(ScannerEvent::ScanStarted).ok();
 
-        let exts = ["mp3", "wav", "ogg", "opus", "aac", "m4a"];
+        let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
             let playlist_id = playlist_id.unwrap_or_else(|| PlaylistId(Uuid::new_v4()));
