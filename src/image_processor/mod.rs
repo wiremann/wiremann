@@ -61,7 +61,7 @@ impl ImageProcessor {
         let (playlist_thumb_tx, playlist_thumb_rx) = crossbeam_channel::unbounded();
 
         self.spawn_thumbnail_workers(&thumb_rx, thumbnail_workers);
-        self.spawn_album_art_worker(album_art_rx);
+        self.spawn_album_art_workers(&album_art_rx, 2);
         self.spawn_playlist_thumbnail_worker(playlist_thumb_rx);
 
         let mut inflight_playlists = HashSet::new();
@@ -162,51 +162,69 @@ impl ImageProcessor {
         }
     }
 
-    fn spawn_album_art_worker(&self, album_art_rx: Receiver<ImageJob>) {
-        let events_tx = self.tx.clone();
-        let cache_path = self.app_paths.cache.clone();
+    fn spawn_album_art_workers(&self, album_art_rx: &Receiver<ImageJob>, workers: usize) {
+        for _ in 0..workers {
+            let events_tx = self.tx.clone();
+            let cache_path = self.app_paths.cache.clone();
+            let album_art_rx = album_art_rx.clone();
 
-        std::thread::spawn(move || {
-            while let Ok(job) = album_art_rx.recv() {
-                match job {
-                    ImageJob::AlbumArt(id, path) => {
-                        match metadata::read_album_art(&path) {
-                            Ok(Some(image)) => {
-                                if let Ok(hash) = ImageId::generate(&image) {
-                                    let path = CachePaths::image_cache_path(
-                                        cache_path.as_path(),
-                                        hash,
-                                        ImageKind::AlbumArt,
-                                    );
+            std::thread::spawn(move || {
+                while let Ok(job) = album_art_rx.recv() {
+                    match job {
+                        ImageJob::AlbumArt(id, path) => {
+                            match metadata::read_album_art(&path) {
+                                Ok(Some(image)) => {
+                                    if let Ok(hash) = ImageId::generate(&image) {
+                                        let path = CachePaths::image_cache_path(
+                                            cache_path.as_path(),
+                                            hash,
+                                            ImageKind::AlbumArt,
+                                        );
 
-                                    if path.exists() {
-                                        let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                            HashMap::from([(id, hash)]),
-                                        ));
-                                    } else if let Ok(album_art) =
-                                        render_album_art(&image, ImageKind::AlbumArt)
-                                    {
-                                        let _ = events_tx
-                                            .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
-                                        let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                            HashMap::from([(id, hash)]),
-                                        ));
+                                        if path.exists() {
+                                            let _ = events_tx.send(
+                                                ImageProcessorEvent::UpdateImageLookup(
+                                                    HashMap::from([(id, hash)]),
+                                                ),
+                                            );
+                                        } else if let Ok(album_art) =
+                                            render_album_art(&image, ImageKind::AlbumArt)
+                                        {
+                                            let _ = events_tx.send(
+                                                ImageProcessorEvent::InsertAlbumArt(hash, album_art),
+                                            );
+                                            let _ = events_tx.send(
+                                                ImageProcessorEvent::UpdateImageLookup(
+                                                    HashMap::from([(id, hash)]),
+                                                ),
+                                            );
+                                        }
                                     }
                                 }
+                                Err(err) => warn!(error = ?err, "Failed to read album art"),
+                                Ok(None) => info!(
+                                    track_id = ?id,
+                                    path = ?path,
+                                    "No embedded album art found in file"
+                                ),
                             }
-                            Err(err) => warn!(error = ?err, "Failed to read album art"),
-                            Ok(None) => info!(track_id = ?id, path = ?path, "No embedded album art found in file"),
                         }
+                        ImageJob::AlbumArtOnline(id, title, artist, album) => {
+                            let start = Instant::now();
+                            fetch_album_art_online(
+                                &events_tx, &cache_path, id, &title, &artist, &album,
+                            );
+                            info!(
+                                track_id = ?id,
+                                elapsed_ms = ?start.elapsed().as_millis(),
+                                "online album art fetch finished"
+                            );
+                        }
+                        _ => {} // ignore other job types sent to this channel by mistake
                     }
-                    ImageJob::AlbumArtOnline(id, title, artist, album) => {
-                        fetch_album_art_online(
-                            &events_tx, &cache_path, id, &title, &artist, &album,
-                        );
-                    }
-                    _ => {} // ignore other job types sent to this channel by mistake
                 }
-            }
-        });
+            });
+        }
     }
 
     fn spawn_playlist_thumbnail_worker(&self, playlist_thumb_rx: Receiver<ImageJob>) {

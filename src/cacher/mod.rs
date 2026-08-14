@@ -182,6 +182,13 @@ impl Cacher {
                     let result: Result<(), CacherError> = (|| {
                         match job {
                             CacheJob::WriteLibraryState(state) => {
+                                // Coalesce: a scan can queue many snapshots while it runs;
+                                // any later snapshot queued behind this one supersedes it,
+                                // so drain them and persist only the final state.
+                                let mut state = state;
+                                while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
+                                    state = later;
+                                }
                                 cacher.write_library_state(&state)?;
                             }
                             CacheJob::WritePlaybackState(state) => {

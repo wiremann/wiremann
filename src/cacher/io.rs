@@ -7,6 +7,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
+use tracing::info;
 
 use super::schema::{
     CacheFile, CachedLibraryState, CachedPlaybackState, CachedQueueState, ImageKind,
@@ -76,12 +78,19 @@ pub fn write_library_state_to_disk(
     cache_dir: &Path,
     state: &LibraryState,
 ) -> Result<(), CacherError> {
+    let start = Instant::now();
     let tmp_path = cache_dir.join("library.tmp");
     let final_path = cache_dir.join("library.bin");
 
     let library = CachedLibraryState::from(state);
 
     write_cache(&tmp_path, &final_path, library)?;
+
+    info!(
+        elapsed_ms = ?start.elapsed().as_millis(),
+        tracks = state.tracks.len(),
+        "library state written to disk"
+    );
 
     Ok(())
 }
