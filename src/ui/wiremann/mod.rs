@@ -3,6 +3,7 @@ mod titlebar;
 
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
+use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
@@ -15,7 +16,7 @@ use crate::ui::pages::player::{
 use crate::ui::pages::{library::LibraryPage, player::PlayerPage};
 use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
-use components::{Page, image_cache::ImageCache};
+use components::{Page, image_cache::ImageCache, window_border::window_border};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
@@ -29,6 +30,7 @@ pub struct Wiremann {
     pub player_page: Entity<PlayerPage>,
     pub library_page: Entity<LibraryPage>,
     pub toast_manager: Entity<ToastManager>,
+    pub keybinds_overlay: Entity<KeybindsOverlay>,
 }
 
 impl Wiremann {
@@ -98,6 +100,9 @@ impl Wiremann {
         let lyrics_state = LyricsState(cx.new(|_| LyricsStateInner::new()));
         cx.set_global(lyrics_state);
 
+        let keybinds_overlay = KeybindsOverlay::new(cx);
+        cx.set_global(KeybindsOverlayHandle(keybinds_overlay.clone()));
+
         global_keybinds::register_keybinds(cx);
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));
@@ -113,6 +118,7 @@ impl Wiremann {
             player_page,
             library_page,
             toast_manager,
+            keybinds_overlay,
         }
     }
 }
@@ -137,8 +143,9 @@ impl Render for Wiremann {
             Page::Library => div().w_full().h_full().child(self.library_page.clone()),
         };
 
-        div()
-            .id("main_container")
+        window_border().child(
+            div()
+                .id("main_container")
             .size_full()
             .font_family("Space Grotesk")
             .relative()
@@ -184,5 +191,8 @@ impl Render for Wiremann {
                     }),
             )
             .child(self.toast_manager.clone())
+            .child(self.keybinds_overlay.clone())
+            .into_any_element(),
+        )
     }
 }

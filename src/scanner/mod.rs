@@ -15,6 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use tracing::{info, trace};
@@ -26,7 +27,7 @@ pub struct Scanner {
     pub rx: Receiver<ScannerCommand>,
 
     state: State,
-    queue: VecDeque<PathBuf>,
+    queue: VecDeque<(PathBuf, Option<PlaylistId>)>,
 
     app_paths: AppPaths,
 
@@ -44,6 +45,9 @@ struct ScanProgress {
     discovery_done: AtomicBool,
     total: AtomicUsize,
     processed: AtomicUsize,
+    metadata_reads: AtomicUsize,
+    metadata_elapsed_us: AtomicUsize,
+    started_at: Mutex<Option<Instant>>,
 }
 
 type ScanRecord = Arc<DashMap<TrackSource, TrackId>>;
@@ -67,6 +71,9 @@ impl Scanner {
                 discovery_done: AtomicBool::new(false),
                 total: AtomicUsize::new(0),
                 processed: AtomicUsize::new(0),
+                metadata_reads: AtomicUsize::new(0),
+                metadata_elapsed_us: AtomicUsize::new(0),
+                started_at: Mutex::new(None),
             }),
             scan_record: Arc::new(DashMap::new()),
         };
@@ -83,13 +90,23 @@ impl Scanner {
         loop {
             match self.rx.recv()? {
                 ScannerCommand::ScanDir(path) => {
-                    self.queue.push_back(path);
+                    self.queue.push_back((path, None));
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
+                    }
+                }
+                ScannerCommand::ScanDirRescan { path, playlist } => {
+                    self.queue.push_back((path, Some(playlist)));
+
+                    if self.state == State::Idle
+                        && let Some((path, playlist)) = self.queue.pop_front()
+                    {
+                        self.state = State::Scanning;
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::StartNextScan => {
@@ -97,10 +114,10 @@ impl Scanner {
                     self.write_scan_record();
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::ScanTrack(path) => {
@@ -167,7 +184,6 @@ impl Scanner {
         new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
         let start = Instant::now();
-        let mut incremented = false;
 
         let Ok(ts) = TrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
@@ -187,9 +203,15 @@ impl Scanner {
                 }
 
                 scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-                incremented = true;
+            } else {
+                // Track was already recorded by an earlier scan and there is no
+                // playlist to update. It must still count towards `processed`,
+                // otherwise `processed` never reaches `total` and the scan never
+                // emits ScanFinished.
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             }
         } else {
+            let read_start = Instant::now();
             if let Ok(track) = metadata::read_metadata(ts.clone()) {
                 let id = track.id;
                 new.push((track, pid));
@@ -200,19 +222,38 @@ impl Scanner {
                 }
 
                 scan_record.insert(ts, id);
+
+                scan_progress
+                    .metadata_reads
+                    .fetch_add(1, Ordering::Relaxed);
+                scan_progress.metadata_elapsed_us.fetch_add(
+                    read_start.elapsed().as_micros() as usize,
+                    Ordering::Relaxed,
+                );
             }
 
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-            incremented = true;
         }
 
         let processed = scan_progress.processed.load(Ordering::Relaxed);
         let total = scan_progress.total.load(Ordering::Relaxed);
 
-        if incremented && (processed.is_multiple_of(16) || processed == total) {
+        if processed.is_multiple_of(16) || processed == total {
             tx.send(ScannerEvent::Processed { processed, total }).ok();
         }
         if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
+            let reads = scan_progress.metadata_reads.load(Ordering::Relaxed);
+            let meta_us = scan_progress.metadata_elapsed_us.load(Ordering::Relaxed);
+            let started = scan_progress.started_at.lock().unwrap();
+            info!(
+                total,
+                processed,
+                metadata_reads = reads,
+                metadata_total_ms = meta_us / 1000,
+                metadata_avg_ms = if reads > 0 { meta_us / reads / 1000 } else { 0 },
+                scan_elapsed_ms = started.map_or(0, |t| t.elapsed().as_millis()),
+                "scan complete"
+            );
             tx.send(ScannerEvent::ScanFinished).ok();
         }
 
@@ -240,12 +281,24 @@ impl Scanner {
         }
     }
 
-    fn scan_folder(&self, path: PathBuf, worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>) {
+    fn scan_folder(
+        &self,
+        path: PathBuf,
+        playlist_id: Option<PlaylistId>,
+        worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>,
+    ) {
         self.scan_progress.total.store(0, Ordering::Relaxed);
         self.scan_progress.processed.store(0, Ordering::Relaxed);
         self.scan_progress
+            .metadata_reads
+            .store(0, Ordering::Relaxed);
+        self.scan_progress
+            .metadata_elapsed_us
+            .store(0, Ordering::Relaxed);
+        self.scan_progress
             .discovery_done
             .store(false, Ordering::Release);
+        *self.scan_progress.started_at.lock().unwrap() = Some(Instant::now());
 
         self.read_scan_record();
 
@@ -254,7 +307,7 @@ impl Scanner {
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
-            let playlist_id = PlaylistId(Uuid::new_v4());
+            let playlist_id = playlist_id.unwrap_or_else(|| PlaylistId(Uuid::new_v4()));
 
             let playlist = Playlist {
                 id: playlist_id,

@@ -16,6 +16,7 @@ impl Controller {
             ScannerEvent::UpsertTracks(tracks) => {
                 let mut modified_playlists = HashSet::new();
                 let start = Instant::now();
+                let batch_size = tracks.len();
 
                 trace!(thread_id = ?std::thread::current().id(), "controller handling UpsertTracks batch size={}", tracks.len());
 
@@ -42,6 +43,12 @@ impl Controller {
                     cx.notify();
                 });
 
+                info!(
+                    batch_size,
+                    elapsed_ms = ?start.elapsed().as_millis(),
+                    "UpsertTracks batch handled"
+                );
+
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
@@ -58,6 +65,12 @@ impl Controller {
                     }
                     cx.notify();
                 });
+                info!(
+                    pid = ?pid,
+                    count = tids.len(),
+                    elapsed_ms = ?start.elapsed().as_millis(),
+                    "InsertTracksIntoPlaylist handled"
+                );
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
@@ -149,6 +162,11 @@ impl Controller {
                 self.scanner_tx.send(ScannerCommand::StartNextScan).ok();
                 let tracks = self.state.read(cx).library.tracks.clone();
 
+                info!(
+                    library_tracks = tracks.len(),
+                    "ScanFinished: total tracks in library"
+                );
+
                 let to_request: HashSet<(TrackId, PathBuf)> = tracks
                     .iter()
                     .filter(|(_, track)| track.image_id.is_none())
@@ -166,6 +184,50 @@ impl Controller {
                         ImageKind::ThumbnailSmall,
                     ));
                 trace!(thread_id = ?std::thread::current().id(), elapsed_ms = ?start.elapsed().as_millis(), "controller finished ScanFinished work");
+
+                // Batch fetch online album art for every track that has no image_id.
+                // This fills in covers for all songs without requiring them to be played first.
+                let state_ref = self.state.read(cx);
+                let art_missing = tracks.iter().filter(|(_, t)| t.image_id.is_none()).count();
+                info!(
+                    tracks_without_art = art_missing,
+                    "requesting online album art for tracks missing embedded covers"
+                );
+                for (id, track) in &tracks {
+                    if track.image_id.is_some() {
+                        continue;
+                    }
+                    let mut title = track.title.to_string();
+                    let mut artist = track
+                        .artists(&state_ref.library)
+                        .map(|a| a.name.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let album = track
+                        .album(&state_ref.library)
+                        .map(|a| a.name.to_string())
+                        .unwrap_or_default();
+                    if let Some(idx) = title.find(" - ") {
+                        let prefix = title[..idx].trim().to_string();
+                        let suffix = title[idx + 3..].trim().to_string();
+                        if !prefix.is_empty() && !suffix.is_empty()
+                            && (artist.is_empty()
+                                || artist.eq_ignore_ascii_case("Unknown Artist")
+                                || artist.eq_ignore_ascii_case(&prefix))
+                        {
+                            artist = prefix;
+                            title = suffix;
+                        }
+                    }
+                    let _ = self.image_processor_tx.send(
+                        ImageProcessorCommand::FetchAlbumArtOnline {
+                            id: *id,
+                            title,
+                            artist,
+                            album,
+                        },
+                    );
+                }
 
                 view.update(cx, |this, cx| {
                     this.toast_manager.update(cx, |this, cx| {

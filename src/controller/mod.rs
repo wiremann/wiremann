@@ -24,6 +24,7 @@ use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
 use gpui::{App, Entity, Global, Rgba, rgb};
+use tracing::info;
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -115,10 +116,17 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
+        info!(
+            current_index = state.playback.current_index,
+            queue_len = state.queue.tracks.len(),
+            "load_queue_current called"
+        );
+
         if let Some(track_id) = state.queue.get_id(state.playback.current_index)
             && let Some(track) = state.library.tracks.get(&track_id)
             && let Some(source) = track.get_valid_source()
         {
+            info!(?track_id, path = ?source.path, "load_queue_current sending commands");
             self.audio_tx
                 .send(AudioCommand::Load(track_id, source.path.clone()))
                 .ok();
@@ -128,6 +136,8 @@ impl Controller {
                     source.path.clone(),
                 ))
                 .ok();
+        } else {
+            info!("load_queue_current: condition failed — check index/track/exists");
         }
     }
 
@@ -137,6 +147,48 @@ impl Controller {
 
     pub fn scan_dir(&self, path: PathBuf) {
         let _ = self.scanner_tx.send(ScannerCommand::ScanDir(path));
+    }
+
+    pub fn delete_playlist(&self, id: PlaylistId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            this.library.playlists.remove(&id);
+
+            if this.playback.current_playlist == Some(id) {
+                this.playback.current_playlist = None;
+                this.playback.current = None;
+                this.playback.current_index = 0;
+                this.playback.status = PlaybackStatus::Stopped;
+                this.queue.tracks.clear();
+                this.queue.order.clear();
+            }
+
+            cx.notify();
+        });
+
+        let _ = self.audio_tx.send(AudioCommand::Stop);
+
+        let library = self.state.read(cx).library.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(library));
+        let playback = self.state.read(cx).playback.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WritePlaybackState(playback));
+        let queue = self.state.read(cx).queue.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
+    }
+
+    pub fn rescan_playlist(&self, id: PlaylistId, cx: &mut App) {
+        let path = self
+            .state
+            .read(cx)
+            .library
+            .playlists
+            .get(&id)
+            .and_then(|p| p.folder_path.clone());
+
+        if let Some(path) = path {
+            let _ = self
+                .scanner_tx
+                .send(ScannerCommand::ScanDirRescan { path, playlist: id });
+        }
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {

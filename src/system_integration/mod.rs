@@ -1,8 +1,4 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::time::Duration;
 
 use crate::{
     app::AppPaths,
@@ -12,8 +8,6 @@ use crate::{
     errors::SystemIntegrationError,
 };
 use crossbeam_channel::{Receiver, Sender, select};
-use garb::bytes::bgra_to_rgb;
-use image::{ExtendedColorType, codecs::jpeg::JpegEncoder};
 use raw_window_handle::RawWindowHandle;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -43,24 +37,25 @@ impl SystemIntegration {
         let (event_tx, event_rx) = crossbeam_channel::unbounded();
 
         #[cfg(not(target_os = "windows"))]
-        let hwnd = None;
+        let hwnd: Option<*mut std::ffi::c_void> = None;
 
         #[cfg(target_os = "windows")]
         let hwnd = raw_window_handle.and_then(|handle| {
-            let handle = match handle {
-                RawWindowHandle::Win32(h) => h,
-                _ => unreachable!(),
-            };
-            Some(handle.hwnd)
+            match handle {
+                RawWindowHandle::Win32(h) => Some(h.hwnd.get() as *mut std::ffi::c_void),
+                _ => None,
+            }
         });
 
         let config = PlatformConfig {
-            hwnd: hwnd.map(|h: std::num::NonZeroIsize| h.get() as *mut std::ffi::c_void),
+            hwnd,
             dbus_name: "app.wiremann.wiremann",
             display_name: "Wiremann",
         };
 
-        let media_controls = MediaControls::new(config).ok();
+        let media_controls = MediaControls::new(config).inspect_err(|e| {
+            eprintln!("[wiremann] MediaControls::new failed: {e}");
+        }).ok();
 
         (
             Self {
@@ -79,14 +74,20 @@ impl SystemIntegration {
         let (souvlaki_tx, souvlaki_rx) = crossbeam_channel::unbounded();
 
         if let Some(controls) = &mut self.media_controls {
-            controls.attach(move |event| {
+            if let Err(e) = controls.attach(move |event| {
                 souvlaki_tx.send(event).ok();
-            })?;
+            }) {
+                eprintln!("[wiremann] MediaControls attach failed: {e}");
+                return Ok(());
+            }
+            eprintln!("[wiremann] MediaControls attached successfully");
 
             loop {
                 select! {
                     recv(self.rx) -> msg => {
-                        if let Ok(cmd) = msg {self.handle_commands(cmd)?;}
+                        if let Ok(cmd) = msg {
+                            let _ = self.handle_commands(cmd);
+                        }
                     }
                     recv(souvlaki_rx) -> msg => {
                         if let Ok(cmd) = msg {self.handle_system_events(&cmd);}
@@ -104,57 +105,41 @@ impl SystemIntegration {
         cmd: SystemIntegrationCommand,
     ) -> Result<(), SystemIntegrationError> {
         if let Some(controls) = &mut self.media_controls {
-            match cmd {
+            let result: Result<(), SystemIntegrationError> = match cmd {
                 SystemIntegrationCommand::SetMetadata {
                     title,
                     artist,
                     album,
-                    image,
+                    image: _,
                     duration,
                 } => {
-                    let version = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-                    let name = format!("current_album_art_{version}.jpg");
+                    // souvlaki's Windows path masking has a bug with file:/// URIs,
+                    // so we skip the cover image for now. Metadata still works.
+                    let cover_url: Option<&str> = None;
 
-                    let path = self.app_paths.cache.join(&name);
-
-                    if let Some((width, height, bytes)) = image {
-                        let mut rgb = vec![0u8; (width * height * 3) as usize];
-
-                        bgra_to_rgb(&bytes, &mut rgb)?;
-
-                        let tmp_path = path.with_extension("jpg.tmp");
-
-                        {
-                            let file = File::create(&tmp_path)?;
-                            let mut writer = BufWriter::new(file);
-
-                            let mut encoder = JpegEncoder::new_with_quality(&mut writer, 80);
-                            encoder.encode(&rgb, width, height, ExtendedColorType::Rgb8)?;
-                            writer.flush()?;
-                        }
-
-                        std::fs::rename(&tmp_path, &path)?;
+                    match controls.set_metadata(MediaMetadata {
+                        title: Some(title.as_str()),
+                        album: if album.is_empty() { None } else { Some(album.as_str()) },
+                        artist: if artist.is_empty() { None } else { Some(artist.as_str()) },
+                        cover_url: cover_url.as_deref(),
+                        duration: Some(Duration::from_secs(duration)),
+                    }) {
+                        Ok(()) => eprintln!("[wiremann] set_metadata OK"),
+                        Err(e) => eprintln!("[wiremann] set_metadata failed: {e}"),
                     }
 
-                    let cover_url = format!("file://{}?v={}", path.display(), version);
-
-                    controls.set_metadata(MediaMetadata {
-                        title: Some(title.as_str()),
-                        album: Some(album.as_str()),
-                        artist: Some(artist.as_str()),
-                        cover_url: Some(&cover_url),
-                        duration: Some(Duration::from_secs(duration)),
-                    })?;
-
-                    self.cleanup_images(&name)?;
+                    Ok(())
                 }
                 SystemIntegrationCommand::SetPosition(pos) => {
-                    controls.set_playback(MediaPlayback::Playing {
+                    if let Err(e) = controls.set_playback(MediaPlayback::Playing {
                         progress: Some(MediaPosition(pos)),
-                    })?;
+                    }) {
+                        eprintln!("[wiremann] set_playback (position) failed: {e}");
+                    }
+                    Ok(())
                 }
                 SystemIntegrationCommand::SetPlaybackStatus(status, pos) => {
-                    let status = match status {
+                    let playback = match status {
                         PlaybackStatus::Stopped => MediaPlayback::Stopped,
                         PlaybackStatus::Paused => MediaPlayback::Paused {
                             progress: Some(MediaPosition(pos)),
@@ -163,8 +148,15 @@ impl SystemIntegration {
                             progress: Some(MediaPosition(pos)),
                         },
                     };
-                    controls.set_playback(status)?;
+                    if let Err(e) = controls.set_playback(playback) {
+                        eprintln!("[wiremann] set_playback (status) failed: {e}");
+                    }
+                    Ok(())
                 }
+            };
+
+            if let Err(e) = result {
+                eprintln!("[wiremann] handle_commands error: {e}");
             }
         }
 
@@ -213,22 +205,4 @@ impl SystemIntegration {
         }
     }
 
-    fn cleanup_images(&self, current_name: &str) -> std::io::Result<()> {
-        let path = &self.app_paths.cache;
-        for entry in std::fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            #[allow(clippy::case_sensitive_file_extension_comparisons)]
-            if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && name.starts_with("current_album_art_")
-                && name.ends_with(".jpg")
-                && name != current_name
-            {
-                let _ = std::fs::remove_file(path);
-            }
-        }
-
-        Ok(())
-    }
 }

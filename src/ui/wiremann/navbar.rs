@@ -33,6 +33,7 @@ impl Render for NavBar {
             .flex()
             .w_auto()
             .h_full()
+            .py_1()
             .rounded_full()
             .items_center()
             .justify_center()
@@ -100,7 +101,10 @@ impl Render for NavBar {
                             this.text_color(theme.switcher_text_hover)
                         }
                     })
-                    .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Library)
+                    .on_click(|_, _, cx| {
+                        cx.stop_propagation();
+                        *cx.global_mut::<Page>() = Page::Library
+                    })
                     .when(page == Page::Library, |this| {
                         this.text_color(theme.switcher_text_active)
                     })
@@ -124,7 +128,10 @@ impl Render for NavBar {
                             this.text_color(theme.switcher_text_hover)
                         }
                     })
-                    .on_click(|_, _, cx| *cx.global_mut::<Page>() = Page::Player)
+                    .on_click(|_, _, cx| {
+                        cx.stop_propagation();
+                        *cx.global_mut::<Page>() = Page::Player
+                    })
                     .when(page == Page::Player, |this| {
                         this.text_color(theme.switcher_text_active)
                     })

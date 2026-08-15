@@ -273,7 +273,22 @@ impl Controller {
                         .map(|a| a.name.to_string())
                         .unwrap_or_default();
 
-                    self.get_lyrics(*id, &track.title, &artist_str, &album_str, track.duration);
+                    let mut title = track.title.to_string();
+                    let mut artist = artist_str;
+                    // YouTube rips often have "Artist - Title" as the title field.
+                    if let Some(idx) = title.find(" - ") {
+                        let prefix = title[..idx].trim().to_string();
+                        let suffix = title[idx + 3..].trim().to_string();
+                        if !prefix.is_empty() && !suffix.is_empty()
+                            && (artist.is_empty()
+                                || artist.eq_ignore_ascii_case("Unknown Artist")
+                                || artist.eq_ignore_ascii_case(&prefix))
+                        {
+                            artist = prefix;
+                            title = suffix;
+                        }
+                    }
+                    self.get_lyrics(*id, &title, &artist, &album_str, track.duration);
                 }
             }
         }

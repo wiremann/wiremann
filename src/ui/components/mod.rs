@@ -2,11 +2,13 @@ pub mod bounds_observer;
 mod element_ext;
 pub mod icons;
 pub mod image_cache;
+pub mod keybinds_overlay;
 pub mod scrollbar;
 pub mod slider;
 pub mod toasts;
 pub mod virtual_grid;
 pub mod virtual_list;
+pub mod window_border;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Page {

@@ -5,6 +5,24 @@ use super::{
 };
 use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
+/// Helper: if the title looks like "Artist - RealTitle" and the artist is
+/// unknown or matches the prefix, split it apart.
+fn clean_track_title(title: &mut String, artist: &mut String) {
+    if let Some(idx) = title.find(" - ") {
+        let prefix = title[..idx].trim().to_string();
+        let suffix = title[idx + 3..].trim().to_string();
+        if !prefix.is_empty() && !suffix.is_empty() {
+            let do_clean = artist.is_empty()
+                || artist.eq_ignore_ascii_case("Unknown Artist")
+                || artist.eq_ignore_ascii_case(&prefix);
+            if do_clean {
+                *artist = prefix;
+                *title = suffix;
+            }
+        }
+    }
+}
+
 impl Controller {
     pub fn handle_audio_event(
         &mut self,
@@ -63,16 +81,43 @@ impl Controller {
                         .send(ScannerCommand::ScanTrack(path.clone()));
                 }
 
+                // Always send album art extraction — the path is valid even if the track
+                // hasn't been scanned into the library yet (race condition fix).
+                self.image_processor_tx
+                    .send(ImageProcessorCommand::GetCurrentAlbumArt(
+                        *track_id,
+                        path.clone(),
+                    ))
+                    .ok();
+
                 if let Some(track) = state.library.tracks.get(track_id) {
+                    // Also request cached album art if image_id is already known
                     if let Some(image_id) = track.image_id {
                         let _ = self.cacher_tx.send(CacherCommand::GetImage(
                             HashSet::from([image_id]),
                             ImageKind::AlbumArt,
                         ));
                     } else {
-                        let _ = self.image_processor_tx.send(
-                            ImageProcessorCommand::GetCurrentAlbumArt(*track_id, path.clone()),
-                        );
+                        // No known album art — try online fallback
+                        let mut t = track.title.to_string();
+                        let mut a = track
+                            .artists(&state.library)
+                            .map(|a| a.name.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let album = track
+                            .album(&state.library)
+                            .map(|a| a.name.to_string())
+                            .unwrap_or_default();
+                        clean_track_title(&mut t, &mut a);
+                        self.image_processor_tx
+                            .send(ImageProcessorCommand::FetchAlbumArtOnline {
+                                id: *track_id,
+                                title: t,
+                                artist: a,
+                                album,
+                            })
+                            .ok();
                     }
 
                     let artist_str = track

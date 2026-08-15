@@ -55,6 +55,35 @@ pub fn read_metadata(track_source: TrackSource) -> Result<ScannedTrack, ScannerE
         duration = tagged_file.properties().duration();
     }
 
+    // YouTube rips and bad tags often store "Artist - Title" as the title field
+    // while leaving the artist tag empty or wrong. Try to repair this.
+    clean_title_from_artists(&mut title, &mut artists);
+
+    // If the artist is still unknown after tag reading and title cleaning,
+    // attempt to parse it from the filename (the fallback may have had it
+    // before tags overwrote it).
+    if artists.is_empty() || artists.iter().any(|a| a.eq_ignore_ascii_case("Unknown Artist")) {
+        if let Some(idx) = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|stem| stem.find(" - "))
+        {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            let parsed_artist = stem[..idx].trim();
+            let parsed_title = stem[idx + 3..].trim();
+            if !parsed_artist.is_empty() && !parsed_title.is_empty() {
+                artists = vec![parsed_artist.to_string()];
+                // If the tag had a correct title (no "Artist - " prefix), keep it.
+                // Otherwise use the parsed title from filename.
+                if title.eq_ignore_ascii_case(&format!("{} - {}", parsed_artist, parsed_title))
+                    || title.is_empty()
+                {
+                    title = parsed_title.to_string();
+                }
+            }
+        }
+    }
+
     Ok(ScannedTrack {
         id: TrackId::generate(&title, &artists.join(", "), &album)?,
         source: track_source,
@@ -80,15 +109,49 @@ pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
     Ok(None)
 }
 
-fn fallback_metadata(_path: &Path) -> (String, Vec<String>, String) {
-    let title = _path
+/// If the title looks like "Artist - Title" but the artist field is empty or
+/// mismatched, split it apart. This is common for YouTube rips and poor tags.
+fn clean_title_from_artists(title: &mut String, artists: &mut Vec<String>) {
+    if let Some(idx) = title.find(" - ") {
+        let prefix = title[..idx].trim();
+        let suffix = title[idx + 3..].trim();
+
+        if !prefix.is_empty() && !suffix.is_empty() {
+            let artist_is_unknown = artists.is_empty()
+                || artists.iter().any(|a| {
+                    a.eq_ignore_ascii_case("Unknown Artist") || a.eq_ignore_ascii_case(prefix)
+                });
+
+            if artist_is_unknown {
+                *artists = vec![prefix.to_string()];
+                *title = suffix.to_string();
+            }
+        }
+    }
+}
+
+fn fallback_metadata(path: &Path) -> (String, Vec<String>, String) {
+    let stem = path
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("Unknown")
-        .to_string();
+        .unwrap_or("Unknown");
+
+    // Try to parse "Artist - Title" convention from the filename.
+    if let Some(idx) = stem.find(" - ") {
+        let (artist, title) = stem.split_at(idx);
+        let title = title.trim_start_matches(" - ").trim();
+        let artist = artist.trim();
+        if !artist.is_empty() && !title.is_empty() {
+            return (
+                title.to_string(),
+                vec![artist.to_string()],
+                "Unknown Album".to_string(),
+            );
+        }
+    }
 
     (
-        title,
+        stem.to_string(),
         vec!["Unknown Artist".to_string()],
         "Unknown Album".to_string(),
     )
