@@ -14,6 +14,7 @@ use crate::ui::pages::player::{
     lyrics::{LyricsState, LyricsStateInner},
 };
 use crate::ui::pages::{library::LibraryPage, player::PlayerPage};
+use crate::ui::popout::{PopOutPlayer, PopOutState};
 use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
@@ -31,6 +32,7 @@ pub struct Wiremann {
     pub library_page: Entity<LibraryPage>,
     pub toast_manager: Entity<ToastManager>,
     pub keybinds_overlay: Entity<KeybindsOverlay>,
+    pub popout_player: Entity<PopOutPlayer>,
 }
 
 impl Wiremann {
@@ -107,9 +109,13 @@ impl Wiremann {
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));
         let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
-        let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar));
+        let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar.clone()));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
+
+        let popout_player = cx.new(|_| PopOutPlayer::new(controlbar));
+
+        cx.set_global(PopOutState::default());
 
         cx.global::<Controller>().load_cached_app_state();
 
@@ -119,6 +125,7 @@ impl Wiremann {
             library_page,
             toast_manager,
             keybinds_overlay,
+            popout_player,
         }
     }
 }
@@ -128,6 +135,7 @@ impl Render for Wiremann {
         let theme = *cx.global::<Theme>();
 
         let page = *cx.global::<Page>();
+        let popout_enabled = cx.global::<PopOutState>().enabled;
 
         let page_state = window.use_keyed_state("page_transition", cx, |_, _| page);
         let prev_page = *page_state.read(cx);
@@ -143,6 +151,52 @@ impl Render for Wiremann {
             Page::Library => div().w_full().h_full().child(self.library_page.clone()),
         };
 
+        let content = if popout_enabled {
+            div()
+                .id("popout_container")
+                .w_full()
+                .h_full()
+                .min_h_0()
+                .child(self.popout_player.clone())
+                .into_any_element()
+        } else {
+            div()
+                .id("animation_container")
+                .w_full()
+                .h_full()
+                .min_h_0()
+                .map(move |this| {
+                    if prev_page == page {
+                        this.child(page_el).into_any_element()
+                    } else {
+                        let duration = std::time::Duration::from_millis(300);
+
+                        cx.spawn({
+                            let page_state = page_state.clone();
+                            async move |_, cx| {
+                                cx.background_executor().timer(duration).await;
+                                let _ = page_state.update(cx, |state, _| {
+                                    *state = page;
+                                });
+                            }
+                        })
+                        .detach();
+
+                        this.child(page_el)
+                            .with_animation(
+                                ElementId::NamedInteger("page_slide".into(), page as u64),
+                                Animation::new(duration).with_easing(ease_in_out_expo()),
+                                move |this, delta| {
+                                    let offset = 360.0 * direction * (1.0 - delta);
+                                    this.left(px(offset)).opacity(delta)
+                                },
+                            )
+                            .into_any_element()
+                    }
+                })
+                .into_any_element()
+        };
+
         window_border().child(
             div()
                 .id("main_container")
@@ -155,44 +209,9 @@ impl Render for Wiremann {
             .items_center()
             .bg(theme.app_bg)
             .child(self.titlebar.clone())
-            .child(
-                div()
-                    .id("animation_container")
-                    .w_full()
-                    .h_full()
-                    .min_h_0()
-                    .map(move |this| {
-                        if prev_page == page {
-                            this.child(page_el).into_any_element()
-                        } else {
-                            let duration = std::time::Duration::from_millis(300);
-
-                            cx.spawn({
-                                let page_state = page_state.clone();
-                                async move |_, cx| {
-                                    cx.background_executor().timer(duration).await;
-                                    let _ = page_state.update(cx, |state, _| {
-                                        *state = page;
-                                    });
-                                }
-                            })
-                            .detach();
-
-                            this.child(page_el)
-                                .with_animation(
-                                    ElementId::NamedInteger("page_slide".into(), page as u64),
-                                    Animation::new(duration).with_easing(ease_in_out_expo()),
-                                    move |this, delta| {
-                                        let offset = 360.0 * direction * (1.0 - delta);
-                                        this.left(px(offset)).opacity(delta)
-                                    },
-                                )
-                                .into_any_element()
-                        }
-                    }),
-            )
-            .child(self.toast_manager.clone())
-            .child(self.keybinds_overlay.clone())
+            .child(content)
+            .when(!popout_enabled, |this| this.child(self.toast_manager.clone()))
+            .when(!popout_enabled, |this| this.child(self.keybinds_overlay.clone()))
             .into_any_element(),
         )
     }

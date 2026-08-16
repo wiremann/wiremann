@@ -4,6 +4,7 @@ use crate::controller::Controller;
 use crate::ui::components::icons::{icon, Icons};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::Page;
+use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -22,6 +23,7 @@ impl Render for Titlebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<Theme>().clone();
         let page = *cx.global::<Page>();
+        let popout_enabled = cx.global::<PopOutState>().enabled;
         let is_maximized = window.is_maximized();
 
         let controller = cx.global::<Controller>().clone();
@@ -32,7 +34,7 @@ impl Render for Titlebar {
         });
         let current_image = cx.global::<ImageCache>().current.clone();
 
-        let show_mini_player = page != Page::Player && current_track.is_some();
+        let show_mini_player = !popout_enabled && page != Page::Player && current_track.is_some();
 
         div()
             .id("titlebar")
@@ -71,17 +73,19 @@ impl Render for Titlebar {
                         parent.child(mini_player(&theme, track, &current_image, is_playing, controller.clone(), &artist))
                     }),
             )
-            .child(
-                div()
-                    .id("titlebar_nav")
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .px_4()
-                    .py_1()
-                    .text_color(white())
-                    .child(self.navbar.clone()),
-            )
+            .when(!popout_enabled, |this| {
+                this.child(
+                    div()
+                        .id("titlebar_nav")
+                        .flex_shrink_0()
+                        .flex()
+                        .items_center()
+                        .px_4()
+                        .py_1()
+                        .text_color(white())
+                        .child(self.navbar.clone()),
+                )
+            })
             .child(
                 div()
                     .id("titlebar_right")
@@ -94,7 +98,7 @@ impl Render for Titlebar {
                     .text_color(white())
                     .child(
                         div()
-                            .id("help_btn")
+                            .id("popout_btn")
                             .h_8()
                             .w_8()
                             .rounded_full()
@@ -108,84 +112,111 @@ impl Render for Titlebar {
                                 window.prevent_default();
                                 cx.stop_propagation();
                             })
-                            .on_click({
-                                move |_, _, cx| {
-                                    let handle = cx
-                                        .global::<
-                                            crate::ui::components::keybinds_overlay::KeybindsOverlayHandle,
-                                        >()
-                                        .clone();
-                                    handle.0.update(cx, |overlay, cx| overlay.toggle(cx));
-                                }
-                            })
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .font_weight(gpui::FontWeight::BOLD)
-                                    .child("?"),
-                            ),
+                            .on_click(|_, window, cx| toggle_pop_out(window, cx))
+                            .child(icon(Icons::PopOut)),
                     )
-                    .child(
-                        div()
-                            .id("win_min_btn")
-                            .h_8()
-                            .w_8()
-                            .rounded_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
-                            .text_color(theme.titlebar_window_icons_text)
-                            .cursor_pointer()
-                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
-                                window.prevent_default();
-                                cx.stop_propagation();
-                            })
-                            .on_click(|_, window, _| window.minimize_window())
-                            .child(icon(Icons::WinMin)),
-                    )
-                    .child(
-                        div()
-                            .id("win_max_btn")
-                            .h_8()
-                            .w_8()
-                            .rounded_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
-                            .text_color(theme.titlebar_window_icons_text)
-                            .cursor_pointer()
-                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
-                                window.prevent_default();
-                                cx.stop_propagation();
-                            })
-                            .on_click(|_, window, _| window.zoom_window())
-                            .child(if is_maximized {
-                                icon(Icons::WinRes)
-                            } else {
-                                icon(Icons::WinMax)
-                            }),
-                    )
-                    .child(
-                        div()
-                            .id("win_close_btn")
-                            .h_8()
-                            .w_8()
-                            .rounded_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
-                            .text_color(theme.titlebar_window_icons_text)
-                            .cursor_pointer()
-                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
-                                window.prevent_default();
-                                cx.stop_propagation();
-                            })
-                            .on_click(|_, window, _| window.remove_window())
-                            .child(icon(Icons::WinClose)),
-                    ),
+                    .when(!popout_enabled, |this| {
+                        this.child(
+                            div()
+                                .id("help_btn")
+                                .h_8()
+                                .w_8()
+                                .rounded_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
+                                .text_color(theme.titlebar_window_icons_text)
+                                .cursor_pointer()
+                                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                    window.prevent_default();
+                                    cx.stop_propagation();
+                                })
+                                .on_click({
+                                    move |_, _, cx| {
+                                        let handle = cx
+                                            .global::<
+                                                crate::ui::components::keybinds_overlay::KeybindsOverlayHandle,
+                                            >()
+                                            .clone();
+                                        handle.0.update(cx, |overlay, cx| overlay.toggle(cx));
+                                    }
+                                })
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(gpui::FontWeight::BOLD)
+                                        .child("?"),
+                                ),
+                        )
+                    })
+                    .when(!popout_enabled, |this| {
+                        this.child(
+                            div()
+                                .id("win_min_btn")
+                                .h_8()
+                                .w_8()
+                                .rounded_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
+                                .text_color(theme.titlebar_window_icons_text)
+                                .cursor_pointer()
+                                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                    window.prevent_default();
+                                    cx.stop_propagation();
+                                })
+                                .on_click(|_, window, _| window.minimize_window())
+                                .child(icon(Icons::WinMin)),
+                        )
+                    })
+                    .when(!popout_enabled, |this| {
+                        this.child(
+                            div()
+                                .id("win_max_btn")
+                                .h_8()
+                                .w_8()
+                                .rounded_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
+                                .text_color(theme.titlebar_window_icons_text)
+                                .cursor_pointer()
+                                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                    window.prevent_default();
+                                    cx.stop_propagation();
+                                })
+                                .on_click(|_, window, _| window.zoom_window())
+                                .child(if is_maximized {
+                                    icon(Icons::WinRes)
+                                } else {
+                                    icon(Icons::WinMax)
+                                }),
+                        )
+                    })
+                    .when(!popout_enabled, |this| {
+                        this.child(
+                            div()
+                                .id("win_close_btn")
+                                .h_8()
+                                .w_8()
+                                .rounded_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
+                                .text_color(theme.titlebar_window_icons_text)
+                                .cursor_pointer()
+                                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                    window.prevent_default();
+                                    cx.stop_propagation();
+                                })
+                                .on_click(|_, window, _| window.remove_window())
+                                .child(icon(Icons::WinClose)),
+                        )
+                    }),
             )
     }
 }

@@ -12,7 +12,7 @@ use crate::{
     controller::{Controller, state::AppState},
     errors::AppError,
     scanner::Scanner,
-    ui::{assets::Assets, res_handler::ResHandler, wiremann::Wiremann},
+    ui::{assets::Assets, popout::PopOutHandle, res_handler::ResHandler, wiremann::Wiremann},
 };
 pub use paths::*;
 
@@ -103,6 +103,8 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
                 cx.set_global(controller.clone());
 
                 let view = cx.new(Wiremann::new);
+
+                cx.set_global(PopOutHandle(view.clone()));
 
                 let res_handler = cx.new(|_| ResHandler {});
                 let arc_res = Arc::new(res_handler.clone());

@@ -15,8 +15,8 @@ pub fn build_window_options(app_icon: Option<WindowIcon>, cx: &mut App) -> Windo
         is_resizable: true,
         window_decorations: Some(WindowDecorations::Client),
         window_min_size: Some(Size {
-            width: px(800.0),
-            height: px(740.0),
+            width: px(460.0),
+            height: px(717.0),
         }),
         app_icon,
         window_background: WindowBackgroundAppearance::Blurred,
