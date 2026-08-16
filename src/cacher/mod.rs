@@ -1,5 +1,7 @@
+pub mod db;
 pub mod images;
 pub mod io;
+pub mod legacy;
 pub mod lyrics;
 pub mod paths;
 pub mod schema;
@@ -7,12 +9,10 @@ pub mod schema;
 use crate::app::AppPaths;
 use crate::controller::commands::CacherCommand;
 use crate::controller::events::CacherEvent;
-use crate::controller::state::{
-    LibraryState, ListenMetrics, PlaybackState, QueueState, TrackId,
-};
 use crate::errors::CacherError;
 use crossbeam_channel::{Receiver, Sender};
 
+pub use db::Db;
 pub use io::CacheJob;
 pub use schema::{CachedImage, CachedTrackSource, ImageKind};
 use tracing::error;
@@ -150,84 +150,68 @@ impl Cacher {
         }
     }
 
-    fn write_library_state(&self, state: &LibraryState) -> Result<(), CacherError> {
-        io::write_library_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn write_playback_state(&self, state: &PlaybackState) -> Result<(), CacherError> {
-        io::write_playback_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn write_queue_state(&self, state: &QueueState) -> Result<(), CacherError> {
-        io::write_queue_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn write_favorites(&self, ids: &[TrackId]) -> Result<(), CacherError> {
-        io::write_favorites_to_disk(&self.app_paths.cache, ids)
-    }
-
-    fn write_metrics(&self, metrics: &ListenMetrics) -> Result<(), CacherError> {
-        io::write_metrics_to_disk(&self.app_paths.cache, metrics)
-    }
-
-    fn load_app_state(&self) -> Result<crate::controller::state::AppState, CacherError> {
-        io::load_app_state(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_library_state(&self) -> Result<LibraryState, CacherError> {
-        io::read_library_state_from_disk(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_queue_state(&self) -> Result<QueueState, CacherError> {
-        io::read_queue_state_from_disk(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_playback_state(&self) -> Result<PlaybackState, CacherError> {
-        io::read_playback_state_from_disk(&self.app_paths.cache)
-    }
-
     fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>) {
         let cacher = self.clone();
 
         std::thread::spawn(move || {
+            // SQLx is async-first; run a small current-thread runtime inside
+            // this worker so every job can await the database directly.
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    error!(error = ?e, "failed to start SQLite runtime");
+                    return;
+                }
+            };
+
+            let db = match rt.block_on(Db::connect(&cacher.app_paths.cache)) {
+                Ok(db) => db,
+                Err(e) => {
+                    error!(error = ?e, "failed to open database");
+                    return;
+                }
+            };
+
             loop {
                 while let Ok(job) = rx.recv() {
-                    let result: Result<(), CacherError> = (|| {
-                        match job {
-                            CacheJob::WriteLibraryState(state) => {
-                                // Coalesce: a scan can queue many snapshots while it runs;
-                                // any later snapshot queued behind this one supersedes it,
-                                // so drain them and persist only the final state.
-                                let mut state = state;
-                                while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
-                                    state = later;
-                                }
-                                cacher.write_library_state(&state)?;
+                    let result: Result<(), CacherError> = match job {
+                        CacheJob::WriteLibraryState(state) => {
+                            // Coalesce: a scan can queue many snapshots while it runs;
+                            // any later snapshot queued behind this one supersedes it,
+                            // so drain them and persist only the final state.
+                            let mut state = state;
+                            while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
+                                state = later;
                             }
-                            CacheJob::WritePlaybackState(state) => {
-                                cacher.write_playback_state(&state)?;
-                            }
-                            CacheJob::WriteQueueState(state) => {
-                                cacher.write_queue_state(&state)?;
-                            }
-                            CacheJob::WriteFavorites(ids) => {
-                                cacher.write_favorites(&ids)?;
-                            }
-                            CacheJob::WriteMetrics(metrics) => {
-                                cacher.write_metrics(&metrics)?;
-                            }
-                            CacheJob::LoadAppState => {
-                                let state = cacher.load_app_state()?;
-                                let _ = cacher.tx.send(CacherEvent::AppState(state));
-                            }
-                            _ => {}
+                            rt.block_on(db.write_library(&state)).map_err(Into::into)
                         }
-
-                        Ok(())
-                    })();
+                        CacheJob::WriteQueueState(state) => {
+                            rt.block_on(db.write_queue(&state)).map_err(Into::into)
+                        }
+                        CacheJob::WriteFavorites(ids) => {
+                            rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
+                        }
+                        CacheJob::WriteMetrics(metrics) => {
+                            rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
+                        }
+                        CacheJob::WritePlaybackState(state) => {
+                            io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)
+                        }
+                        CacheJob::LoadAppState => {
+                            let state = rt.block_on(db.load_app_state(&cacher.app_paths.cache));
+                            match state {
+                                Ok(state) => {
+                                    let _ = cacher.tx.send(CacherEvent::AppState(state));
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                        _ => Ok(()),
+                    };
 
                     if let Err(err) = result {
                         error!(error = ?err, "Error occurred");
