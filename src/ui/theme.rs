@@ -86,6 +86,18 @@ pub struct Theme {
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
+    pub library_home_section_meta: Rgba,
+    pub library_home_section_stat_bg: Rgba,
+    pub library_home_section_stat_bg_hover: Rgba,
+    pub library_home_section_stat_value: Rgba,
+    pub library_home_section_stat_label: Rgba,
+    pub library_home_section_stat_icon: Rgba,
+    pub library_home_section_see_all_text: Rgba,
+    pub library_home_section_see_all_text_hover: Rgba,
+    pub library_home_section_card_bg: Rgba,
+    pub library_home_section_card_bg_hover: Rgba,
+    pub library_home_section_card_title: Rgba,
+    pub library_home_section_card_meta: Rgba,
 
     // Library Page Albums Section
     pub library_albums_section_title: Rgba,
@@ -141,6 +153,23 @@ pub struct Theme {
 
     // Library Page Favorites Section
     pub library_favorites_section_title: Rgba,
+
+    // Library Page Stats Section
+    pub library_stats_section_title: Rgba,
+    pub library_stats_banner_gradient_a: Rgba,
+    pub library_stats_banner_gradient_b: Rgba,
+    pub library_stats_banner_text: Rgba,
+    pub library_stats_banner_muted: Rgba,
+    pub library_stats_banner_accent: Rgba,
+    pub library_stats_banner_button_bg: Rgba,
+    pub library_stats_banner_button_text: Rgba,
+    pub library_stats_pill_bg: Rgba,
+    pub library_stats_card_bg: Rgba,
+    pub library_stats_card_value: Rgba,
+    pub library_stats_card_label: Rgba,
+    pub library_stats_rank: Rgba,
+    pub library_stats_table_text: Rgba,
+    pub library_stats_table_meta: Rgba,
 
     // Library Page Settings Section
     pub library_settings_section_title: Rgba,
@@ -295,6 +324,18 @@ impl Default for Theme {
             library_sidebar_indicator_glow: rgba(0xFFFFFF4D),
 
             library_home_section_title: rgb(0xFFFFFF),
+            library_home_section_meta: rgb(0x71717A),
+            library_home_section_stat_bg: rgba(0xFFFFFF0A),
+            library_home_section_stat_bg_hover: rgba(0xFFFFFF14),
+            library_home_section_stat_value: rgb(0xFAFAFA),
+            library_home_section_stat_label: rgb(0x71717A),
+            library_home_section_stat_icon: rgb(0xFAFAFA),
+            library_home_section_see_all_text: rgb(0x71717A),
+            library_home_section_see_all_text_hover: rgb(0xFFFFFF),
+            library_home_section_card_bg: rgba(0xFFFFFF08),
+            library_home_section_card_bg_hover: rgba(0xFFFFFF14),
+            library_home_section_card_title: rgb(0xFAFAFA),
+            library_home_section_card_meta: rgb(0x71717A),
             library_albums_section_title: rgb(0xFFFFFF),
             library_albums_section_bg: rgba(0xFFFFFF00),
             library_albums_section_bg_hover: rgba(0xFFFFFF08),
@@ -344,6 +385,21 @@ impl Default for Theme {
             library_artist_section_button_secondary_text: rgb(0xFAFAFA),
 
             library_favorites_section_title: rgb(0xFFFFFF),
+            library_stats_section_title: rgb(0xFFFFFF),
+            library_stats_banner_gradient_a: rgb(0x7C3AED),
+            library_stats_banner_gradient_b: rgb(0x06B6D4),
+            library_stats_banner_text: rgb(0xFFFFFF),
+            library_stats_banner_muted: rgba(0xFFFFFFC4),
+            library_stats_banner_accent: rgba(0xFFFFFF1F),
+            library_stats_banner_button_bg: rgb(0xFFFFFF),
+            library_stats_banner_button_text: rgb(0x09090B),
+            library_stats_pill_bg: rgba(0x0505054D),
+            library_stats_card_bg: rgba(0xFFFFFF0A),
+            library_stats_card_value: rgb(0xFAFAFA),
+            library_stats_card_label: rgb(0x71717A),
+            library_stats_rank: rgb(0x71717A),
+            library_stats_table_text: rgb(0xFAFAFA),
+            library_stats_table_meta: rgb(0x71717A),
             library_settings_section_title: rgb(0xFFFFFF),
             library_plugins_section_title: rgb(0xFFFFFF),
 

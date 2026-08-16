@@ -9,6 +9,7 @@ use crate::{
             bounds_observer::observe_bounds,
             icons::{icon, Icons},
             image_cache::ImageCache,
+            resize_handle::{ResizeHandle, ResizeSide, ResizeState},
             scrollbar::{RightPad, floating_scrollbar},
         },
         theme::{DominantColors, Theme},
@@ -34,6 +35,7 @@ pub struct PlayerPage {
     pub controlbar: Entity<ControlBar>,
     show_panel: Entity<bool>,
     current_panel: Entity<Panel>,
+    panel_width: Entity<ResizeState>,
     album_bounds: Option<Bounds<Pixels>>,
 }
 
@@ -48,6 +50,7 @@ impl PlayerPage {
         let queue_scroll_handle = UniformListScrollHandle::new();
         let show_panel = cx.new(|_| true);
         let current_panel = cx.new(|_| Panel::Queue);
+        let panel_width = cx.new(|_| ResizeState::new(ResizeSide::Right, 480.0, 360.0, 760.0));
 
         PlayerPage {
             queue: Queue::new(cx, queue_scroll_handle.clone()),
@@ -57,6 +60,7 @@ impl PlayerPage {
             controlbar,
             show_panel,
             current_panel,
+            panel_width,
             album_bounds: None,
         }
     }
@@ -80,6 +84,9 @@ impl Render for PlayerPage {
         } else {
             None
         };
+
+        let current_id = state.playback.current;
+        let panel_width = self.panel_width.read(cx).width();
 
         let (current_artist_str, _current_album_str) = if let Some(track) = current {
             (
@@ -267,6 +274,45 @@ impl Render for PlayerPage {
                             .mt_6()
                             .child(
                                 div()
+                                    .id("favorite")
+                                    .p_4()
+                                    .rounded_md()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .text_color(theme.player_icons_text)
+                                    .hover(|this| {
+                                        this.bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .when(
+                                        current_id
+                                            .map(|id| controller.is_favorite(id, cx))
+                                            .unwrap_or(false),
+                                        |this| {
+                                            this.text_color(theme.player_icons_text_active)
+                                                .bg(theme.player_icons_bg_active)
+                                        },
+                                    )
+                                    .on_click({
+                                        let controller = controller.clone();
+                                        move |_, _, cx| {
+                                            if let Some(id) = cx
+                                                .global::<Controller>()
+                                                .state
+                                                .read(cx)
+                                                .playback
+                                                .current
+                                            {
+                                                controller.toggle_favorite(id, cx);
+                                            }
+                                        }
+                                    })
+                                    .child(icon(Icons::Heart).size_4()),
+                            )
+                            .child(
+                                div()
                                     .id("shuffle")
                                     .p_4()
                                     .rounded_md()
@@ -390,18 +436,45 @@ impl Render for PlayerPage {
                                         move |_, _, cx| controller.set_repeat(cx)
                                     })
                                     .child(icon(Icons::Repeat).size_4()),
+                            )
+                            .child(
+                                div()
+                                    .id("reveal_in_folder")
+                                    .p_4()
+                                    .rounded_md()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .text_color(theme.player_icons_text)
+                                    .hover(|this| {
+                                        this.bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .on_click(|_, _, cx| {
+                                        if let Some(id) = cx
+                                            .global::<Controller>()
+                                            .state
+                                            .read(cx)
+                                            .playback
+                                            .current
+                                        {
+                                            cx.global::<Controller>().reveal_in_folder(id, cx);
+                                        }
+                                    })
+                                    .child(icon(Icons::FolderOpen).size_4()),
                             ),
                     )
                     .child(self.controlbar.clone()),
             )
+            .when(!is_portrait && *show_panel.read(cx), |this| {
+                this.child(ResizeHandle::new(&self.panel_width))
+            })
             .child(if *show_panel.read(cx) {
                 div()
                     .h_full()
                     .when(is_portrait, |this| this.w_full().flex_1())
-                    .when(!is_portrait, |this| this.w(relative(0.46)).h_full())
-                    .when(*self.current_panel.read(cx) == Panel::Queue && !is_portrait, |this| {
-                        this.max_w_128()
-                    })
+                    .when(!is_portrait, |this| this.w(px(panel_width)).h_full())
                     .flex_shrink_0()
                     .flex()
                     .flex_col()

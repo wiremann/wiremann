@@ -3,6 +3,7 @@ mod element_ext;
 pub mod icons;
 pub mod image_cache;
 pub mod keybinds_overlay;
+pub mod resize_handle;
 pub mod scrollbar;
 pub mod slider;
 pub mod toasts;

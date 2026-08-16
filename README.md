@@ -9,6 +9,7 @@
 # Wiremann
 
 ![Main Showcase.png](assets/screenshots/Main%20Showcase.png)
+![Library Showcase.png](assets/screenshots/Library.png)
 
 A fast, no-bullshit music player built in Rust. Just pure, native speed.
 

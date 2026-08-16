@@ -10,8 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::controller::state::LibraryState;
-use crate::controller::state::{Album, AlbumId, Artist, ArtistId};
+use crate::controller::state::{
+    Album, AlbumId, Artist, ArtistId, LibraryState, ListenMetrics, TrackListenMetrics,
+};
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Hash)]
 pub enum ImageKind {
@@ -123,6 +124,25 @@ pub struct CachedPlaybackState {
 pub struct CachedQueueState {
     pub tracks: Vec<[u8; 16]>,
     pub order: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
+pub struct CachedFavorites {
+    pub tracks: Vec<[u8; 16]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
+pub struct CachedTrackMetrics {
+    pub play_count: u32,
+    pub play_time: u64,
+    pub first_played: Option<u64>,
+    pub last_played: Option<u64>,
+    pub skip_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Encode, Decode)]
+pub struct CachedListenMetrics {
+    pub tracks: Vec<([u8; 16], CachedTrackMetrics)>,
 }
 
 // Conversion implementations
@@ -387,6 +407,66 @@ impl From<CachedQueueState> for QueueState {
         Self {
             tracks: c.tracks.into_iter().map(TrackId).collect(),
             order: c.order,
+        }
+    }
+}
+
+impl From<&[TrackId]> for CachedFavorites {
+    fn from(ids: &[TrackId]) -> Self {
+        Self {
+            tracks: ids.iter().map(|id| id.0).collect(),
+        }
+    }
+}
+
+impl From<CachedFavorites> for Vec<TrackId> {
+    fn from(c: CachedFavorites) -> Self {
+        c.tracks.into_iter().map(TrackId).collect()
+    }
+}
+
+impl From<&ListenMetrics> for CachedListenMetrics {
+    fn from(m: &ListenMetrics) -> Self {
+        Self {
+            tracks: m
+                .tracks
+                .iter()
+                .map(|(id, t)| {
+                    (
+                        id.0,
+                        CachedTrackMetrics {
+                            play_count: t.play_count,
+                            play_time: t.play_time.as_secs(),
+                            first_played: t.first_played,
+                            last_played: t.last_played,
+                            skip_count: t.skip_count,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<CachedListenMetrics> for ListenMetrics {
+    fn from(c: CachedListenMetrics) -> Self {
+        Self {
+            tracks: c
+                .tracks
+                .into_iter()
+                .map(|(id, t)| {
+                    (
+                        TrackId(id),
+                        TrackListenMetrics {
+                            play_count: t.play_count,
+                            play_time: Duration::from_secs(t.play_time),
+                            first_played: t.first_played,
+                            last_played: t.last_played,
+                            skip_count: t.skip_count,
+                        },
+                    )
+                })
+                .collect(),
         }
     }
 }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hasher;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, UNIX_EPOCH};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use twox_hash::{XxHash3_64, XxHash3_128};
 use uuid::Uuid;
@@ -19,6 +19,12 @@ pub struct AppState {
     pub playback: PlaybackState,
     pub library: LibraryState,
     pub queue: QueueState,
+    pub favorites: Vec<TrackId>,
+    pub metrics: ListenMetrics,
+    pub metrics_session: Option<MetricsSession>,
+    /// Last time `session.ron` was written while the position ticked, used to
+    /// throttle position-driven writes to disk.
+    pub last_playback_write: Option<Instant>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -92,6 +98,27 @@ pub struct PlaybackState {
 pub struct QueueState {
     pub tracks: Vec<TrackId>,
     pub order: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TrackListenMetrics {
+    pub play_count: u32,
+    pub play_time: Duration,
+    pub first_played: Option<u64>,
+    pub last_played: Option<u64>,
+    pub skip_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ListenMetrics {
+    pub tracks: HashMap<TrackId, TrackListenMetrics>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricsSession {
+    pub track_id: TrackId,
+    pub last_position: Duration,
+    pub played: Duration,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -249,6 +276,24 @@ impl QueueState {
     pub fn get_index(&self, id: TrackId) -> Option<usize> {
         let track_idx = self.tracks.iter().position(|&t| t == id)?;
         self.order.iter().position(|&o| o == track_idx)
+    }
+}
+
+impl AppState {
+    #[must_use]
+    pub fn is_favorite(&self, id: TrackId) -> bool {
+        self.favorites.contains(&id)
+    }
+
+    /// Toggles whether the given track is favorited, returning the new state.
+    pub fn toggle_favorite(&mut self, id: TrackId) -> bool {
+        if let Some(idx) = self.favorites.iter().position(|&f| f == id) {
+            self.favorites.remove(idx);
+            false
+        } else {
+            self.favorites.push(id);
+            true
+        }
     }
 }
 

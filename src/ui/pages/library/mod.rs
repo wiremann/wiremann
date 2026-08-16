@@ -4,6 +4,7 @@ mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::ease_in_out_expo;
+use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
 use crate::ui::pages::library::routes::albums::AlbumsSection;
@@ -15,6 +16,7 @@ use crate::ui::pages::library::routes::playlist::PlaylistViewSection;
 use crate::ui::pages::library::routes::playlists::PlaylistsSection;
 use crate::ui::pages::library::routes::plugins::PluginsSection;
 use crate::ui::pages::library::routes::settings::SettingsSection;
+use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
@@ -31,6 +33,7 @@ pub enum LibraryRoutes {
     // Discovery
     Home,
     Favorites,
+    Stats,
 
     // Collection
     Tracks,
@@ -51,6 +54,7 @@ pub enum LibraryRoutes {
 #[derive(Clone)]
 pub struct LibraryPage {
     sidebar: Entity<Sidebar>,
+    sidebar_width: Entity<ResizeState>,
     album: Entity<AlbumViewSection>,
     albums: Entity<AlbumsSection>,
     artist: Entity<ArtistViewSection>,
@@ -62,6 +66,7 @@ pub struct LibraryPage {
     tracks: Entity<TracksSection>,
     plugins: Entity<PluginsSection>,
     settings: Entity<SettingsSection>,
+    stats: Entity<StatsSection>,
 }
 
 impl LibraryRoutes {
@@ -69,18 +74,19 @@ impl LibraryRoutes {
         match self {
             Self::Home => 0,
             Self::Favorites => 1,
+            Self::Stats => 2,
 
-            Self::Tracks => 2,
-            Self::Albums => 3,
-            Self::Artists => 4,
-            Self::Playlists => 5,
+            Self::Tracks => 3,
+            Self::Albums => 4,
+            Self::Artists => 5,
+            Self::Playlists => 6,
 
-            Self::Album(_) => 6,
-            Self::Artist(_) => 7,
-            Self::Playlist(_) => 8,
+            Self::Album(_) => 7,
+            Self::Artist(_) => 8,
+            Self::Playlist(_) => 9,
 
-            Self::Settings => 9,
-            Self::Plugins => 10,
+            Self::Settings => 10,
+            Self::Plugins => 11,
         }
     }
 }
@@ -96,6 +102,7 @@ impl LibraryPage {
 
         LibraryPage {
             sidebar: cx.new(|_| Sidebar),
+            sidebar_width: cx.new(|_| ResizeState::new(ResizeSide::Left, 256.0, 220.0, 420.0)),
             album: cx.new(|cx| AlbumViewSection {
                 album_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
@@ -123,13 +130,20 @@ impl LibraryPage {
                 scroll_handle: ScrollHandle::new(),
                 grid_controller: VirtualGridScrollController::new(),
             }),
-            favorites: cx.new(|_| FavoritesSection),
-            home: cx.new(|_| HomeSection),
+            favorites: cx.new(|_| FavoritesSection {
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            home: cx.new(|_| HomeSection {
+                scroll_handle: ScrollHandle::new(),
+            }),
             tracks: cx.new(|_| TracksSection {
                 scroll_handle: UniformListScrollHandle::new(),
             }),
             plugins: cx.new(|_| PluginsSection),
             settings: cx.new(|_| SettingsSection),
+            stats: cx.new(|_| StatsSection {
+                scroll_handle: ScrollHandle::new(),
+            }),
         }
     }
 }
@@ -149,9 +163,12 @@ impl Render for LibraryPage {
 
         let section = *cx.global::<LibraryRoutes>();
 
+        let sidebar_width = self.sidebar_width.read(cx).width();
+
         let section_el = match section {
             LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
             LibraryRoutes::Favorites => div().w_full().h_full().child(self.favorites.clone()),
+            LibraryRoutes::Stats => div().w_full().h_full().child(self.stats.clone()),
             LibraryRoutes::Tracks => div().w_full().h_full().child(self.tracks.clone()),
             LibraryRoutes::Albums => div().w_full().h_full().child(self.albums.clone()),
             LibraryRoutes::Artists => div().w_full().h_full().child(self.artists.clone()),
@@ -198,7 +215,14 @@ impl Render for LibraryPage {
             .px_2()
             .pt_2()
             .flex()
-            .child(self.sidebar.clone())
+            .child(
+                div()
+                    .w(px(sidebar_width))
+                    .h_full()
+                    .flex_shrink_0()
+                    .child(self.sidebar.clone()),
+            )
+            .child(ResizeHandle::new(&self.sidebar_width))
             .child(
                 div()
                     .id("animation_container")

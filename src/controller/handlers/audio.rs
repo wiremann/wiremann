@@ -1,9 +1,15 @@
 use super::{
     App, AudioEvent, CacherCommand, Controller, ControllerError, Duration, Entity, HashSet,
-    ImageKind, ImageProcessorCommand, ScannerCommand, SystemIntegrationCommand, Wiremann,
-    duration_to_slider,
+    ImageKind, ImageProcessorCommand, Instant, PlaybackStatus, ScannerCommand,
+    SystemIntegrationCommand, Wiremann, duration_to_slider,
 };
 use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
+
+/// How often `session.ron` is refreshed while the playback position ticks.
+/// Position changes stream in every frame (~16 ms); persisting each one would
+/// hammer the disk. State transitions (track load, pause, stop) still write
+/// immediately, so the worst case loss on a crash is a few seconds of position.
+const PLAYBACK_STATE_PERSIST_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Helper: if the title looks like "Artist - RealTitle" and the artist is
 /// unknown or matches the prefix, split it apart.
@@ -58,19 +64,45 @@ impl Controller {
                         });
                         cx.notify();
                     });
-                    self.state.update(cx, |this, cx| {
+                    let should_persist = self.state.update(cx, |this, cx| {
                         this.playback.position = *pos;
+
+                        if let Some(session) = this.metrics_session.as_mut() {
+                            if *pos > session.last_position {
+                                let delta = *pos - session.last_position;
+
+                                if this.playback.status == PlaybackStatus::Playing {
+                                    session.played += delta;
+                                }
+                            }
+
+                            session.last_position = *pos;
+                        }
+
+                        let now = Instant::now();
+                        let should_persist = this.last_playback_write.map_or(true, |last| {
+                            now.duration_since(last) >= PLAYBACK_STATE_PERSIST_INTERVAL
+                        });
+
+                        if should_persist {
+                            this.last_playback_write = Some(now);
+                        }
+
                         cx.notify();
+
+                        should_persist
                     });
 
                     self.system_integration_tx
                         .send(SystemIntegrationCommand::SetPosition(*pos))
                         .ok();
 
-                    let state = self.state.read(cx).playback.clone();
-                    let _ = self
-                        .cacher_tx
-                        .send(CacherCommand::WritePlaybackState(state));
+                    if should_persist {
+                        let state = self.state.read(cx).playback.clone();
+                        let _ = self
+                            .cacher_tx
+                            .send(CacherCommand::WritePlaybackState(state));
+                    }
                 }
             }
             AudioEvent::TrackLoaded(track_id, path) => {
@@ -164,6 +196,20 @@ impl Controller {
                     cx.notify();
                 });
 
+                {
+                    let prev = self
+                        .state
+                        .read(cx)
+                        .metrics_session
+                        .as_ref()
+                        .map(|s| s.track_id);
+
+                    if prev != Some(*track_id) {
+                        self.finalize_metrics_session(cx, false);
+                        self.start_metrics_session(*track_id, cx);
+                    }
+                }
+
                 let state = self.state.read(cx).playback.clone();
                 let _ = self
                     .cacher_tx
@@ -175,6 +221,11 @@ impl Controller {
                     cx.notify();
                 });
                 cx.notify(view.entity_id());
+
+                if *status == PlaybackStatus::Stopped {
+                    self.finalize_metrics_session(cx, false);
+                }
+
                 let state = self.state.read(cx).playback.clone();
                 self.system_integration_tx
                     .send(SystemIntegrationCommand::SetPlaybackStatus(
@@ -187,6 +238,8 @@ impl Controller {
                     .send(CacherCommand::WritePlaybackState(state));
             }
             AudioEvent::TrackEnded => {
+                self.finalize_metrics_session(cx, true);
+
                 let repeat = self.state.read(cx).playback.repeat;
 
                 if repeat {
