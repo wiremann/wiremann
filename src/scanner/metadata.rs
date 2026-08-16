@@ -63,23 +63,19 @@ pub fn read_metadata(track_source: TrackSource) -> Result<ScannedTrack, ScannerE
     // attempt to parse it from the filename (the fallback may have had it
     // before tags overwrote it).
     if artists.is_empty() || artists.iter().any(|a| a.eq_ignore_ascii_case("Unknown Artist")) {
-        if let Some(idx) = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .and_then(|stem| stem.find(" - "))
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        if let Some((parsed_artist, parsed_title)) = split_artist_title(stem)
+            && !parsed_artist.is_empty()
+            && !parsed_title.is_empty()
         {
-            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-            let parsed_artist = stem[..idx].trim();
-            let parsed_title = stem[idx + 3..].trim();
-            if !parsed_artist.is_empty() && !parsed_title.is_empty() {
-                artists = vec![parsed_artist.to_string()];
-                // If the tag had a correct title (no "Artist - " prefix), keep it.
-                // Otherwise use the parsed title from filename.
-                if title.eq_ignore_ascii_case(&format!("{} - {}", parsed_artist, parsed_title))
-                    || title.is_empty()
-                {
-                    title = parsed_title.to_string();
-                }
+            artists = vec![parsed_artist.to_string()];
+            // If the tag had a correct title (no "Artist - " prefix), keep it.
+            // Otherwise use the parsed title from filename.
+            if title.eq_ignore_ascii_case(&format!("{} - {}", parsed_artist, parsed_title))
+                || title.eq_ignore_ascii_case(&format!("{}: {}", parsed_artist, parsed_title))
+                || title.is_empty()
+            {
+                title = parsed_title.to_string();
             }
         }
     }
@@ -136,18 +132,16 @@ fn fallback_metadata(path: &Path) -> (String, Vec<String>, String) {
         .and_then(|s| s.to_str())
         .unwrap_or("Unknown");
 
-    // Try to parse "Artist - Title" convention from the filename.
-    if let Some(idx) = stem.find(" - ") {
-        let (artist, title) = stem.split_at(idx);
-        let title = title.trim_start_matches(" - ").trim();
-        let artist = artist.trim();
-        if !artist.is_empty() && !title.is_empty() {
-            return (
-                title.to_string(),
-                vec![artist.to_string()],
-                "Unknown Album".to_string(),
-            );
-        }
+    // Try to parse "Artist - Title" or "Artist: Title" from the filename.
+    if let Some((artist, title)) = split_artist_title(stem)
+        && !artist.is_empty()
+        && !title.is_empty()
+    {
+        return (
+            title.to_string(),
+            vec![artist.to_string()],
+            "Unknown Album".to_string(),
+        );
     }
 
     (
@@ -155,4 +149,23 @@ fn fallback_metadata(path: &Path) -> (String, Vec<String>, String) {
         vec!["Unknown Artist".to_string()],
         "Unknown Album".to_string(),
     )
+}
+
+/// Splits a filename stem into `(artist, title)` using either the
+/// "Artist - Title" or "Artist: Title" convention. Returns [`None`] when no
+/// separator is present or either side is empty.
+fn split_artist_title(stem: &str) -> Option<(&str, &str)> {
+    let (sep_len, i) = stem
+        .find(" - ")
+        .map(|i| (3, i))
+        .or_else(|| stem.find(": ").map(|i| (2, i)))?;
+
+    let artist = stem[..i].trim();
+    let title = stem[i + sep_len..].trim();
+
+    if artist.is_empty() || title.is_empty() {
+        return None;
+    }
+
+    Some((artist, title))
 }

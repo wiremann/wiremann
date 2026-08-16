@@ -4,7 +4,12 @@ use crate::controller::commands::ImageProcessorCommand;
 use crate::controller::events::ImageProcessorEvent;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
-use crate::{cacher::ImageKind, errors::ImageProcessorError, scanner::metadata};
+use crate::{
+    cacher::ImageKind,
+    errors::ImageProcessorError,
+    scanner::metadata,
+    title::strip_search_suffixes,
+};
 use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
 use gpui::RenderImage;
@@ -278,16 +283,28 @@ fn fetch_album_art_online(
     artist: &str,
     album: &str,
 ) {
-    // Build search query. Skip artist when it's unset — "Unknown Artist" pollutes the search.
-    let query = if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
-        title.to_string()
+    // Filenames without metadata often trail "[Official Music Video]" or
+    // similar bracket groups that pollute the search. Try the stripped title
+    // first, falling back to the raw title and album.
+    let stripped = strip_search_suffixes(title);
+    let title_attempts: &[&str] = if stripped != title && !stripped.is_empty() {
+        &[stripped, title]
     } else {
-        format!("{} {}", artist, title)
+        &[title]
     };
 
-    if let Some(cover_url) = deezer_search(&query, 3) {
-        download_and_send_album_art(events_tx, id, &cover_url);
-        return;
+    for title_attempt in title_attempts {
+        // Build search query. Skip artist when it's unset — "Unknown Artist" pollutes the search.
+        let query = if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
+            (*title_attempt).to_string()
+        } else {
+            format!("{} {title_attempt}", artist)
+        };
+
+        if let Some(cover_url) = deezer_search(&query, 3) {
+            download_and_send_album_art(events_tx, id, &cover_url);
+            return;
+        }
     }
 
     // Fallback: try artist + album when the album name is real.

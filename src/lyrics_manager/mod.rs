@@ -6,6 +6,7 @@ use crate::{
     controller::{commands::LyricsCommand, events::LyricsEvent},
     errors::LyricsError,
     lyrics_manager::providers::{lrclib::LrcLib, youly::YouLY},
+    title::strip_search_suffixes,
 };
 use bitcode::{Decode, Encode};
 use crossbeam_channel::{Receiver, Sender};
@@ -110,23 +111,46 @@ impl LyricsManager {
                     std::thread::spawn(move || {
                         let mut found = None;
 
-                        for provider in &*providers {
-                            match provider.get_lyrics(
-                                title.as_str(),
-                                artist.as_str(),
-                                album.as_str(),
-                                duration,
-                            ) {
-                                Ok(Some(lyrics)) => {
-                                    found = Some(lyrics);
-                                    break;
+                        // Filenames without metadata often trail "[Official
+                        // Music Video]" or similar bracket groups that confuse
+                        // search. Try the stripped title first, then the raw
+                        // one as a fallback.
+                        let stripped = strip_search_suffixes(&title);
+                        let attempts: [&str; 2] = if stripped == title.as_str()
+                            || stripped.is_empty()
+                        {
+                            [title.as_str(), ""]
+                        } else {
+                            [stripped, title.as_str()]
+                        };
+
+                        for attempt in attempts.iter() {
+                            if attempt.is_empty() {
+                                continue;
+                            }
+
+                            for provider in &*providers {
+                                match provider.get_lyrics(
+                                    attempt,
+                                    artist.as_str(),
+                                    album.as_str(),
+                                    duration,
+                                ) {
+                                    Ok(Some(lyrics)) => {
+                                        found = Some(lyrics);
+                                        break;
+                                    }
+                                    Ok(None) => {
+                                        warn!(provider = %provider.name(), " returned no lyrics");
+                                    }
+                                    Err(e) => {
+                                        error!(error = ?e, provider = %provider.name(), " failed");
+                                    }
                                 }
-                                Ok(None) => {
-                                    warn!(provider = %provider.name(), " returned no lyrics");
-                                }
-                                Err(e) => {
-                                    error!(error = ?e, provider = %provider.name(), " failed");
-                                }
+                            }
+
+                            if found.is_some() {
+                                break;
                             }
                         }
 
