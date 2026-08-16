@@ -169,3 +169,43 @@ fn split_artist_title(stem: &str) -> Option<(&str, &str)> {
 
     Some((artist, title))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::split_artist_title;
+
+    #[test]
+    fn parses_dash_separator() {
+        assert_eq!(
+            split_artist_title("Artist - Song"),
+            Some(("Artist", "Song"))
+        );
+    }
+
+    #[test]
+    fn parses_colon_separator() {
+        assert_eq!(
+            split_artist_title("twenty one pilots: Heathens (from Suicide Squad)"),
+            Some(("twenty one pilots", "Heathens (from Suicide Squad)"))
+        );
+    }
+
+    #[test]
+    fn prefers_dash_over_colon() {
+        assert_eq!(
+            split_artist_title("Band - Song (Live: 2020)"),
+            Some(("Band", "Song (Live: 2020)"))
+        );
+    }
+
+    #[test]
+    fn none_when_no_separator() {
+        assert_eq!(split_artist_title("Just A Song"), None);
+    }
+
+    #[test]
+    fn none_when_side_empty() {
+        assert_eq!(split_artist_title(": Missing Artist"), None);
+        assert_eq!(split_artist_title("Missing Title: "), None);
+    }
+}
