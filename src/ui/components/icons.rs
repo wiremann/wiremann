@@ -160,6 +160,7 @@ pub enum Icons {
     FolderOpen,
     Trash,
     Chart,
+    PopOut,
 }
 
 impl Icons {
@@ -207,6 +208,7 @@ impl IconNamed for Icons {
             Icons::FolderOpen => "icons/folder-open.svg",
             Icons::Trash => "icons/trash.svg",
             Icons::Chart => "icons/chart.svg",
+            Icons::PopOut => "icons/pop-out.svg",
         }
         .into()
     }
