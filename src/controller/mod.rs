@@ -12,6 +12,7 @@ use crate::controller::events::{
 use crate::controller::state::PlaybackStatus;
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::controller::state::{Track, TrackId};
+use crate::controller::state::{MetricsSession, TrackListenMetrics};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, duration_to_slider};
@@ -28,6 +29,7 @@ use tracing::info;
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
+use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
@@ -59,6 +61,19 @@ pub struct Controller {
     // Lyrics manager channel
     pub lyrics_manager_tx: Sender<LyricsCommand>,
     pub lyrics_manager_rx: Receiver<LyricsEvent>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListenStats {
+    pub total_play_time: Duration,
+    pub total_plays: u64,
+    pub total_skips: u64,
+    pub total_tracks_listened: u64,
+    pub first_listen: Option<u64>,
+    pub last_listen: Option<u64>,
+    pub top_tracks: Vec<(TrackId, TrackListenMetrics)>,
+    pub top_artists: Vec<(ArtistId, u32)>,
+    pub top_albums: Vec<(AlbumId, u32)>,
 }
 
 impl Controller {
@@ -561,9 +576,293 @@ impl Controller {
             })
             .ok();
     }
+
+    pub fn is_favorite(&self, id: TrackId, cx: &App) -> bool {
+        self.state.read(cx).is_favorite(id)
+    }
+
+    pub fn toggle_favorite(&self, id: TrackId, cx: &mut App) {
+        self.state.update(cx, |this, _| {
+            this.toggle_favorite(id);
+        });
+
+        let favorites = self.state.read(cx).favorites.clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteFavorites(favorites));
+    }
+
+    pub fn reveal_in_folder(&self, id: TrackId, cx: &App) {
+        let Some(path) = self
+            .state
+            .read(cx)
+            .library
+            .track(id)
+            .and_then(|track| track.get_valid_source())
+            .map(|source| source.path.clone())
+        else {
+            return;
+        };
+
+        reveal_in_os(&path);
+    }
+
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    }
+
+    pub fn finalize_metrics_session(&self, cx: &mut App, completed: bool) {
+        let should_send = self.state.update(cx, |this, _| {
+            let Some(session) = this.metrics_session.take() else {
+                return false;
+            };
+
+            let metrics = this.metrics.tracks.entry(session.track_id).or_default();
+
+            if session.played > Duration::ZERO {
+                metrics.play_time += session.played;
+            }
+
+            let duration = this
+                .library
+                .tracks
+                .get(&session.track_id)
+                .map(|t| t.duration)
+                .unwrap_or_default();
+
+            if !completed && duration > Duration::ZERO && session.played * 5 < duration * 4 {
+                metrics.skip_count += 1;
+            }
+
+            true
+        });
+
+        if should_send {
+            let metrics = self.state.read(cx).metrics.clone();
+            let _ = self
+                .cacher_tx
+                .send(CacherCommand::WriteMetrics(metrics));
+        }
+    }
+
+    pub fn start_metrics_session(&self, track_id: TrackId, cx: &mut App) {
+        self.state.update(cx, |this, _| {
+            let now = Self::now_secs();
+
+            let metrics = this.metrics.tracks.entry(track_id).or_default();
+            metrics.play_count += 1;
+            metrics.first_played.get_or_insert(now);
+            metrics.last_played = Some(now);
+
+            this.metrics_session = Some(MetricsSession {
+                track_id,
+                last_position: Duration::ZERO,
+                played: Duration::ZERO,
+            });
+        });
+
+        let metrics = self.state.read(cx).metrics.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteMetrics(metrics));
+    }
+
+    pub fn top_tracks(&self, cx: &App, limit: usize) -> Vec<TrackId> {
+        let state = self.state.read(cx);
+
+        let mut ranked = state
+            .metrics
+            .tracks
+            .iter()
+            .filter(|(id, _)| state.library.tracks.contains_key(id))
+            .map(|(id, m)| {
+                (
+                    *id,
+                    m.play_count,
+                    m.play_time.as_secs(),
+                    m.last_played.unwrap_or(0),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then(b.2.cmp(&a.2)).then(b.3.cmp(&a.3)));
+
+        ranked
+            .into_iter()
+            .take(limit)
+            .map(|(id, _, _, _)| id)
+            .collect()
+    }
+
+    pub fn recently_played(&self, cx: &App, limit: usize) -> Vec<TrackId> {
+        let state = self.state.read(cx);
+
+        let mut ranked = state
+            .metrics
+            .tracks
+            .iter()
+            .filter(|(id, m)| state.library.tracks.contains_key(id) && m.last_played.is_some())
+            .map(|(id, m)| (*id, m.last_played.unwrap_or(0)))
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+
+        ranked.into_iter().take(limit).map(|(id, _)| id).collect()
+    }
+
+    pub fn top_artists(&self, cx: &App, limit: usize) -> Vec<ArtistId> {
+        let state = self.state.read(cx);
+
+        let mut agg = HashMap::<ArtistId, u32>::new();
+
+        for (id, m) in state.metrics.tracks.iter() {
+            if let Some(track) = state.library.tracks.get(id) {
+                for artist_id in track.artists.iter() {
+                    *agg.entry(*artist_id).or_default() += m.play_count;
+                }
+            }
+        }
+
+        let mut ranked = agg
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .artists
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+
+        // Break ties by name so equal play counts render in a stable order
+        // instead of flickering (the aggregate map is rebuilt every render).
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+
+        ranked.into_iter().take(limit).map(|(id, _, _)| id).collect()
+    }
+
+    pub fn listen_stats(&self, cx: &App) -> ListenStats {
+        let state = self.state.read(cx);
+
+        let mut stats = ListenStats::default();
+
+        let mut artist_plays = HashMap::<ArtistId, u32>::new();
+        let mut album_plays = HashMap::<AlbumId, u32>::new();
+
+        let mut top_tracks = Vec::new();
+
+        for (id, m) in state.metrics.tracks.iter() {
+            let Some(track) = state.library.tracks.get(id) else {
+                continue;
+            };
+
+            stats.total_plays += u64::from(m.play_count);
+            stats.total_skips += u64::from(m.skip_count);
+            stats.total_play_time += m.play_time;
+
+            if m.play_count > 0 {
+                stats.total_tracks_listened += 1;
+            }
+
+            if let Some(first) = m.first_played {
+                stats.first_listen = Some(match stats.first_listen {
+                    Some(prev) => prev.min(first),
+                    None => first,
+                });
+            }
+
+            if let Some(last) = m.last_played {
+                stats.last_listen = Some(match stats.last_listen {
+                    Some(prev) => prev.max(last),
+                    None => last,
+                });
+            }
+
+            top_tracks.push((*id, m.clone()));
+
+            for artist_id in track.artists.iter() {
+                *artist_plays.entry(*artist_id).or_default() += m.play_count;
+            }
+
+            *album_plays.entry(track.album).or_default() += m.play_count;
+        }
+
+        top_tracks.sort_by(|a, b| {
+            b.1.play_count
+                .cmp(&a.1.play_count)
+                .then(b.1.play_time.cmp(&a.1.play_time))
+                .then(b.1.last_played.cmp(&a.1.last_played))
+        });
+        stats.top_tracks = top_tracks.into_iter().take(10).collect();
+
+        let mut top_artists = artist_plays
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .artists
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+        top_artists.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        stats.top_artists = top_artists
+            .into_iter()
+            .take(10)
+            .map(|(id, plays, _)| (id, plays))
+            .collect();
+
+        let mut top_albums = album_plays
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .albums
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+        top_albums.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        stats.top_albums = top_albums
+            .into_iter()
+            .take(10)
+            .map(|(id, plays, _)| (id, plays))
+            .collect();
+
+        stats
+    }
 }
 
 impl Global for Controller {}
+
+fn reveal_in_os(path: &std::path::Path) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer.exe")
+            .arg("/select,")
+            .arg(path)
+            .spawn();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg("-R").arg(path).spawn();
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Some(folder) = path.parent() {
+            let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
+        }
+    }
+}
 
 #[must_use]
 pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(

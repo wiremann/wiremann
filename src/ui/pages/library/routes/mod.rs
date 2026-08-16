@@ -8,4 +8,5 @@ pub mod playlist;
 pub mod playlists;
 pub mod plugins;
 pub mod settings;
+pub mod stats;
 pub mod tracks;

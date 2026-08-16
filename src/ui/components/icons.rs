@@ -157,7 +157,9 @@ pub enum Icons {
     Plugins,
     User,
     Heart,
+    FolderOpen,
     Trash,
+    Chart,
 }
 
 impl Icons {
@@ -202,7 +204,9 @@ impl IconNamed for Icons {
             Icons::Plugins => "icons/plugins.svg",
             Icons::User => "icons/user.svg",
             Icons::Heart => "icons/heart.svg",
+            Icons::FolderOpen => "icons/folder-open.svg",
             Icons::Trash => "icons/trash.svg",
+            Icons::Chart => "icons/chart.svg",
         }
         .into()
     }

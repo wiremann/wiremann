@@ -160,6 +160,7 @@ impl Render for Wiremann {
                     .id("animation_container")
                     .w_full()
                     .h_full()
+                    .min_h_0()
                     .map(move |this| {
                         if prev_page == page {
                             this.child(page_el).into_any_element()

@@ -117,7 +117,7 @@ impl Render for Sidebar {
             "sidebar_root",
             div()
                 .relative()
-                .min_w_64()
+                .w_full()
                 .h_full()
                 .bg(theme.library_sidebar_bg)
                 .flex()
@@ -196,6 +196,13 @@ impl Render for Sidebar {
                     Icons::Heart,
                     "Favorites",
                     LibraryRoutes::Favorites,
+                    current,
+                    theme,
+                ))
+                .child(Self::item(
+                    Icons::Chart,
+                    "Stats",
+                    LibraryRoutes::Stats,
                     current,
                     theme,
                 ))

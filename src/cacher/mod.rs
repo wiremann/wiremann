@@ -7,7 +7,9 @@ pub mod schema;
 use crate::app::AppPaths;
 use crate::controller::commands::CacherCommand;
 use crate::controller::events::CacherEvent;
-use crate::controller::state::{LibraryState, PlaybackState, QueueState};
+use crate::controller::state::{
+    LibraryState, ListenMetrics, PlaybackState, QueueState, TrackId,
+};
 use crate::errors::CacherError;
 use crossbeam_channel::{Receiver, Sender};
 
@@ -58,6 +60,12 @@ impl Cacher {
                 }
                 CacherCommand::WriteQueueState(state) => {
                     let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
+                }
+                CacherCommand::WriteFavorites(ids) => {
+                    let _ = app_state_tx.send(CacheJob::WriteFavorites(ids));
+                }
+                CacherCommand::WriteMetrics(metrics) => {
+                    let _ = app_state_tx.send(CacheJob::WriteMetrics(metrics));
                 }
                 CacherCommand::WriteImage {
                     id,
@@ -154,6 +162,14 @@ impl Cacher {
         io::write_queue_state_to_disk(&self.app_paths.cache, state)
     }
 
+    fn write_favorites(&self, ids: &[TrackId]) -> Result<(), CacherError> {
+        io::write_favorites_to_disk(&self.app_paths.cache, ids)
+    }
+
+    fn write_metrics(&self, metrics: &ListenMetrics) -> Result<(), CacherError> {
+        io::write_metrics_to_disk(&self.app_paths.cache, metrics)
+    }
+
     fn load_app_state(&self) -> Result<crate::controller::state::AppState, CacherError> {
         io::load_app_state(&self.app_paths.cache)
     }
@@ -196,6 +212,12 @@ impl Cacher {
                             }
                             CacheJob::WriteQueueState(state) => {
                                 cacher.write_queue_state(&state)?;
+                            }
+                            CacheJob::WriteFavorites(ids) => {
+                                cacher.write_favorites(&ids)?;
+                            }
+                            CacheJob::WriteMetrics(metrics) => {
+                                cacher.write_metrics(&metrics)?;
                             }
                             CacheJob::LoadAppState => {
                                 let state = cacher.load_app_state()?;
