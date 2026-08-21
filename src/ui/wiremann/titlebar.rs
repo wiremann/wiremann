@@ -1,9 +1,9 @@
 use super::navbar::NavBar;
-use crate::controller::state::PlaybackStatus;
 use crate::controller::Controller;
-use crate::ui::components::icons::{icon, Icons};
-use crate::ui::components::image_cache::ImageCache;
+use crate::controller::state::PlaybackStatus;
 use crate::ui::components::Page;
+use crate::ui::components::icons::{Icons, icon};
+use crate::ui::components::image_cache::ImageCache;
 use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
@@ -29,9 +29,10 @@ impl Render for Titlebar {
         let controller = cx.global::<Controller>().clone();
         let state = controller.state.read(cx);
         let is_playing = state.playback.status == PlaybackStatus::Playing;
-        let current_track = state.playback.current.and_then(|id| {
-            state.library.tracks.get(&id).map(|t| t.clone())
-        });
+        let current_track = state
+            .playback
+            .current
+            .and_then(|id| state.library.tracks.get(&id).map(|t| t.clone()));
         let current_image = cx.global::<ImageCache>().current.clone();
 
         let show_mini_player = !popout_enabled && page != Page::Player && current_track.is_some();
@@ -82,7 +83,10 @@ impl Render for Titlebar {
                         .items_center()
                         .px_4()
                         .py_1()
-                        .text_color(white())
+                        .text_color(white())                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
                         .child(self.navbar.clone()),
                 )
             })
@@ -271,9 +275,7 @@ fn mini_player(
                 .min_w_0()
                 .child({
                     if scroll_range > 0.0 {
-                        let scroll_dur = Duration::from_secs_f32(
-                            1.5 + title.len() as f32 * 0.12,
-                        );
+                        let scroll_dur = Duration::from_secs_f32(1.5 + title.len() as f32 * 0.12);
                         let total_width = container_w + scroll_range;
                         div()
                             .id("mini_title_scroll_container")
@@ -293,9 +295,7 @@ fn mini_player(
                                     .with_animation(
                                         ElementId::Name("mini_title_scroll".into()),
                                         Animation::new(scroll_dur).repeat(),
-                                        move |this, delta| {
-                                            this.left(px(-total_width * delta))
-                                        },
+                                        move |this, delta| this.left(px(-total_width * delta)),
                                     ),
                             )
                             .into_any_element()
@@ -344,9 +344,7 @@ fn mini_player(
                         .text_color(theme.titlebar_window_icons_text)
                         .text_xs()
                         .cursor_pointer()
-                        .hover(|this| {
-                            this.bg(theme.titlebar_window_icons_bg_hover)
-                        })
+                        .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
                         .on_mouse_down(MouseButton::Left, |_, window, cx| {
                             window.prevent_default();
                             cx.stop_propagation();
@@ -373,9 +371,7 @@ fn mini_player(
                         .justify_center()
                         .text_color(theme.titlebar_window_icons_text)
                         .cursor_pointer()
-                        .hover(|this| {
-                            this.bg(theme.titlebar_window_icons_bg_hover)
-                        })
+                        .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
                         .on_mouse_down(MouseButton::Left, |_, window, cx| {
                             window.prevent_default();
                             cx.stop_propagation();
@@ -407,9 +403,7 @@ fn mini_player(
                         .text_color(theme.titlebar_window_icons_text)
                         .text_xs()
                         .cursor_pointer()
-                        .hover(|this| {
-                            this.bg(theme.titlebar_window_icons_bg_hover)
-                        })
+                        .hover(|this| this.bg(theme.titlebar_window_icons_bg_hover))
                         .on_mouse_down(MouseButton::Left, |_, window, cx| {
                             window.prevent_default();
                             cx.stop_propagation();
@@ -419,9 +413,10 @@ fn mini_player(
                             move |_, _, cx| {
                                 let state = controller.state.read(cx);
                                 let pos = state.playback.position;
-                                let track = state.playback.current.and_then(|id| {
-                                    state.library.tracks.get(&id)
-                                });
+                                let track = state
+                                    .playback
+                                    .current
+                                    .and_then(|id| state.library.tracks.get(&id));
                                 let max_dur = track.map_or(Duration::ZERO, |t| t.duration);
                                 let new_pos = (pos + Duration::from_secs(5)).min(max_dur);
                                 controller.seek(new_pos);
