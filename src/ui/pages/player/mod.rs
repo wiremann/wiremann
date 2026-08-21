@@ -7,7 +7,7 @@ use crate::{
     ui::{
         components::{
             bounds_observer::observe_bounds,
-            icons::{icon, Icons},
+            icons::{Icons, icon},
             image_cache::ImageCache,
             resize_handle::{ResizeHandle, ResizeSide, ResizeState},
             scrollbar::{RightPad, floating_scrollbar},
@@ -22,9 +22,10 @@ use queue::Queue;
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
-    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative, rgba,
+    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative,
+    rgba,
 };
-use gpui::prelude::FluentBuilder;
+use gpui::{prelude::FluentBuilder, rgb};
 
 #[derive(Clone)]
 pub struct PlayerPage {

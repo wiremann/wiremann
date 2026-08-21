@@ -233,6 +233,8 @@ pub struct Theme {
     // Common
     pub border: Rgba,
     pub scrollbar_thumb: Rgba,
+    pub resize_handle: Rgba,
+    pub resize_handle_hover: Rgba,
 }
 
 impl Default for Theme {
@@ -456,6 +458,8 @@ impl Default for Theme {
             border: rgba(0xFFFFFF22),
 
             scrollbar_thumb: rgba(0xFFFFFF26),
+            resize_handle: rgba(0xFFFFFF26),
+            resize_handle_hover: rgba(0xFFFFFF4D),
         }
     }
 }

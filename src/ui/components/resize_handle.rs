@@ -1,8 +1,8 @@
-use crate::ui::components::element_ext::ElementExt;
+use crate::ui::{components::element_ext::ElementExt, theme::Theme};
 use gpui::{
     App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, InteractiveElement,
-    IntoElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    px,
+    IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement,
+    Styled, Window, div, px,
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -77,8 +77,9 @@ impl ResizeHandle {
 }
 
 impl RenderOnce for ResizeHandle {
-    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let entity_id = self.state.entity_id();
+        let theme = cx.global::<Theme>();
 
         div()
             .id(("resize_handle", entity_id))
@@ -86,6 +87,16 @@ impl RenderOnce for ResizeHandle {
             .h_full()
             .flex_shrink_0()
             .cursor_col_resize()
+            .flex()
+            .justify_center()
+            .items_center()
+            .child(
+                div()
+                    .id("resize_handle_inner")
+                    .w(px(2.0))
+                    .h_full()
+                    .bg(theme.resize_handle),
+            )
             .on_drag(ResizeDrag(entity_id), |drag, _, _, cx| {
                 cx.new(|_| drag.clone())
             })
