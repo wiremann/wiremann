@@ -71,13 +71,15 @@ impl StatsSection {
             .child(title.to_string())
     }
 
-    fn horizontal_row(children: Vec<Div>) -> Div {
+    fn responsive_grid(children: Vec<Div>) -> Div {
         div()
             .w_full()
             .flex()
+            .flex_wrap()
+            .items_stretch()
+            .justify_center()
             .gap_4()
             .py_1()
-            .overflow_x_scroll()
             .children(children)
     }
 
@@ -219,7 +221,8 @@ impl StatsSection {
     fn stat_card(value: String, label: &str, theme: Theme) -> Div {
         div()
             .flex_1()
-            .min_w_0()
+            .min_w(px(180.0))
+            .max_w(px(220.0))
             .p_5()
             .rounded_xl()
             .bg(theme.library_stats_card_bg)
@@ -245,6 +248,9 @@ impl StatsSection {
         div()
             .w_full()
             .flex()
+            .flex_wrap()
+            .justify_center()
+            .items_stretch()
             .gap_4()
             .child(Self::stat_card(
                 stats.total_plays.to_string(),
@@ -307,7 +313,7 @@ impl StatsSection {
             .px_3()
             .py_2()
             .rounded_md()
-            .hover(|this| this.bg(theme.library_stats_card_bg))
+            .hover(|this| this.bg(theme.library_stats_row_hover))
             .cursor_pointer()
             .on_click(move |_, _, cx| {
                 let controller = cx.global::<Controller>().clone();
@@ -441,58 +447,62 @@ impl StatsSection {
 
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().w(px(180.0)).flex_shrink_0().child(
-            div()
-                .id(format!("stats_artist_{}", artist.id.0))
-                .w_full()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_3()
-                .rounded_xl()
-                .bg(theme.library_stats_card_bg)
-                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                .cursor_pointer()
-                .on_click({
-                    let id = artist.id;
+        div()
+            .min_w(px(180.0))
+            .flex_1()
+            .max_w(px(220.0))
+            .child(
+                div()
+                    .id(format!("stats_artist_{}", artist.id.0))
+                    .w_full()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .p_3()
+                    .rounded_xl()
+                    .bg(theme.library_stats_card_bg)
+                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                    .cursor_pointer()
+                    .on_click({
+                        let id = artist.id;
 
-                    move |_, _, cx| {
-                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Artist(id);
-                    }
-                })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
-                        Some(image) => img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                        None => img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                    }),
-                )
-                .child(
-                    div()
-                        .text_base()
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.library_stats_table_text)
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .child(artist.name.to_string()),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(theme.library_stats_table_meta)
-                        .child(format!("{plays} plays")),
-                ),
-        )
+                        move |_, _, cx| {
+                            *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Artist(id);
+                        }
+                    })
+                    .child(
+                        div().w_full().aspect_square().child(match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
+                        }),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.library_stats_table_text)
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(artist.name.to_string()),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.library_stats_table_meta)
+                            .child(format!("{plays} plays")),
+                    ),
+            )
     }
 
     fn render_album_card(id: AlbumId, plays: u32, cx: &mut App) -> Div {
@@ -517,58 +527,62 @@ impl StatsSection {
 
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().w(px(180.0)).flex_shrink_0().child(
-            div()
-                .id(format!("stats_album_{}", album.id.0))
-                .w_full()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_3()
-                .rounded_xl()
-                .bg(theme.library_stats_card_bg)
-                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                .cursor_pointer()
-                .on_click({
-                    let id = album.id;
+        div()
+            .min_w(px(180.0))
+            .flex_1()
+            .max_w(px(220.0))
+            .child(
+                div()
+                    .id(format!("stats_album_{}", album.id.0))
+                    .w_full()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .p_3()
+                    .rounded_xl()
+                    .bg(theme.library_stats_card_bg)
+                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                    .cursor_pointer()
+                    .on_click({
+                        let id = album.id;
 
-                    move |_, _, cx| {
-                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Album(id);
-                    }
-                })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
-                        Some(image) => img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_md()
-                            .border_1()
-                            .border_color(theme.border),
-                        None => img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_md()
-                            .border_1()
-                            .border_color(theme.border),
-                    }),
-                )
-                .child(
-                    div()
-                        .text_base()
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.library_stats_table_text)
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .child(album.name.to_string()),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(theme.library_stats_table_meta)
-                        .child(format!("{plays} plays")),
-                ),
-        )
+                        move |_, _, cx| {
+                            *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Album(id);
+                        }
+                    })
+                    .child(
+                        div().w_full().aspect_square().child(match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_md()
+                                .border_1()
+                                .border_color(theme.border),
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_md()
+                                .border_1()
+                                .border_color(theme.border),
+                        }),
+                    )
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.library_stats_table_text)
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(album.name.to_string()),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.library_stats_table_meta)
+                            .child(format!("{plays} plays")),
+                    ),
+            )
     }
 
     fn top_artists_section(stats: &ListenStats, cx: &mut App) -> Div {
@@ -584,7 +598,7 @@ impl StatsSection {
             .flex_col()
             .gap_3()
             .child(Self::section_header("Top Artists", cx))
-            .child(Self::horizontal_row(rows))
+            .child(Self::responsive_grid(rows))
     }
 
     fn top_albums_section(stats: &ListenStats, cx: &mut App) -> Div {
@@ -600,7 +614,7 @@ impl StatsSection {
             .flex_col()
             .gap_3()
             .child(Self::section_header("Top Albums", cx))
-            .child(Self::horizontal_row(rows))
+            .child(Self::responsive_grid(rows))
     }
 
     fn empty_state(theme: Theme) -> Div {
@@ -725,7 +739,7 @@ impl Render for StatsSection {
                         div()
                             .mt_1()
                             .text_sm()
-                            .text_color(theme.library_stats_card_label)
+                            .text_color(theme.library_stats_section_meta)
                             .child("Your listening, wrapped"),
                     ),
             )
