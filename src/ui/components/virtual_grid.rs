@@ -37,7 +37,7 @@ impl VirtualGridScrollController {
 pub struct VirtualGrid {
     id: ElementId,
     base: Stateful<Div>,
-    scroll_handle: ScrollHandle,
+    scroll_handle: Option<ScrollHandle>,
     item_count: usize,
     min_card_width: Pixels,
     footer_height: Pixels,
@@ -62,7 +62,7 @@ pub fn vgrid<R, V>(
     min_card_width: Pixels,
     footer_height: Pixels,
     vertical_padding: Pixels,
-    scroll_handle: ScrollHandle,
+    scroll_handle: Option<ScrollHandle>,
     controller: &VirtualGridScrollController,
     f: impl 'static + Fn(&mut V, Range<usize>, usize, &mut Window, &mut Context<V>) -> Vec<R>,
 ) -> VirtualGrid
@@ -81,11 +81,11 @@ where
         })
     };
 
-    let base = div()
-        .id(id.clone())
-        .size_full()
-        .overflow_scroll()
-        .track_scroll(&scroll_handle);
+    let mut base = div().id(id.clone()).size_full();
+
+    if let Some(ref handle) = scroll_handle {
+        base = base.overflow_scroll().track_scroll(handle);
+    }
 
     VirtualGrid {
         id,
@@ -176,32 +176,42 @@ impl Element for VirtualGrid {
         let rows = (self.item_count + cols - 1) / cols;
 
         self.content_height = px(rows as f32 * row_height_px);
-        let mut logical_scroll = self.scroll_handle.offset().y;
+        let mut logical_scroll = if let Some(ref handle) = self.scroll_handle {
+            handle.offset().y
+        } else {
+            px(0.0)
+        };
 
         if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {
             let target = deferred.item_index.min(self.item_count.saturating_sub(1));
             let target_row = target / cols;
             let item_top = target_row as f32 * row_height_px;
             let target_scroll = -item_top.max(0.0);
-            self.scroll_handle
-                .set_offset(point(px(0.0), px(target_scroll)));
-            logical_scroll = px(target_scroll);
+            if let Some(ref handle) = self.scroll_handle {
+                handle.set_offset(point(px(0.0), px(target_scroll)));
+                logical_scroll = px(target_scroll);
+            } else {
+                logical_scroll = px(0.0);
+            }
         }
 
         let max_scroll = (self.content_height - viewport_height).max(px(0.0));
 
         logical_scroll = logical_scroll.clamp(-max_scroll, px(0.0));
 
-        self.scroll_handle
-            .set_offset(point(px(0.0), logical_scroll));
+        if let Some(ref handle) = self.scroll_handle {
+            handle.set_offset(point(px(0.0), logical_scroll));
+        }
 
-        let visual_scroll = {
+        let visual_scroll = if self.scroll_handle.is_some() {
             let mut state = self.scroll_state.borrow_mut();
             state.smooth_scroll.set_target(logical_scroll);
             if state.smooth_scroll.update() {
                 window.refresh();
             }
             state.smooth_scroll.current()
+        } else {
+            px(0.0)
         };
 
         let visual_scroll_px: f32 = visual_scroll.into();

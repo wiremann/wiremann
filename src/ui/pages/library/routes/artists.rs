@@ -177,7 +177,7 @@ impl Render for ArtistsSection {
                         px(280.0),
                         px(56.0),
                         px(2.0),
-                        self.scroll_handle.clone(),
+                        Some(self.scroll_handle.clone()),
                         &self.grid_controller,
                         move |_, range, _, _, cx| {
                             controller.request_artist_thumbnails(&artist_ids[range.clone()], cx);
