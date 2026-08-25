@@ -1,8 +1,7 @@
 use gpui::{
     AnyElement, App, AvailableSpace, Bounds, ContentMask, Context, Div, Element, ElementId, Entity,
     GlobalElementId, Hitbox, InteractiveElement, IntoElement, Pixels, Render, ScrollHandle, Size,
-    SmoothScrollState, Stateful, StatefulInteractiveElement, Style, Styled, Window, div, point, px,
-    size,
+    SmoothScrollState, Stateful, StatefulInteractiveElement, Styled, Window, div, point, px, size,
 };
 use smallvec::SmallVec;
 use std::{cell::RefCell, cmp, ops::Range, rc::Rc};
@@ -16,6 +15,43 @@ pub struct DeferredGridScroll {
 pub struct VirtualGridScrollState {
     pub deferred_scroll: Option<DeferredGridScroll>,
     pub smooth_scroll: SmoothScrollState,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct GridMetrics {
+    pub columns: usize,
+    pub cell_width: Pixels,
+    pub row_height: Pixels,
+    pub content_height: Pixels,
+}
+
+impl GridMetrics {
+    pub fn from_available_width(
+        available_width: Pixels,
+        min_card_width: Pixels,
+        footer_height: Pixels,
+        vertical_padding: Pixels,
+        item_count: usize,
+    ) -> Self {
+        let available_width_px: f32 = available_width.into();
+        let min_card_width_px: f32 = min_card_width.into();
+        let footer_height_px: f32 = footer_height.into();
+        let vertical_padding_px: f32 = vertical_padding.into();
+
+        let columns = ((available_width_px / min_card_width_px).floor() as usize).max(1);
+        let cell_width_px = available_width_px / columns as f32;
+        let cell_width = px(cell_width_px);
+        let row_height_px = cell_width_px + footer_height_px + (vertical_padding_px * 2.0);
+        let row_height = px(row_height_px);
+        let rows = (item_count + columns - 1) / columns;
+
+        Self {
+            columns,
+            cell_width,
+            row_height,
+            content_height: px(rows as f32 * row_height_px),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -87,21 +123,7 @@ where
     if let Some(ref handle) = scroll_handle {
         base = base.size_full().overflow_scroll().track_scroll(handle);
     } else {
-        // Non-scrollable: estimate content height so the grid occupies space
-        let min_card_width_px: f32 = min_card_width.into();
-        let footer_height_px: f32 = footer_height.into();
-        let cell_padding_px: f32 = vertical_padding.into();
-
-        // Assume a reasonable default column count for layout when we don't
-        // have the actual available width at this point. This prevents the
-        // grid from collapsing to zero height in non-scrollable mode.
-        let assumed_cols = 4usize.max(1);
-        let rows = (item_count + assumed_cols - 1) / assumed_cols;
-
-        let row_height_px = min_card_width_px + footer_height_px + (cell_padding_px * 2.0);
-        let content_height_px = rows as f32 * row_height_px;
-
-        base = base.w_full().h(px(content_height_px));
+        base = base.w_full();
     }
 
     VirtualGrid {
@@ -175,37 +197,19 @@ impl Element for VirtualGrid {
         cx: &mut App,
     ) -> Self::PrepaintState {
         let viewport_height = bounds.size.height;
+        let metrics = GridMetrics::from_available_width(
+            bounds.size.width,
+            self.min_card_width,
+            self.footer_height,
+            self.cell_padding,
+            self.item_count,
+        );
 
-        let available_width_px: f32 = bounds.size.width.into();
-        let min_card_width_px: f32 = self.min_card_width.into();
-        let footer_height_px: f32 = self.footer_height.into();
-        let cell_padding_px: f32 = self.cell_padding.into();
-
-        let mut cols = (available_width_px / min_card_width_px).floor() as usize;
-        if cols == 0 {
-            cols = 1;
-        }
-
-        let cell_width_px = available_width_px / (cols as f32);
-        let row_height_px = cell_width_px + footer_height_px + (cell_padding_px * 2.0);
-        let row_height = px(row_height_px);
-
+        let cols = metrics.columns;
         let rows = (self.item_count + cols - 1) / cols;
-
-        let new_content_height = px(rows as f32 * row_height_px);
-
-        // If non-scrollable (no scroll_handle) and the computed content height
-        // changed, request a relayout so the parent can allocate the proper
-        // height. This avoids collapsing to zero when the grid is embedded
-        // in a flow layout.
-        if self.scroll_handle.is_none() {
-            // compare with a small epsilon
-            let diff = (new_content_height - self.content_height).abs();
-            if diff > px(0.5) {
-                let mut style = Style::default();
-                let _ = window.request_layout(style, None, cx);
-            }
-        }
+        let row_height = metrics.row_height;
+        let row_height_px: f32 = row_height.into();
+        let new_content_height = metrics.content_height;
 
         self.content_height = new_content_height;
         let mut logical_scroll = if let Some(ref handle) = self.scroll_handle {

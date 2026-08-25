@@ -1,7 +1,7 @@
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, gradient_color_stop, img, linear_gradient, px, rems,
+    ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
+    Window, div, gradient_color_stop, img, linear_gradient, px, relative, rems,
 };
 
 use crate::{
@@ -76,10 +76,12 @@ impl StatsSection {
             .flex()
             .flex_wrap()
             .items_stretch()
-            .justify_start()
+            .justify_center()
             .gap_4()
             .py_1()
-            .children(children)
+            .children(children.into_iter().map(|child| {
+                child.flex_basis(relative(33.333)).flex_grow().flex_shrink().min_w(px(180.0))
+            }))
     }
 
     fn banner_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {

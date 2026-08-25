@@ -1,7 +1,8 @@
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
+    ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
+    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, relative,
+    rems,
 };
 
 use crate::{
@@ -88,10 +89,10 @@ impl HomeSection {
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         div()
-            .flex_basis(px(200.0))
+            .flex_basis(relative(32.0))
             .flex_grow()
             .flex_shrink()
-            .min_w(px(160.0))
+            .min_w(px(140.0))
             .child(
                 div()
                     .id(format!("home_album_{}", album.id.0))
@@ -170,10 +171,10 @@ impl HomeSection {
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         div()
-            .flex_basis(px(200.0))
+            .flex_basis(relative(32.0))
             .flex_grow()
             .flex_shrink()
-            .min_w(px(160.0))
+            .min_w(px(140.0))
             .child(
                 div()
                     .id(format!("home_artist_{}", artist.id.0))
@@ -252,10 +253,10 @@ impl HomeSection {
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         div()
-            .flex_basis(px(200.0))
+            .flex_basis(relative(32.0))
             .flex_grow()
             .flex_shrink()
-            .min_w(px(160.0))
+            .min_w(px(140.0))
             .child(
                 div()
                     .id(format!("home_playlist_{}", playlist.id.0))
@@ -335,10 +336,10 @@ impl HomeSection {
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
         div()
-            .flex_basis(px(180.0))
+            .flex_basis(relative(24.0))
             .flex_grow()
             .flex_shrink()
-            .min_w(px(160.0))
+            .min_w(px(120.0))
             .child(
                 div()
                     .id(format!("home_{prefix}_{:?}", track.id.0))
@@ -401,16 +402,26 @@ impl HomeSection {
         )
     }
 
-    fn responsive_grid(children: Vec<Div>) -> Div {
+    fn responsive_grid(children: Vec<Div>, max_columns: usize, min_card_width: Pixels) -> Div {
+        let columns = max_columns.max(1);
+        let basis = 100.0 / columns as f32;
+
         div()
             .w_full()
+            .min_w_0()
             .flex()
             .flex_wrap()
             .items_stretch()
-            .justify_start()
+            .justify_center()
             .gap_4()
             .py_1()
-            .children(children.into_iter().map(|child| child.flex_grow().flex_shrink()))
+            .children(children.into_iter().map(|child| {
+                child
+                    .flex_basis(relative(basis))
+                    .flex_grow()
+                    .flex_shrink()
+                    .min_w(min_card_width)
+            }))
     }
 
     fn summary_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {
@@ -706,6 +717,8 @@ impl Render for HomeSection {
                             ids.iter()
                                 .map(|&id| Self::render_track_card("top", id, cx))
                                 .collect(),
+                            4,
+                            px(120.0),
                         )),
                 );
             }
@@ -728,6 +741,8 @@ impl Render for HomeSection {
                             ids.iter()
                                 .map(|&id| Self::render_track_card("recent", id, cx))
                                 .collect(),
+                            4,
+                            px(120.0),
                         )),
                 );
             }
@@ -748,6 +763,8 @@ impl Render for HomeSection {
                         ))
                         .child(Self::responsive_grid(
                             ids.iter().map(|&id| Self::render_artist_card(id, cx)).collect(),
+                            3,
+                            px(140.0),
                         )),
                 );
             }
@@ -768,6 +785,8 @@ impl Render for HomeSection {
                         ))
                         .child(Self::responsive_grid(
                             ids.iter().map(|&id| Self::render_album_card(id, cx)).collect(),
+                            3,
+                            px(140.0),
                         )),
                 );
             }
@@ -788,6 +807,8 @@ impl Render for HomeSection {
                         ))
                         .child(Self::responsive_grid(
                             ids.iter().map(|&id| Self::render_artist_card(id, cx)).collect(),
+                            3,
+                            px(140.0),
                         )),
                 );
             }
@@ -808,6 +829,8 @@ impl Render for HomeSection {
                         ))
                         .child(Self::responsive_grid(
                             ids.iter().map(|&id| Self::render_playlist_card(id, cx)).collect(),
+                            3,
+                            px(140.0),
                         )),
                 );
             }
@@ -862,6 +885,7 @@ impl Render for HomeSection {
                         div()
                             .id("home_scroll")
                             .w_full()
+                            .min_w_0()
                             .h_full()
                             .overflow_y_scroll()
                             .track_scroll(&scroll_handle)
