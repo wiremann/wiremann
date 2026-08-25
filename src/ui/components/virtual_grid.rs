@@ -17,43 +17,6 @@ pub struct VirtualGridScrollState {
     pub smooth_scroll: SmoothScrollState,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct GridMetrics {
-    pub columns: usize,
-    pub cell_width: Pixels,
-    pub row_height: Pixels,
-    pub content_height: Pixels,
-}
-
-impl GridMetrics {
-    pub fn from_available_width(
-        available_width: Pixels,
-        min_card_width: Pixels,
-        footer_height: Pixels,
-        vertical_padding: Pixels,
-        item_count: usize,
-    ) -> Self {
-        let available_width_px: f32 = available_width.into();
-        let min_card_width_px: f32 = min_card_width.into();
-        let footer_height_px: f32 = footer_height.into();
-        let vertical_padding_px: f32 = vertical_padding.into();
-
-        let columns = ((available_width_px / min_card_width_px).floor() as usize).max(1);
-        let cell_width_px = available_width_px / columns as f32;
-        let cell_width = px(cell_width_px);
-        let row_height_px = cell_width_px + footer_height_px + (vertical_padding_px * 2.0);
-        let row_height = px(row_height_px);
-        let rows = (item_count + columns - 1) / columns;
-
-        Self {
-            columns,
-            cell_width,
-            row_height,
-            content_height: px(rows as f32 * row_height_px),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct VirtualGridScrollController {
     pub state: Rc<RefCell<VirtualGridScrollState>>,
@@ -74,7 +37,7 @@ impl VirtualGridScrollController {
 pub struct VirtualGrid {
     id: ElementId,
     base: Stateful<Div>,
-    scroll_handle: Option<ScrollHandle>,
+    scroll_handle: ScrollHandle,
     item_count: usize,
     min_card_width: Pixels,
     footer_height: Pixels,
@@ -99,7 +62,7 @@ pub fn vgrid<R, V>(
     min_card_width: Pixels,
     footer_height: Pixels,
     vertical_padding: Pixels,
-    scroll_handle: Option<ScrollHandle>,
+    scroll_handle: ScrollHandle,
     controller: &VirtualGridScrollController,
     f: impl 'static + Fn(&mut V, Range<usize>, usize, &mut Window, &mut Context<V>) -> Vec<R>,
 ) -> VirtualGrid
@@ -118,13 +81,11 @@ where
         })
     };
 
-    let mut base = div().id(id.clone());
-
-    if let Some(ref handle) = scroll_handle {
-        base = base.size_full().overflow_scroll().track_scroll(handle);
-    } else {
-        base = base.w_full();
-    }
+    let base = div()
+        .id(id.clone())
+        .size_full()
+        .overflow_scroll()
+        .track_scroll(&scroll_handle);
 
     VirtualGrid {
         id,
@@ -197,57 +158,50 @@ impl Element for VirtualGrid {
         cx: &mut App,
     ) -> Self::PrepaintState {
         let viewport_height = bounds.size.height;
-        let metrics = GridMetrics::from_available_width(
-            bounds.size.width,
-            self.min_card_width,
-            self.footer_height,
-            self.cell_padding,
-            self.item_count,
-        );
 
-        let cols = metrics.columns;
+        let available_width_px: f32 = bounds.size.width.into();
+        let min_card_width_px: f32 = self.min_card_width.into();
+        let footer_height_px: f32 = self.footer_height.into();
+        let cell_padding_px: f32 = self.cell_padding.into();
+
+        let mut cols = (available_width_px / min_card_width_px).floor() as usize;
+        if cols == 0 {
+            cols = 1;
+        }
+
+        let cell_width_px = available_width_px / (cols as f32);
+        let row_height_px = cell_width_px + footer_height_px + (cell_padding_px * 2.0);
+        let row_height = px(row_height_px);
+
         let rows = (self.item_count + cols - 1) / cols;
-        let row_height = metrics.row_height;
-        let row_height_px: f32 = row_height.into();
-        let new_content_height = metrics.content_height;
 
-        self.content_height = new_content_height;
-        let mut logical_scroll = if let Some(ref handle) = self.scroll_handle {
-            handle.offset().y
-        } else {
-            px(0.0)
-        };
+        self.content_height = px(rows as f32 * row_height_px);
+        let mut logical_scroll = self.scroll_handle.offset().y;
 
         if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {
             let target = deferred.item_index.min(self.item_count.saturating_sub(1));
             let target_row = target / cols;
             let item_top = target_row as f32 * row_height_px;
             let target_scroll = -item_top.max(0.0);
-            if let Some(ref handle) = self.scroll_handle {
-                handle.set_offset(point(px(0.0), px(target_scroll)));
-                logical_scroll = px(target_scroll);
-            } else {
-                logical_scroll = px(0.0);
-            }
+            self.scroll_handle
+                .set_offset(point(px(0.0), px(target_scroll)));
+            logical_scroll = px(target_scroll);
         }
 
         let max_scroll = (self.content_height - viewport_height).max(px(0.0));
 
         logical_scroll = logical_scroll.clamp(-max_scroll, px(0.0));
 
-        if let Some(ref handle) = self.scroll_handle {
-            handle.set_offset(point(px(0.0), logical_scroll));
-        }
+        self.scroll_handle
+            .set_offset(point(px(0.0), logical_scroll));
 
-        let visual_scroll = if self.scroll_handle.is_some() {
+        let visual_scroll = {
             let mut state = self.scroll_state.borrow_mut();
             state.smooth_scroll.set_target(logical_scroll);
             if state.smooth_scroll.update() {
                 window.refresh();
             }
             state.smooth_scroll.current()
-        } else {
-            px(0.0)
         };
 
         let visual_scroll_px: f32 = visual_scroll.into();

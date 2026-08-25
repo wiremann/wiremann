@@ -177,7 +177,7 @@ impl Render for AlbumsSection {
                         px(280.0),
                         px(56.0),
                         px(2.0),
-                        Some(self.scroll_handle.clone()),
+                        self.scroll_handle.clone(),
                         &self.grid_controller,
                         move |_, range, _, _, cx| {
                             controller.request_album_thumbnails(&album_ids[range.clone()], cx);
