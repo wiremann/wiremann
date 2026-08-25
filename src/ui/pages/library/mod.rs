@@ -135,7 +135,6 @@ impl LibraryPage {
             }),
             home: cx.new(|_| HomeSection {
                 scroll_handle: ScrollHandle::new(),
-                grid_controller: VirtualGridScrollController::new(),
             }),
             tracks: cx.new(|_| TracksSection {
                 scroll_handle: UniformListScrollHandle::new(),

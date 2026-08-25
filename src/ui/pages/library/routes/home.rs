@@ -14,7 +14,6 @@ use crate::{
             Page,
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
-            virtual_grid::{VirtualGridScrollController, vgrid},
         },
         pages::library::LibraryRoutes,
         theme::Theme,
@@ -25,7 +24,6 @@ const ROW_COUNT: usize = 12;
 
 pub struct HomeSection {
     pub scroll_handle: ScrollHandle,
-    pub grid_controller: VirtualGridScrollController,
 }
 
 impl HomeSection {
@@ -89,9 +87,14 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().flex_1().min_w(px(180.0)).child(
-            div()
-                .id(format!("home_album_{}", album.id.0))
+        div()
+            .flex_basis(px(200.0))
+            .flex_grow()
+            .flex_shrink()
+            .min_w(px(160.0))
+            .child(
+                div()
+                    .id(format!("home_album_{}", album.id.0))
                 .w_full()
                 .flex()
                 .flex_col()
@@ -166,9 +169,14 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().flex_1().min_w(px(180.0)).child(
-            div()
-                .id(format!("home_artist_{}", artist.id.0))
+        div()
+            .flex_basis(px(200.0))
+            .flex_grow()
+            .flex_shrink()
+            .min_w(px(160.0))
+            .child(
+                div()
+                    .id(format!("home_artist_{}", artist.id.0))
                 .w_full()
                 .flex()
                 .flex_col()
@@ -243,9 +251,14 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().flex_1().min_w(px(180.0)).child(
-            div()
-                .id(format!("home_playlist_{}", playlist.id.0))
+        div()
+            .flex_basis(px(200.0))
+            .flex_grow()
+            .flex_shrink()
+            .min_w(px(160.0))
+            .child(
+                div()
+                    .id(format!("home_playlist_{}", playlist.id.0))
                 .w_full()
                 .flex()
                 .flex_col()
@@ -321,9 +334,14 @@ impl HomeSection {
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().flex_1().min_w(px(160.0)).child(
-            div()
-                .id(format!("home_{prefix}_{:?}", track.id.0))
+        div()
+            .flex_basis(px(180.0))
+            .flex_grow()
+            .flex_shrink()
+            .min_w(px(160.0))
+            .child(
+                div()
+                    .id(format!("home_{prefix}_{:?}", track.id.0))
                 .w_full()
                 .flex()
                 .flex_col()
@@ -392,7 +410,7 @@ impl HomeSection {
             .justify_start()
             .gap_4()
             .py_1()
-            .children(children)
+            .children(children.into_iter().map(|child| child.flex_grow().flex_shrink()))
     }
 
     fn summary_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {
@@ -672,8 +690,6 @@ impl Render for HomeSection {
 
             if !top_track_ids.is_empty() {
                 let ids = top_track_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -686,30 +702,16 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Tracks),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_top_tracks_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_track_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_track_card("top", ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter()
+                                .map(|&id| Self::render_track_card("top", id, cx))
+                                .collect(),
+                        )),
                 );
             }
 
             if !recent_track_ids.is_empty() {
                 let ids = recent_track_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -722,30 +724,16 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Tracks),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_recent_tracks_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_track_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_track_card("recent", ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter()
+                                .map(|&id| Self::render_track_card("recent", id, cx))
+                                .collect(),
+                        )),
                 );
             }
 
             if !top_artist_ids.is_empty() {
                 let ids = top_artist_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -758,30 +746,14 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Artists),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_top_artists_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_artist_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_artist_card(ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter().map(|&id| Self::render_artist_card(id, cx)).collect(),
+                        )),
                 );
             }
 
             if !album_ids.is_empty() {
                 let ids = album_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -794,30 +766,14 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Albums),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_albums_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_album_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_album_card(ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter().map(|&id| Self::render_album_card(id, cx)).collect(),
+                        )),
                 );
             }
 
             if !artist_ids.is_empty() {
                 let ids = artist_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -830,30 +786,14 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Artists),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_artists_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_artist_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_artist_card(ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter().map(|&id| Self::render_artist_card(id, cx)).collect(),
+                        )),
                 );
             }
 
             if !playlist_ids.is_empty() {
                 let ids = playlist_ids;
-                let len = ids.len();
-                let ctrl = controller.clone();
 
                 rows.push(
                     div()
@@ -866,23 +806,9 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Playlists),
                             cx,
                         ))
-                        .child(div().size_full().child(vgrid(
-                            cx.entity(),
-                            "home_playlists_grid",
-                            len,
-                            px(220.0),
-                            px(56.0),
-                            px(2.0),
-                            None,
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                ctrl.request_playlist_thumbnails(&ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_playlist_card(ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        ))),
+                        .child(Self::responsive_grid(
+                            ids.iter().map(|&id| Self::render_playlist_card(id, cx)).collect(),
+                        )),
                 );
             }
         }
