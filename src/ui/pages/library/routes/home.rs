@@ -1,8 +1,10 @@
+use crate::ui::components::bounds_observer::observe_bounds;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
+    ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
+    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
 };
+use std::collections::HashMap;
 
 use crate::{
     controller::{
@@ -21,9 +23,41 @@ use crate::{
 };
 
 const ROW_COUNT: usize = 12;
+const HOME_GRID_GAP: f32 = 16.0;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GridGeometry {
+    pub columns: usize,
+    pub cell_width: Pixels,
+}
+
+fn calculate_grid_geometry(
+    available_width: Pixels,
+    min_card_width: Pixels,
+    gap: Pixels,
+) -> GridGeometry {
+    let available_width_px: f32 = available_width.into();
+    let min_card_width_px: f32 = min_card_width.into();
+    let gap_px: f32 = gap.into();
+
+    let mut columns =
+        ((available_width_px + gap_px) / (min_card_width_px + gap_px)).floor() as usize;
+    if columns == 0 {
+        columns = 1;
+    }
+
+    let total_gap_px = (columns as f32 - 1.0) * gap_px;
+    let cell_width_px = ((available_width_px - total_gap_px) / columns as f32).max(0.0);
+
+    GridGeometry {
+        columns,
+        cell_width: px(cell_width_px),
+    }
+}
 
 pub struct HomeSection {
     pub scroll_handle: ScrollHandle,
+    pub grid_cell_widths: HashMap<String, Pixels>,
 }
 
 impl HomeSection {
@@ -87,65 +121,61 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div()
-            .min_w(px(180.0))
-            .flex_1()
-            .max_w(px(220.0))
-            .child(
-                div()
-                    .id(format!("home_album_{}", album.id.0))
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_3()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(theme.library_home_section_card_border)
-                    .bg(theme.library_home_section_card_bg)
-                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                    .cursor_pointer()
-                    .on_click({
-                        let id = album.id;
+        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+            div()
+                .id(format!("home_album_{}", album.id.0))
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_3()
+                .rounded_xl()
+                .border_1()
+                .border_color(theme.library_home_section_card_border)
+                .bg(theme.library_home_section_card_bg)
+                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                .cursor_pointer()
+                .on_click({
+                    let id = album.id;
 
-                        move |_, _, cx| {
-                            *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Album(id);
-                        }
-                    })
-                    .child(
-                        div().w_full().aspect_square().child(match thumbnail {
-                            Some(image) => img(ImageSource::Render(image.clone()))
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                            None => img("icons/placeholder.svg")
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                        }),
-                    )
-                    .child(
-                        div()
-                            .pt_1()
-                            .text_base()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.library_home_section_card_title)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(album.name.to_string()),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.library_home_section_card_meta)
-                            .child(format!("{} Tracks", album.tracks.len())),
-                    ),
-            )
+                    move |_, _, cx| {
+                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Album(id);
+                    }
+                })
+                .child(
+                    div().w_full().aspect_square().child(match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                    }),
+                )
+                .child(
+                    div()
+                        .pt_1()
+                        .text_base()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.library_home_section_card_title)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(album.name.to_string()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.library_home_section_card_meta)
+                        .child(format!("{} Tracks", album.tracks.len())),
+                ),
+        )
     }
 
     fn render_artist_card(id: ArtistId, cx: &mut App) -> Div {
@@ -168,65 +198,61 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div()
-            .min_w(px(180.0))
-            .flex_1()
-            .max_w(px(220.0))
-            .child(
-                div()
-                    .id(format!("home_artist_{}", artist.id.0))
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_3()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(theme.library_home_section_card_border)
-                    .bg(theme.library_home_section_card_bg)
-                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                    .cursor_pointer()
-                    .on_click({
-                        let id = artist.id;
+        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+            div()
+                .id(format!("home_artist_{}", artist.id.0))
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_3()
+                .rounded_xl()
+                .border_1()
+                .border_color(theme.library_home_section_card_border)
+                .bg(theme.library_home_section_card_bg)
+                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                .cursor_pointer()
+                .on_click({
+                    let id = artist.id;
 
-                        move |_, _, cx| {
-                            *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Artist(id);
-                        }
-                    })
-                    .child(
-                        div().w_full().aspect_square().child(match thumbnail {
-                            Some(image) => img(ImageSource::Render(image.clone()))
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_full()
-                                .border_1()
-                                .border_color(theme.border),
-                            None => img("icons/placeholder.svg")
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_full()
-                                .border_1()
-                                .border_color(theme.border),
-                        }),
-                    )
-                    .child(
-                        div()
-                            .pt_1()
-                            .text_base()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.library_home_section_card_title)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(artist.name.to_string()),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.library_home_section_card_meta)
-                            .child(format!("{} Tracks", artist.tracks.len())),
-                    ),
-            )
+                    move |_, _, cx| {
+                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Artist(id);
+                    }
+                })
+                .child(
+                    div().w_full().aspect_square().child(match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_full()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_full()
+                            .border_1()
+                            .border_color(theme.border),
+                    }),
+                )
+                .child(
+                    div()
+                        .pt_1()
+                        .text_base()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.library_home_section_card_title)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(artist.name.to_string()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.library_home_section_card_meta)
+                        .child(format!("{} Tracks", artist.tracks.len())),
+                ),
+        )
     }
 
     fn render_playlist_card(id: PlaylistId, cx: &mut App) -> Div {
@@ -249,65 +275,61 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div()
-            .min_w(px(180.0))
-            .flex_1()
-            .max_w(px(220.0))
-            .child(
-                div()
-                    .id(format!("home_playlist_{}", playlist.id.0))
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_3()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(theme.library_home_section_card_border)
-                    .bg(theme.library_home_section_card_bg)
-                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                    .cursor_pointer()
-                    .on_click({
-                        let id = playlist.id;
+        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+            div()
+                .id(format!("home_playlist_{}", playlist.id.0))
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_3()
+                .rounded_xl()
+                .border_1()
+                .border_color(theme.library_home_section_card_border)
+                .bg(theme.library_home_section_card_bg)
+                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                .cursor_pointer()
+                .on_click({
+                    let id = playlist.id;
 
-                        move |_, _, cx| {
-                            *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Playlist(id);
-                        }
-                    })
-                    .child(
-                        div().w_full().aspect_square().child(match thumbnail {
-                            Some(image) => img(ImageSource::Render(image.clone()))
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                            None => img("icons/placeholder.svg")
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                        }),
-                    )
-                    .child(
-                        div()
-                            .pt_1()
-                            .text_base()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.library_home_section_card_title)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(playlist.name.to_string()),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.library_home_section_card_meta)
-                            .child(format!("{} Tracks", playlist.tracks.len())),
-                    ),
-            )
+                    move |_, _, cx| {
+                        *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Playlist(id);
+                    }
+                })
+                .child(
+                    div().w_full().aspect_square().child(match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                    }),
+                )
+                .child(
+                    div()
+                        .pt_1()
+                        .text_base()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.library_home_section_card_title)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(playlist.name.to_string()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.library_home_section_card_meta)
+                        .child(format!("{} Tracks", playlist.tracks.len())),
+                ),
+        )
     }
 
     fn render_track_card(prefix: &str, id: TrackId, cx: &mut App) -> Div {
@@ -331,81 +353,124 @@ impl HomeSection {
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div()
-            .min_w(px(160.0))
-            .flex_1()
-            .max_w(px(220.0))
-            .child(
-                div()
-                    .id(format!("home_{prefix}_{:?}", track.id.0))
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_3()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(theme.library_home_section_card_border)
-                    .bg(theme.library_home_section_card_bg)
-                    .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
-                    .cursor_pointer()
-                    .on_click({
-                        let controller = controller.clone();
-                        let id = track.id;
+        div().min_w(px(160.0)).flex_1().max_w(px(220.0)).child(
+            div()
+                .id(format!("home_{prefix}_{:?}", track.id.0))
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_3()
+                .rounded_xl()
+                .border_1()
+                .border_color(theme.library_home_section_card_border)
+                .bg(theme.library_home_section_card_bg)
+                .hover(|this| this.bg(theme.library_home_section_card_bg_hover))
+                .cursor_pointer()
+                .on_click({
+                    let controller = controller.clone();
+                    let id = track.id;
 
-                        move |_, _, cx| {
-                            controller.load_track(id, cx);
-                            *cx.global_mut::<Page>() = Page::Player;
-                        }
-                    })
-                    .child(
-                        div().w_full().aspect_square().child(match thumbnail {
-                            Some(image) => img(ImageSource::Render(image.clone()))
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                            None => img("icons/placeholder.svg")
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_md()
-                                .border_1()
-                                .border_color(theme.border),
-                        }),
-                    )
-                    .child(
-                        div()
-                            .pt_1()
-                            .text_base()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.library_home_section_card_title)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(track.title.to_string()),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.library_home_section_card_meta)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(artist),
-                    ),
-            )
+                    move |_, _, cx| {
+                        controller.load_track(id, cx);
+                        *cx.global_mut::<Page>() = Page::Player;
+                    }
+                })
+                .child(
+                    div().w_full().aspect_square().child(match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .size_full()
+                            .object_fit(ObjectFit::Contain)
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                    }),
+                )
+                .child(
+                    div()
+                        .pt_1()
+                        .text_base()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.library_home_section_card_title)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(track.title.to_string()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.library_home_section_card_meta)
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(artist),
+                ),
+        )
     }
 
-    fn responsive_grid(children: Vec<Div>) -> Div {
-        div()
+    fn responsive_grid(
+        &mut self,
+        cx: &mut Context<Self>,
+        section_id: &str,
+        children: Vec<Div>,
+        min_card_width: Pixels,
+    ) -> impl IntoElement {
+        let gap = px(HOME_GRID_GAP);
+        let container = div()
             .w_full()
+            .min_w_0()
             .flex()
             .flex_wrap()
             .items_stretch()
+            .justify_start()
             .gap_4()
-            .py_1()
-            .children(children)
+            .py_1();
+
+        let measured = self.grid_cell_widths.get(section_id).copied();
+        let cell_width = measured.unwrap_or(min_card_width);
+
+        let children = children
+            .into_iter()
+            .map(|child| {
+                if measured.is_some() {
+                    child.w(cell_width).flex_shrink_0()
+                } else {
+                    child.min_w(min_card_width).flex_shrink_0()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let grid = container.children(children);
+
+        let entity = cx.entity();
+        let section_key = section_id.to_string();
+        let obs_id = format!("home_grid_{}", section_key.clone());
+
+        observe_bounds(obs_id, grid, move |bounds, _, cx| {
+            let width = bounds.size.width;
+            if width <= px(0.0) {
+                return;
+            }
+
+            let geometry = calculate_grid_geometry(width, min_card_width, gap);
+            let next_width = geometry.cell_width;
+
+            entity.update(cx, |this, cx| {
+                let prev = this.grid_cell_widths.get(&section_key).copied();
+                if prev != Some(next_width) {
+                    this.grid_cell_widths
+                        .insert(section_key.clone(), next_width);
+                    cx.notify();
+                }
+            });
+        })
     }
 
     fn summary_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {
@@ -514,11 +579,7 @@ impl HomeSection {
                             .items_center()
                             .gap_3()
                             .when_some(top_artist, |this, name| {
-                                this.child(Self::summary_pill(
-                                    "TOP ARTIST",
-                                    vec![name],
-                                    theme,
-                                ))
+                                this.child(Self::summary_pill("TOP ARTIST", vec![name], theme))
                             })
                             .when_some(top_track, |this, (title, artist)| {
                                 this.child(Self::summary_pill(
@@ -688,6 +749,11 @@ impl Render for HomeSection {
             }
 
             if !top_track_ids.is_empty() {
+                let top_children = top_track_ids
+                    .into_iter()
+                    .map(|id| Self::render_track_card("top", id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -699,16 +765,16 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Tracks),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            top_track_ids
-                                .into_iter()
-                                .map(|id| Self::render_track_card("top", id, cx))
-                                .collect(),
-                        )),
+                        .child(self.responsive_grid(cx, "top_tracks", top_children, px(120.0))),
                 );
             }
 
             if !recent_track_ids.is_empty() {
+                let recent_children = recent_track_ids
+                    .into_iter()
+                    .map(|id| Self::render_track_card("recent", id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -720,16 +786,21 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Tracks),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            recent_track_ids
-                                .into_iter()
-                                .map(|id| Self::render_track_card("recent", id, cx))
-                                .collect(),
+                        .child(self.responsive_grid(
+                            cx,
+                            "recent_tracks",
+                            recent_children,
+                            px(120.0),
                         )),
                 );
             }
 
             if !top_artist_ids.is_empty() {
+                let top_artist_children = top_artist_ids
+                    .into_iter()
+                    .map(|id| Self::render_artist_card(id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -741,16 +812,21 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Artists),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            top_artist_ids
-                                .into_iter()
-                                .map(|id| Self::render_artist_card(id, cx))
-                                .collect(),
+                        .child(self.responsive_grid(
+                            cx,
+                            "top_artists",
+                            top_artist_children,
+                            px(140.0),
                         )),
                 );
             }
 
             if !album_ids.is_empty() {
+                let album_children = album_ids
+                    .into_iter()
+                    .map(|id| Self::render_album_card(id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -762,16 +838,16 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Albums),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            album_ids
-                                .into_iter()
-                                .map(|id| Self::render_album_card(id, cx))
-                                .collect(),
-                        )),
+                        .child(self.responsive_grid(cx, "albums", album_children, px(140.0))),
                 );
             }
 
             if !artist_ids.is_empty() {
+                let artist_children = artist_ids
+                    .into_iter()
+                    .map(|id| Self::render_artist_card(id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -783,16 +859,16 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Artists),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            artist_ids
-                                .into_iter()
-                                .map(|id| Self::render_artist_card(id, cx))
-                                .collect(),
-                        )),
+                        .child(self.responsive_grid(cx, "artists", artist_children, px(140.0))),
                 );
             }
 
             if !playlist_ids.is_empty() {
+                let playlist_children = playlist_ids
+                    .into_iter()
+                    .map(|id| Self::render_playlist_card(id, cx))
+                    .collect::<Vec<_>>();
+
                 rows.push(
                     div()
                         .w_full()
@@ -804,12 +880,7 @@ impl Render for HomeSection {
                             Some(LibraryRoutes::Playlists),
                             cx,
                         ))
-                        .child(Self::responsive_grid(
-                            playlist_ids
-                                .into_iter()
-                                .map(|id| Self::render_playlist_card(id, cx))
-                                .collect(),
-                        )),
+                        .child(self.responsive_grid(cx, "playlists", playlist_children, px(140.0))),
                 );
             }
         }
