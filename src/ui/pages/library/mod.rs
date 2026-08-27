@@ -135,7 +135,7 @@ impl LibraryPage {
             }),
             home: cx.new(|_| HomeSection {
                 scroll_handle: ScrollHandle::new(),
-                grid_cell_widths: std::collections::HashMap::new(),
+                avail_width: 0.0,
             }),
             tracks: cx.new(|_| TracksSection {
                 scroll_handle: UniformListScrollHandle::new(),

@@ -68,13 +68,22 @@ mod tests {
 
     #[test]
     fn strips_parenthesized_suffix() {
-        assert_eq!(strip_search_suffixes("Song Name (Official Music Video)"), "Song Name");
-        assert_eq!(strip_search_suffixes("Song (From 'Movie' Soundtrack)"), "Song");
+        assert_eq!(
+            strip_search_suffixes("Song Name (Official Music Video)"),
+            "Song Name"
+        );
+        assert_eq!(
+            strip_search_suffixes("Song (From 'Movie' Soundtrack)"),
+            "Song"
+        );
     }
 
     #[test]
     fn strips_bracketed_suffix() {
-        assert_eq!(strip_search_suffixes("Song Name [Official Video]"), "Song Name");
+        assert_eq!(
+            strip_search_suffixes("Song Name [Official Video]"),
+            "Song Name"
+        );
         assert_eq!(strip_search_suffixes("Song [From: Movie]"), "Song");
     }
 
@@ -105,6 +114,9 @@ mod tests {
 
     #[test]
     fn trims_whitespace_after_group() {
-        assert_eq!(strip_search_suffixes("Song Name  (official)  "), "Song Name");
+        assert_eq!(
+            strip_search_suffixes("Song Name  (official)  "),
+            "Song Name"
+        );
     }
 }

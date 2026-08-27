@@ -257,13 +257,14 @@ impl Cacher {
             };
             if let Some(name) = entry.file_name().to_str()
                 && name.ends_with(ends_with)
-                    && let Some((hex_part, _rest)) = name.split_once('_') {
-                        let mut arr = [0u8; 16];
+                && let Some((hex_part, _rest)) = name.split_once('_')
+            {
+                let mut arr = [0u8; 16];
 
-                        if hex::decode_to_slice(hex_part, &mut arr).is_ok() {
-                            set.insert(ImageId(arr));
-                        }
-                    }
+                if hex::decode_to_slice(hex_part, &mut arr).is_ok() {
+                    set.insert(ImageId(arr));
+                }
+            }
         }
 
         set

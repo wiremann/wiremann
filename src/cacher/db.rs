@@ -1,6 +1,6 @@
 use crate::controller::state::{
-    Album, AlbumId, Artist, ArtistId, ImageId, LibraryState, ListenMetrics, Playlist,
-    PlaylistId, PlaylistSource, QueueState, Track, TrackId, TrackListenMetrics, TrackSource,
+    Album, AlbumId, Artist, ArtistId, ImageId, LibraryState, ListenMetrics, Playlist, PlaylistId,
+    PlaylistSource, QueueState, Track, TrackId, TrackListenMetrics, TrackSource,
 };
 use crate::errors::CacherError;
 use sqlx::{Row, Sqlite, SqlitePool, Transaction};
@@ -108,7 +108,10 @@ impl Db {
         }
 
         if let Some(library) = crate::cacher::legacy::read_legacy_library(cache_dir) {
-            tracing::info!(tracks = library.tracks.len(), "migrating legacy library into SQLite");
+            tracing::info!(
+                tracks = library.tracks.len(),
+                "migrating legacy library into SQLite"
+            );
             self.write_library(&library).await?;
             std::fs::remove_file(&library_bin).ok();
         }
@@ -241,14 +244,12 @@ impl Db {
         let mut artist_ids = state.artists.values().collect::<Vec<_>>();
         artist_ids.sort_by_key(|a| a.id.0);
         for artist in artist_ids {
-            sqlx::query(
-                "INSERT INTO artists (id, name, image_id) VALUES (?1, ?2, ?3)",
-            )
-            .bind(artist_hex(artist.id))
-            .bind(artist.name.to_string())
-            .bind(artist.image_id.map(image_hex))
-            .execute(&mut *tx)
-            .await?;
+            sqlx::query("INSERT INTO artists (id, name, image_id) VALUES (?1, ?2, ?3)")
+                .bind(artist_hex(artist.id))
+                .bind(artist.name.to_string())
+                .bind(artist.image_id.map(image_hex))
+                .execute(&mut *tx)
+                .await?;
         }
 
         // Albums
@@ -411,11 +412,9 @@ impl Db {
     pub async fn load_library(&self) -> Result<LibraryState, CacherError> {
         let mut tracks: HashMap<TrackId, Arc<Track>> = HashMap::new();
 
-        let rows = sqlx::query(
-            "SELECT id, title, album, duration_ms, image_id FROM tracks",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = sqlx::query("SELECT id, title, album, duration_ms, image_id FROM tracks")
+            .fetch_all(&self.pool)
+            .await?;
 
         for row in rows {
             let id = from_track_hex(row.get::<String, _>("id").as_str());
@@ -469,7 +468,9 @@ impl Db {
         }
 
         let mut artists: HashMap<ArtistId, Arc<Artist>> = HashMap::new();
-        let rows = sqlx::query("SELECT id, name, image_id FROM artists").fetch_all(&self.pool).await?;
+        let rows = sqlx::query("SELECT id, name, image_id FROM artists")
+            .fetch_all(&self.pool)
+            .await?;
         for row in rows {
             let id = from_artist_hex(row.get::<String, _>("id").as_str());
             let image_id: Option<String> = row.get("image_id");
@@ -512,11 +513,9 @@ impl Db {
         }
 
         let mut albums: HashMap<AlbumId, Arc<Album>> = HashMap::new();
-        let rows = sqlx::query(
-            "SELECT id, name, duration_ms, image_id FROM albums",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = sqlx::query("SELECT id, name, duration_ms, image_id FROM albums")
+            .fetch_all(&self.pool)
+            .await?;
         for row in rows {
             let id = from_album_hex(row.get::<String, _>("id").as_str());
             let image_id: Option<String> = row.get("image_id");
@@ -546,11 +545,10 @@ impl Db {
             }
         }
 
-        let rows = sqlx::query(
-            "SELECT album_id, track_id FROM album_tracks ORDER BY album_id, position",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query("SELECT album_id, track_id FROM album_tracks ORDER BY album_id, position")
+                .fetch_all(&self.pool)
+                .await?;
         for row in rows {
             let album_id = from_album_hex(row.get::<String, _>("album_id").as_str());
             let track_id = from_track_hex(row.get::<String, _>("track_id").as_str());
@@ -566,7 +564,9 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
         for row in rows {
-            let id = PlaylistId(uuid::Uuid::parse_str(row.get::<String, _>("id").as_str()).unwrap_or_default());
+            let id = PlaylistId(
+                uuid::Uuid::parse_str(row.get::<String, _>("id").as_str()).unwrap_or_default(),
+            );
             let folder: Option<String> = row.get("folder_path");
             let image_id: Option<String> = row.get("image_id");
             playlists.insert(
@@ -589,7 +589,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
         for row in rows {
-            let playlist_id = PlaylistId(uuid::Uuid::parse_str(row.get::<String, _>("playlist_id").as_str()).unwrap_or_default());
+            let playlist_id = PlaylistId(
+                uuid::Uuid::parse_str(row.get::<String, _>("playlist_id").as_str())
+                    .unwrap_or_default(),
+            );
             let track_id = from_track_hex(row.get::<String, _>("track_id").as_str());
             if let Some(playlist) = playlists.get_mut(&playlist_id) {
                 playlist.tracks.push(track_id);
@@ -606,8 +609,12 @@ impl Db {
 
     pub async fn write_queue(&self, state: &QueueState) -> Result<(), CacherError> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM queue_tracks").execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM queue_order").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM queue_tracks")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM queue_order")
+            .execute(&mut *tx)
+            .await?;
 
         for (pos, track) in state.tracks.iter().enumerate() {
             sqlx::query("INSERT INTO queue_tracks (position, track_id) VALUES (?1, ?2)")
@@ -653,7 +660,9 @@ impl Db {
 
     pub async fn write_favorites(&self, ids: &[TrackId]) -> Result<(), CacherError> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM favorites").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM favorites")
+            .execute(&mut *tx)
+            .await?;
 
         for (pos, id) in ids.iter().enumerate() {
             sqlx::query("INSERT INTO favorites (position, track_id) VALUES (?1, ?2)")
@@ -680,7 +689,9 @@ impl Db {
 
     pub async fn write_metrics(&self, metrics: &ListenMetrics) -> Result<(), CacherError> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM track_metrics").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM track_metrics")
+            .execute(&mut *tx)
+            .await?;
 
         let mut pairs = metrics.tracks.iter().collect::<Vec<_>>();
         pairs.sort_by_key(|(id, _)| id.0);

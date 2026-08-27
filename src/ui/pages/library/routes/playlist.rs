@@ -16,12 +16,12 @@ use crate::{
     },
 };
 use gpui::Entity;
+use gpui::prelude::FluentBuilder;
 use gpui::{
     App, Bounds, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,
 };
-use gpui::prelude::FluentBuilder;
 
 const THUMBNAIL_MARGIN: usize = 16;
 

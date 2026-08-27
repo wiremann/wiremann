@@ -200,19 +200,23 @@ impl Render for Wiremann {
         window_border().child(
             div()
                 .id("main_container")
-            .size_full()
-            .font_family("Space Grotesk")
-            .relative()
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
-            .bg(theme.app_bg)
-            .child(self.titlebar.clone())
-            .child(content)
-            .when(!popout_enabled, |this| this.child(self.toast_manager.clone()))
-            .when(!popout_enabled, |this| this.child(self.keybinds_overlay.clone()))
-            .into_any_element(),
+                .size_full()
+                .font_family("Space Grotesk")
+                .relative()
+                .flex()
+                .flex_col()
+                .justify_center()
+                .items_center()
+                .bg(theme.app_bg)
+                .child(self.titlebar.clone())
+                .child(content)
+                .when(!popout_enabled, |this| {
+                    this.child(self.toast_manager.clone())
+                })
+                .when(!popout_enabled, |this| {
+                    this.child(self.keybinds_overlay.clone())
+                })
+                .into_any_element(),
         )
     }
 }

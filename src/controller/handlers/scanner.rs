@@ -210,7 +210,8 @@ impl Controller {
                     if let Some(idx) = title.find(" - ") {
                         let prefix = title[..idx].trim().to_string();
                         let suffix = title[idx + 3..].trim().to_string();
-                        if !prefix.is_empty() && !suffix.is_empty()
+                        if !prefix.is_empty()
+                            && !suffix.is_empty()
                             && (artist.is_empty()
                                 || artist.eq_ignore_ascii_case("Unknown Artist")
                                 || artist.eq_ignore_ascii_case(&prefix))
@@ -219,14 +220,14 @@ impl Controller {
                             title = suffix;
                         }
                     }
-                    let _ = self.image_processor_tx.send(
-                        ImageProcessorCommand::FetchAlbumArtOnline {
-                            id: *id,
-                            title,
-                            artist,
-                            album,
-                        },
-                    );
+                    let _ =
+                        self.image_processor_tx
+                            .send(ImageProcessorCommand::FetchAlbumArtOnline {
+                                id: *id,
+                                title,
+                                artist,
+                                album,
+                            });
                 }
 
                 view.update(cx, |this, cx| {

@@ -5,10 +5,7 @@ use crate::controller::events::ImageProcessorEvent;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
 use crate::{
-    cacher::ImageKind,
-    errors::ImageProcessorError,
-    scanner::metadata,
-    title::strip_search_suffixes,
+    cacher::ImageKind, errors::ImageProcessorError, scanner::metadata, title::strip_search_suffixes,
 };
 use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
@@ -91,7 +88,12 @@ impl ImageProcessor {
                     info!(track_id = ?id, ?path, "Received GetCurrentAlbumArt command");
                     let _ = album_art_tx.send(ImageJob::AlbumArt(id, path));
                 }
-                ImageProcessorCommand::FetchAlbumArtOnline { id, title, artist, album } => {
+                ImageProcessorCommand::FetchAlbumArtOnline {
+                    id,
+                    title,
+                    artist,
+                    album,
+                } => {
                     info!(track_id = ?id, title = %title, artist = %artist, "Received FetchAlbumArtOnline command");
                     let _ = album_art_tx.send(ImageJob::AlbumArtOnline(id, title, artist, album));
                 }
@@ -176,48 +178,49 @@ impl ImageProcessor {
             std::thread::spawn(move || {
                 while let Ok(job) = album_art_rx.recv() {
                     match job {
-                        ImageJob::AlbumArt(id, path) => {
-                            match metadata::read_album_art(&path) {
-                                Ok(Some(image)) => {
-                                    if let Ok(hash) = ImageId::generate(&image) {
-                                        let path = CachePaths::image_cache_path(
-                                            cache_path.as_path(),
-                                            hash,
-                                            ImageKind::AlbumArt,
-                                        );
+                        ImageJob::AlbumArt(id, path) => match metadata::read_album_art(&path) {
+                            Ok(Some(image)) => {
+                                if let Ok(hash) = ImageId::generate(&image) {
+                                    let path = CachePaths::image_cache_path(
+                                        cache_path.as_path(),
+                                        hash,
+                                        ImageKind::AlbumArt,
+                                    );
 
-                                        if path.exists() {
-                                            let _ = events_tx.send(
-                                                ImageProcessorEvent::UpdateImageLookup(
-                                                    HashMap::from([(id, hash)]),
-                                                ),
-                                            );
-                                        } else if let Ok(album_art) =
-                                            render_album_art(&image, ImageKind::AlbumArt)
-                                        {
-                                            let _ = events_tx.send(
-                                                ImageProcessorEvent::InsertAlbumArt(hash, album_art),
-                                            );
-                                            let _ = events_tx.send(
-                                                ImageProcessorEvent::UpdateImageLookup(
-                                                    HashMap::from([(id, hash)]),
-                                                ),
-                                            );
-                                        }
+                                    if path.exists() {
+                                        let _ =
+                                            events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                                HashMap::from([(id, hash)]),
+                                            ));
+                                    } else if let Ok(album_art) =
+                                        render_album_art(&image, ImageKind::AlbumArt)
+                                    {
+                                        let _ = events_tx.send(
+                                            ImageProcessorEvent::InsertAlbumArt(hash, album_art),
+                                        );
+                                        let _ =
+                                            events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                                HashMap::from([(id, hash)]),
+                                            ));
                                     }
                                 }
-                                Err(err) => warn!(error = ?err, "Failed to read album art"),
-                                Ok(None) => info!(
-                                    track_id = ?id,
-                                    path = ?path,
-                                    "No embedded album art found in file"
-                                ),
                             }
-                        }
+                            Err(err) => warn!(error = ?err, "Failed to read album art"),
+                            Ok(None) => info!(
+                                track_id = ?id,
+                                path = ?path,
+                                "No embedded album art found in file"
+                            ),
+                        },
                         ImageJob::AlbumArtOnline(id, title, artist, album) => {
                             let start = Instant::now();
                             fetch_album_art_online(
-                                &events_tx, &cache_path, id, &title, &artist, &album,
+                                &events_tx,
+                                &cache_path,
+                                id,
+                                &title,
+                                &artist,
+                                &album,
                             );
                             info!(
                                 track_id = ?id,
@@ -328,7 +331,11 @@ fn deezer_search(query: &str, limit: usize) -> Option<String> {
     );
 
     let client = reqwest::blocking::Client::builder()
-        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
         .timeout(Duration::from_secs(15))
         .build()
         .ok()?;
@@ -337,17 +344,15 @@ fn deezer_search(query: &str, limit: usize) -> Option<String> {
     let body = resp.text().ok()?;
     let json: serde_json::Value = serde_json::from_str(&body).ok()?;
 
-    json.get("data")
-        .and_then(|d| d.as_array())
-        .and_then(|arr| {
-            arr.iter().find_map(|entry| {
-                entry
-                    .get("album")
-                    .and_then(|a| a.get("cover_big"))
-                    .and_then(|c| c.as_str())
-                    .map(String::from)
-            })
+    json.get("data").and_then(|d| d.as_array()).and_then(|arr| {
+        arr.iter().find_map(|entry| {
+            entry
+                .get("album")
+                .and_then(|a| a.get("cover_big"))
+                .and_then(|c| c.as_str())
+                .map(String::from)
         })
+    })
 }
 
 fn download_and_send_album_art(
@@ -378,11 +383,10 @@ fn download_and_send_album_art(
     if let Ok(hash) = ImageId::generate(&img_bytes) {
         match render_album_art(&img_bytes, ImageKind::AlbumArt) {
             Ok(album_art) => {
-                let _ = events_tx
-                    .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
-                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                    HashMap::from([(id, hash)]),
-                ));
+                let _ = events_tx.send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
+                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(HashMap::from([(
+                    id, hash,
+                )])));
                 // Also generate a small thumbnail for library lists.
                 if let Ok(thumb) = render_album_art(&img_bytes, ImageKind::ThumbnailSmall) {
                     let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(

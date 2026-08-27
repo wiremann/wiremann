@@ -79,7 +79,10 @@ impl Render for PopOutPlayer {
         let state = controller.state.read(cx);
         let thumbnail = cx.global::<ImageCache>().current.clone();
 
-        let current = state.playback.current.and_then(|id| state.library.tracks.get(&id));
+        let current = state
+            .playback
+            .current
+            .and_then(|id| state.library.tracks.get(&id));
 
         let (title, artist) = match current {
             Some(track) => (

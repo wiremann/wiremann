@@ -40,11 +40,9 @@ impl SystemIntegration {
         let hwnd: Option<*mut std::ffi::c_void> = None;
 
         #[cfg(target_os = "windows")]
-        let hwnd = raw_window_handle.and_then(|handle| {
-            match handle {
-                RawWindowHandle::Win32(h) => Some(h.hwnd.get() as *mut std::ffi::c_void),
-                _ => None,
-            }
+        let hwnd = raw_window_handle.and_then(|handle| match handle {
+            RawWindowHandle::Win32(h) => Some(h.hwnd.get() as *mut std::ffi::c_void),
+            _ => None,
         });
 
         let config = PlatformConfig {
@@ -53,9 +51,11 @@ impl SystemIntegration {
             display_name: "Wiremann",
         };
 
-        let media_controls = MediaControls::new(config).inspect_err(|e| {
-            eprintln!("[wiremann] MediaControls::new failed: {e}");
-        }).ok();
+        let media_controls = MediaControls::new(config)
+            .inspect_err(|e| {
+                eprintln!("[wiremann] MediaControls::new failed: {e}");
+            })
+            .ok();
 
         (
             Self {
@@ -119,8 +119,16 @@ impl SystemIntegration {
 
                     match controls.set_metadata(MediaMetadata {
                         title: Some(title.as_str()),
-                        album: if album.is_empty() { None } else { Some(album.as_str()) },
-                        artist: if artist.is_empty() { None } else { Some(artist.as_str()) },
+                        album: if album.is_empty() {
+                            None
+                        } else {
+                            Some(album.as_str())
+                        },
+                        artist: if artist.is_empty() {
+                            None
+                        } else {
+                            Some(artist.as_str())
+                        },
                         cover_url: cover_url.as_deref(),
                         duration: Some(Duration::from_secs(duration)),
                     }) {
@@ -204,5 +212,4 @@ impl SystemIntegration {
             _ => {}
         }
     }
-
 }

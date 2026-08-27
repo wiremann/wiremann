@@ -279,7 +279,8 @@ impl Controller {
                     if let Some(idx) = title.find(" - ") {
                         let prefix = title[..idx].trim().to_string();
                         let suffix = title[idx + 3..].trim().to_string();
-                        if !prefix.is_empty() && !suffix.is_empty()
+                        if !prefix.is_empty()
+                            && !suffix.is_empty()
                             && (artist.is_empty()
                                 || artist.eq_ignore_ascii_case("Unknown Artist")
                                 || artist.eq_ignore_ascii_case(&prefix))

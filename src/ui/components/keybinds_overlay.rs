@@ -1,7 +1,7 @@
 use gpui::{
     App, AppContext, Context, Entity, FontWeight, Global, InteractiveElement, IntoElement,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Window, div, px, rgba,
-    rgb,
+    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Window, div, px, rgb,
+    rgba,
 };
 
 use crate::ui::theme::Theme;
@@ -99,7 +99,13 @@ impl Render for KeybindsOverlay {
                             .text_color(theme.library_text)
                             .child("Keyboard Shortcuts"),
                     )
-                    .child(div().id("keybinds_sep_top").w_full().h(px(1.0)).bg(theme.border))
+                    .child(
+                        div()
+                            .id("keybinds_sep_top")
+                            .w_full()
+                            .h(px(1.0))
+                            .bg(theme.border),
+                    )
                     .child(
                         div()
                             .id("keybinds_shortcuts_scroll")
@@ -135,7 +141,13 @@ impl Render for KeybindsOverlay {
                                     )
                             })),
                     )
-                    .child(div().id("keybinds_sep_bot").w_full().h(px(1.0)).bg(theme.border))
+                    .child(
+                        div()
+                            .id("keybinds_sep_bot")
+                            .w_full()
+                            .h(px(1.0))
+                            .bg(theme.border),
+                    )
                     .child(
                         div()
                             .id("keybinds_close_hint")

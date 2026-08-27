@@ -223,13 +223,10 @@ impl Scanner {
 
                 scan_record.insert(ts, id);
 
+                scan_progress.metadata_reads.fetch_add(1, Ordering::Relaxed);
                 scan_progress
-                    .metadata_reads
-                    .fetch_add(1, Ordering::Relaxed);
-                scan_progress.metadata_elapsed_us.fetch_add(
-                    read_start.elapsed().as_micros() as usize,
-                    Ordering::Relaxed,
-                );
+                    .metadata_elapsed_us
+                    .fetch_add(read_start.elapsed().as_micros() as usize, Ordering::Relaxed);
             }
 
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);

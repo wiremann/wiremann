@@ -62,7 +62,11 @@ pub fn read_metadata(track_source: TrackSource) -> Result<ScannedTrack, ScannerE
     // If the artist is still unknown after tag reading and title cleaning,
     // attempt to parse it from the filename (the fallback may have had it
     // before tags overwrote it).
-    if artists.is_empty() || artists.iter().any(|a| a.eq_ignore_ascii_case("Unknown Artist")) {
+    if artists.is_empty()
+        || artists
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case("Unknown Artist"))
+    {
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         if let Some((parsed_artist, parsed_title)) = split_artist_title(stem)
             && !parsed_artist.is_empty()

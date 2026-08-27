@@ -1,4 +1,8 @@
-use super::{Controller, App, ImageProcessorEvent, Entity, Wiremann, ControllerError, ImageCache, CacherCommand, ImageKind, SystemIntegrationCommand, drop_image_from_app, Arc, ImageProcessorCommand};
+use super::{
+    App, Arc, CacherCommand, Controller, ControllerError, Entity, ImageCache, ImageKind,
+    ImageProcessorCommand, ImageProcessorEvent, SystemIntegrationCommand, Wiremann,
+    drop_image_from_app,
+};
 
 impl Controller {
     pub fn handle_image_processor_event(

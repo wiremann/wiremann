@@ -1,9 +1,9 @@
+use gpui::prelude::FluentBuilder;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
-use gpui::prelude::FluentBuilder;
 
 use crate::{
     controller::{Controller, state::TrackId},
@@ -323,29 +323,26 @@ impl Render for FavoritesSection {
             })
             .child(if len > 0 {
                 div().flex_1().relative().px_12().pb_2().child(
-                    div()
-                        .id("favorites_list_container")
-                        .size_full()
-                        .child(
-                            uniform_list("favorites", len, move |range, _, cx| {
-                                let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                                let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                    div().id("favorites_list_container").size_full().child(
+                        uniform_list("favorites", len, move |range, _, cx| {
+                            let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                            let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                                let thumb_tracks: Vec<TrackId> =
-                                    (start..end).map(|i| favorite_ids[i]).collect();
+                            let thumb_tracks: Vec<TrackId> =
+                                (start..end).map(|i| favorite_ids[i]).collect();
 
-                                controller.request_track_thumbnails(&thumb_tracks, cx);
+                            controller.request_track_thumbnails(&thumb_tracks, cx);
 
-                                range
-                                    .map(|i| Self::render_track(i + 1, favorite_ids[i], cx))
-                                    .collect()
-                            })
-                            .w_full()
-                            .h_full()
-                            .flex()
-                            .flex_col()
-                            .track_scroll(&scroll_handle),
-                        ),
+                            range
+                                .map(|i| Self::render_track(i + 1, favorite_ids[i], cx))
+                                .collect()
+                        })
+                        .w_full()
+                        .h_full()
+                        .flex()
+                        .flex_col()
+                        .track_scroll(&scroll_handle),
+                    ),
                 )
             } else {
                 div()

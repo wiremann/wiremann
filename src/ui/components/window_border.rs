@@ -1,8 +1,9 @@
 use crate::ui::theme::Theme;
 use gpui::{
-    canvas, div, point, prelude::FluentBuilder, px, transparent_black, AnyElement, App, Bounds,
-    CursorStyle, Decorations, Edges, HitboxBehavior, Hsla, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Pixels, Point, RenderOnce, ResizeEdge, Size, Styled, Window,
+    AnyElement, App, Bounds, CursorStyle, Decorations, Edges, HitboxBehavior, Hsla,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce,
+    ResizeEdge, Size, Styled, Window, canvas, div, point, prelude::FluentBuilder, px,
+    transparent_black,
 };
 
 #[cfg(not(target_os = "linux"))]

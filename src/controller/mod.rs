@@ -11,8 +11,8 @@ use crate::controller::events::{
 };
 use crate::controller::state::PlaybackStatus;
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
-use crate::controller::state::{Track, TrackId};
 use crate::controller::state::{MetricsSession, TrackListenMetrics};
+use crate::controller::state::{Track, TrackId};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, duration_to_slider};
@@ -25,13 +25,13 @@ use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
 use gpui::{App, Entity, Global, Rgba, rgb};
-use tracing::info;
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct Controller {
@@ -182,9 +182,13 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::Stop);
 
         let library = self.state.read(cx).library.clone();
-        let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(library));
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteLibraryState(library));
         let playback = self.state.read(cx).playback.clone();
-        let _ = self.cacher_tx.send(CacherCommand::WritePlaybackState(playback));
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(playback));
         let queue = self.state.read(cx).queue.clone();
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
     }
@@ -641,9 +645,7 @@ impl Controller {
 
         if should_send {
             let metrics = self.state.read(cx).metrics.clone();
-            let _ = self
-                .cacher_tx
-                .send(CacherCommand::WriteMetrics(metrics));
+            let _ = self.cacher_tx.send(CacherCommand::WriteMetrics(metrics));
         }
     }
 
@@ -740,7 +742,11 @@ impl Controller {
         // instead of flickering (the aggregate map is rebuilt every render).
         ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
 
-        ranked.into_iter().take(limit).map(|(id, _, _)| id).collect()
+        ranked
+            .into_iter()
+            .take(limit)
+            .map(|(id, _, _)| id)
+            .collect()
     }
 
     pub fn listen_stats(&self, cx: &App) -> ListenStats {
@@ -852,7 +858,10 @@ fn reveal_in_os(path: &std::path::Path) {
 
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open").arg("-R").arg(path).spawn();
+        let _ = std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn();
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]

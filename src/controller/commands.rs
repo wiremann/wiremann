@@ -1,7 +1,9 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
-use crate::controller::state::{LibraryState, ListenMetrics, PlaybackState, PlaybackStatus, QueueState};
+use crate::controller::state::{
+    LibraryState, ListenMetrics, PlaybackState, PlaybackStatus, QueueState,
+};
 use crate::lyrics_manager::Lyrics;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -20,10 +22,7 @@ pub enum AudioCommand {
 
 pub enum ScannerCommand {
     ScanDir(PathBuf),
-    ScanDirRescan {
-        path: PathBuf,
-        playlist: PlaylistId,
-    },
+    ScanDirRescan { path: PathBuf, playlist: PlaylistId },
     ScanTrack(PathBuf),
     StartNextScan,
 }

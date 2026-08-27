@@ -116,13 +116,12 @@ impl LyricsManager {
                         // search. Try the stripped title first, then the raw
                         // one as a fallback.
                         let stripped = strip_search_suffixes(&title);
-                        let attempts: [&str; 2] = if stripped == title.as_str()
-                            || stripped.is_empty()
-                        {
-                            [title.as_str(), ""]
-                        } else {
-                            [stripped, title.as_str()]
-                        };
+                        let attempts: [&str; 2] =
+                            if stripped == title.as_str() || stripped.is_empty() {
+                                [title.as_str(), ""]
+                            } else {
+                                [stripped, title.as_str()]
+                            };
 
                         for attempt in attempts.iter() {
                             if attempt.is_empty() {

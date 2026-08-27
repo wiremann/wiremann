@@ -1,6 +1,6 @@
 use crate::controller::state::{
-    Album, AlbumId, Artist, ArtistId, ImageId, LibraryState, ListenMetrics, Playlist,
-    PlaylistId, PlaylistSource, QueueState, Track, TrackId, TrackListenMetrics, TrackSource,
+    Album, AlbumId, Artist, ArtistId, ImageId, LibraryState, ListenMetrics, Playlist, PlaylistId,
+    PlaylistSource, QueueState, Track, TrackId, TrackListenMetrics, TrackSource,
 };
 use crate::errors::CacherError;
 use bitcode::{Decode, Encode};
@@ -182,7 +182,10 @@ pub fn read_legacy_library(cache_dir: &Path) -> Option<LibraryState> {
                 tracks: p.tracks.iter().map(|t| TrackId(*t)).collect(),
                 image_id: p.image_id.map(ImageId),
             };
-            (PlaylistId(Uuid::parse_str(&id).unwrap_or_default()), playlist)
+            (
+                PlaylistId(Uuid::parse_str(&id).unwrap_or_default()),
+                playlist,
+            )
         })
         .collect();
 

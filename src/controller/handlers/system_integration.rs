@@ -1,4 +1,6 @@
-use super::{Controller, App, SystemIntegrationEvent, Entity, Wiremann, ControllerError, PlaybackStatus};
+use super::{
+    App, Controller, ControllerError, Entity, PlaybackStatus, SystemIntegrationEvent, Wiremann,
+};
 
 impl Controller {
     pub fn handle_system_integration_event(
