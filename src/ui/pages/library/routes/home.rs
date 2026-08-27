@@ -1,8 +1,8 @@
 use crate::ui::components::bounds_observer::observe_bounds;
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
-    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
+    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems, rgb,
 };
 use std::collections::HashMap;
 
@@ -27,10 +27,27 @@ const HOME_GRID_GAP: f32 = 16.0;
 
 pub struct HomeSection {
     pub scroll_handle: ScrollHandle,
-    pub avail_width: f64,
+    pub avail_width: Entity<f64>,
 }
 
 impl HomeSection {
+    fn calculate_grid_geometry(
+        available_width: Pixels,
+        min_card_width: Pixels,
+        gap: Pixels,
+    ) -> (usize, Pixels) {
+        let available = available_width.to_f64();
+        let min_width = min_card_width.to_f64();
+        let gap = gap.to_f64();
+
+        let columns = ((available + gap) / (min_width + gap))
+            .floor()
+            .max(1.0) as usize;
+
+        let card_width = ((available - (columns - 1) as f64 * gap) / columns as f64).max(0.0);
+
+        (columns, px(card_width as f32))
+    }
     fn section_header(title: &str, route: Option<LibraryRoutes>, cx: &mut App) -> Div {
         let theme = *cx.global::<Theme>();
 
@@ -91,7 +108,7 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+        div().child(
             div()
                 .id(format!("home_album_{}", album.id.0))
                 .w_full()
@@ -168,7 +185,7 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+        div().child(
             div()
                 .id(format!("home_artist_{}", artist.id.0))
                 .w_full()
@@ -245,7 +262,7 @@ impl HomeSection {
             })
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
+        div().child(
             div()
                 .id(format!("home_playlist_{}", playlist.id.0))
                 .w_full()
@@ -323,7 +340,7 @@ impl HomeSection {
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        div().min_w(px(160.0)).flex_1().max_w(px(220.0)).child(
+        div().child(
             div()
                 .id(format!("home_{prefix}_{:?}", track.id.0))
                 .w_full()
@@ -535,6 +552,41 @@ impl HomeSection {
             format!("{seconds}s")
         }
     }
+
+    fn responsive_grid(children: Vec<Div>, available_width: Pixels, min_card_width: Pixels) -> Div {
+        let gap = px(HOME_GRID_GAP);
+
+        let (columns, cell_width) = Self::calculate_grid_geometry(available_width, min_card_width, gap);
+
+        let mut rows = Vec::new();
+        let mut iter = children.into_iter();
+
+        loop {
+            let mut row_children = Vec::new();
+
+            for _ in 0..columns {
+                if let Some(child) = iter.next() {
+                    row_children.push(child.w(cell_width).flex_shrink_0().into_any_element());
+                } else {
+                    break;
+                }
+            }
+
+            if row_children.is_empty() {
+                break;
+            }
+
+            rows.push(div().w_full().flex().gap(gap).children(row_children));
+        }
+
+        div()
+            .w_full()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(gap)
+            .children(rows)
+    }
 }
 
 impl Render for HomeSection {
@@ -628,28 +680,270 @@ impl Render for HomeSection {
             (None, None)
         };
 
-        div().w_full().h_full().flex().flex_col().child(
-            div()
-                .py_4()
-                .px_8()
-                .flex()
-                .flex_col()
-                .justify_center()
-                .child(
+        let mut rows: Vec<Div> = Vec::new();
+        let avail_width = *self.avail_width.read(cx) as f32;
+
+        if track_count == 0 {
+            rows.push(
+                div()
+                    .w_full()
+                    .py_24()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .text_base()
+                    .text_color(theme.library_albums_section_empty_text)
+                    .child(div().text_size(rems(1.4)).child("Your library is empty"))
+                    .child(
+                        div()
+                            .mt_2()
+                            .text_sm()
+                            .child("Add some tracks to get started."),
+                    ),
+            );
+        } else {
+            if has_stats {
+                rows.push(Self::stats_summary_banner(
+                    &stats,
+                    home_top_track,
+                    home_top_artist,
+                    theme,
+                ));
+            }
+
+            if !top_track_ids.is_empty() {
+                let top_children = top_track_ids
+                    .into_iter()
+                    .map(|id| Self::render_track_card("top", id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
                     div()
-                        .text_size(rems(2.0))
-                        .font_weight(FontWeight::BOLD)
-                        .tracking_tight()
-                        .text_color(theme.library_home_section_title)
-                        .child("Home")
-                        .child(
-                            div()
-                                .h(px(2.0))
-                                .w_16()
-                                .mt_1()
-                                .bg(theme.library_home_section_title),
-                        ),
-                ),
-        )
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Top Tracks",
+                            Some(LibraryRoutes::Tracks),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            top_children,
+                            px(avail_width),
+                            px(120.0),
+                        )),
+                );
+            }
+
+            if !recent_track_ids.is_empty() {
+                let recent_children = recent_track_ids
+                    .into_iter()
+                    .map(|id| Self::render_track_card("recent", id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Recently Played",
+                            Some(LibraryRoutes::Tracks),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            recent_children,
+                            px(avail_width),
+                            px(120.0),
+                        )),
+                );
+            }
+
+            if !top_artist_ids.is_empty() {
+                let top_artist_children = top_artist_ids
+                    .into_iter()
+                    .map(|id| Self::render_artist_card(id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Top Artists",
+                            Some(LibraryRoutes::Artists),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            top_artist_children,
+                            px(avail_width),
+                            px(140.0),
+                        )),
+                );
+            }
+
+            if !album_ids.is_empty() {
+                let album_children = album_ids
+                    .into_iter()
+                    .map(|id| Self::render_album_card(id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Albums",
+                            Some(LibraryRoutes::Albums),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            album_children,
+                            px(avail_width),
+                            px(140.0),
+                        )),
+                );
+            }
+
+            if !artist_ids.is_empty() {
+                let artist_children = artist_ids
+                    .into_iter()
+                    .map(|id| Self::render_artist_card(id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Artists",
+                            Some(LibraryRoutes::Artists),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            artist_children,
+                            px(avail_width),
+                            px(140.0),
+                        )),
+                );
+            }
+
+            if !playlist_ids.is_empty() {
+                let playlist_children = playlist_ids
+                    .into_iter()
+                    .map(|id| Self::render_playlist_card(id, cx))
+                    .collect::<Vec<_>>();
+
+                rows.push(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(Self::section_header(
+                            "Playlists",
+                            Some(LibraryRoutes::Playlists),
+                            cx,
+                        ))
+                        .child(Self::responsive_grid(
+                            playlist_children,
+                            px(avail_width),
+                            px(140.0),
+                        )),
+                );
+            }
+        }
+
+        let scroll_handle = self.scroll_handle.clone();
+
+        div()
+            .w_full()
+            .h_full()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .py_4()
+                    .px_8()
+                    .flex()
+                    .flex_col()
+                    .justify_center()
+                    .child(
+                        div()
+                            .text_size(rems(2.0))
+                            .font_weight(FontWeight::BOLD)
+                            .tracking_tight()
+                            .text_color(theme.library_home_section_title)
+                            .child("Home")
+                            .child(
+                                div()
+                                    .h(px(2.0))
+                                    .w_16()
+                                    .mt_1()
+                                    .bg(theme.library_home_section_title),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .text_sm()
+                            .text_color(theme.library_home_section_meta)
+                            .child(format!(
+                                "{track_count} tracks · {album_count} albums · {artist_count} artists · {playlist_count} playlists"
+                            )),
+                    ),
+            ).child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .min_w_0()
+                    .relative()
+                    .child(
+                        div()
+                            .id("home_scroll")
+                            .w_full()
+                            .h_full()
+                            .overflow_y_scroll()
+                            .track_scroll(&scroll_handle)
+                            .px_8()
+                            .pb_8()
+                            .pt_4()
+                            .flex()
+                            .flex_col()
+                            .gap_y_8()
+                        .child(observe_bounds(
+                            "home_content_available",
+            div().h_1().w_full().flex_1().min_h_0().min_w_0().bg(rgb(0xffffff)),
+                            {
+                                let entity = cx.entity();
+                                move |bounds, _, cx| {
+                                    let avail_width = bounds.size.width.to_f64();
+                                    entity.update(cx, |this, cx| {
+                                        let old = *this.avail_width.read(cx);
+                                        if old != avail_width {
+                                            this.avail_width.update(cx, |v, _| *v = avail_width);
+                                            cx.notify();
+                                        }
+                                    })
+                                }
+                            },
+                        ))
+                            .children(rows),
+                    ),
+            )
+            .child(floating_scrollbar(
+                "home_scrollbar",
+                scroll_handle,
+                RightPad::Pad,
+            ))
     }
 }
