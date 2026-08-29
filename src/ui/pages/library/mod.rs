@@ -135,7 +135,7 @@ impl LibraryPage {
             }),
             home: cx.new(|cx| HomeSection {
                 scroll_handle: ScrollHandle::new(),
-                avail_width: cx.new(|_| 0.0),
+                avail_width: cx.new(|_| 800.0),
             }),
             tracks: cx.new(|_| TracksSection {
                 scroll_handle: UniformListScrollHandle::new(),
