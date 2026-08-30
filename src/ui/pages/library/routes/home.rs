@@ -865,82 +865,92 @@ impl Render for HomeSection {
         let scroll_handle = self.scroll_handle.clone();
 
         div()
-            .w_full()
-            .h_full()
+    .w_full()
+    .h_full()
+    .min_w_0()
+    .flex()
+    .flex_col()
+    .px_8()
+    .child(
+        div()
+            .py_4()
             .flex()
             .flex_col()
-                    .px_8()
+            .justify_center()
             .child(
                 div()
-                    .py_4()
-                    .flex()
-                    .flex_col()
-                    .justify_center()
+                    .text_size(rems(2.0))
+                    .font_weight(FontWeight::BOLD)
+                    .tracking_tight()
+                    .text_color(theme.library_home_section_title)
+                    .child("Home")
                     .child(
                         div()
-                            .text_size(rems(2.0))
-                            .font_weight(FontWeight::BOLD)
-                            .tracking_tight()
-                            .text_color(theme.library_home_section_title)
-                            .child("Home")
-                            .child(
-                                div()
-                                    .h(px(2.0))
-                                    .w_16()
-                                    .mt_1()
-                                    .bg(theme.library_home_section_title),
-                            ),
-                    )
-                    .child(
-                        div()
+                            .h(px(2.0))
+                            .w_16()
                             .mt_1()
-                            .text_sm()
-                            .text_color(theme.library_home_section_meta)
-                            .child(format!(
-                                "{track_count} tracks · {album_count} albums · {artist_count} artists · {playlist_count} playlists"
-                            )),
+                            .bg(theme.library_home_section_title),
                     ),
-            ).child(observe_bounds(
-                            "home_content_available",
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .min_w_0()
-                    .relative().pb_8()
-                            .pt_4()
-                    .child(
-                        div()
-                            .id("home_scroll")
-                            .w_full()
-                            .h_full()
-                            .overflow_y_scroll()
-                            .track_scroll(&scroll_handle)
-                            .flex()
-                            .flex_col()
-                            .gap_y_8()
-                            .children(rows),
-                    ),
-                            {
-                                let entity = cx.entity();
-                                move |bounds, _, cx| {
-                                    let avail_width = bounds.size.width.to_f64();
-                                    entity.update(cx, |this, cx| {
-                                        let old = *this.avail_width.read(cx);
-                                        let diff = (old - avail_width).abs();
-                                        if diff > 0.5 {
-                                            this.avail_width.update(cx, |v, _| *v = avail_width);
-                                            cx.notify();
-                                        }
-                                    })
-                                }
-                            },
-                        )
-
             )
-            .child(floating_scrollbar(
-                "home_scrollbar",
-                scroll_handle,
-                RightPad::Pad,
-            ))
+            .child(
+                div()
+                    .mt_1()
+                    .text_sm()
+                    .text_color(theme.library_home_section_meta)
+                    .child(format!(
+                        "{track_count} tracks · {album_count} albums · {artist_count} artists · {playlist_count} playlists"
+                    )),
+            ),
+    )
+    .child(
+        observe_bounds(
+            "home_content_available",
+            div()
+                .flex_1()
+                .min_h_0()
+                .min_w_0()
+                .relative()
+                .pt_4()
+                .pb_8()
+                .child(
+                    div()
+                        .id("home_scroll")
+                        .w_full()
+                        .h_full()
+                        .min_w_0()
+                        .overflow_y_scroll()
+                        .track_scroll(&scroll_handle)
+                        .flex()
+                        .flex_col()
+                        .gap_y_8()
+                        .children(rows),
+                ),
+            {
+                let entity = cx.entity();
+
+                move |bounds, _, cx| {
+                    let avail_width = bounds.size.width.to_f64();
+
+                    entity.update(cx, |this, cx| {
+                        let old = *this.avail_width.read(cx);
+                        let diff = (old - avail_width).abs();
+
+                        if diff > 0.5 {
+                            this.avail_width.update(cx, |v, _| *v = avail_width);
+                            println!(
+                                "Home available width changed: {old} -> {avail_width}"
+                            );
+                            cx.notify();
+                        }
+                    })
+                }
+            },
+        )
+    )
+    .child(floating_scrollbar(
+        "home_scrollbar",
+        scroll_handle,
+        RightPad::Pad,
+    ))
     }
 }
