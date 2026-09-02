@@ -1,6 +1,6 @@
 use gpui::{
-    Animation, AnimationExt, Context, ElementId, FontWeight, Global, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
+    Animation, AnimationExt, Context, ElementId, FontWeight, IntoElement, Render, Styled, Window,
+    div,
     gradient_color_stop, linear_gradient, px, transparent_black,
 };
 
@@ -26,8 +26,6 @@ pub struct SidebarBounds {
     pub top: f32,
 }
 
-impl Global for SidebarIndicator {}
-impl Global for SidebarBounds {}
 
 impl Sidebar {
     fn section_header(text: &'static str, theme: Theme) -> impl IntoElement {
@@ -86,7 +84,7 @@ impl Sidebar {
                             theme.library_sidebar_item_text
                         }),
                 ),
-            move |bounds, _, cx| {
+            move |bounds| {
                 if *cx.global::<LibraryRoutes>() == section {
                     let sidebar_top = cx.global::<SidebarBounds>().top;
                     let indicator = cx.global_mut::<SidebarIndicator>();

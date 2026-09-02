@@ -16,5 +16,3 @@ pub enum Page {
     Library,
     Player,
 }
-
-impl gpui::Global for Page {}

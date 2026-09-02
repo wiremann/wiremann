@@ -1,7 +1,7 @@
 // Ref: https://github.com/longbridge/gpui-component/blob/main/crates/ui/src/element_ext.rs
-use gpui::{App, Bounds, ParentElement, Pixels, Styled, Window, canvas};
+use gpui::{App, Bounds, Div, Pixels, Styled, Window, canvas};
 
-pub trait ElementExt: ParentElement + Sized {
+pub trait ElementExt: Sized {
     /// Add a prepaint callback to the element.
     ///
     /// This is a helper method to get the bounds of the element after paint.
@@ -24,4 +24,4 @@ pub trait ElementExt: ParentElement + Sized {
     }
 }
 
-impl<T: ParentElement> ElementExt for T {}
+impl ElementExt for Div {}

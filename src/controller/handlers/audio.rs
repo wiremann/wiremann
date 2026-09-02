@@ -41,10 +41,10 @@ impl Controller {
                 let last_pos = self.state.read(cx).playback.position;
 
                 if *pos != last_pos {
-                    view.update(cx, |this, cx| {
-                        this.player_page.update(cx, |this, cx| {
-                            this.controlbar.update(cx, |this, cx| {
-                                this.playback_slider_state.update(cx, |this, cx| {
+                    view.update(&mut *cx, |this, cx| {
+                        this.player_page.update(&mut *cx, |this, cx| {
+                            this.controlbar.update(&mut *cx, |this, cx| {
+                                this.playback_slider_state.update(&mut *cx, |this, cx| {
                                     let state = cx.global::<Controller>().state.read(cx);
                                     let current = if let Some(id) = state.playback.current {
                                         state.library.tracks.get(&id)
@@ -64,7 +64,7 @@ impl Controller {
                         });
                         cx.notify();
                     });
-                    let should_persist = self.state.update(cx, |this, cx| {
+                    let should_persist = self.state.update(&mut *cx, |this, cx| {
                         this.playback.position = *pos;
 
                         if let Some(session) = this.metrics_session.as_mut() {
@@ -178,7 +178,7 @@ impl Controller {
 
                     let lyrics_state = cx.global::<LyricsState>().0.clone();
 
-                    lyrics_state.update(cx, |this, cx| {
+                    lyrics_state.update(&mut *cx, |this, cx| {
                         this.status = LyricsStatus::Fetching;
                         this.lyrics = None;
                         this.track_id = Some(*track_id);
@@ -186,7 +186,7 @@ impl Controller {
                         cx.notify();
                     });
                 }
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     this.playback.current = Some(*track_id);
 
                     if let Some(idx) = this.queue.get_index(*track_id) {
@@ -216,7 +216,7 @@ impl Controller {
                     .send(CacherCommand::WritePlaybackState(state));
             }
             AudioEvent::PlaybackStatus(status) => {
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     this.playback.status = *status;
                     cx.notify();
                 });

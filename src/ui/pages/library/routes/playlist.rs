@@ -17,11 +17,10 @@ use crate::{
 };
 use gpui::Entity;
 use gpui::{
-    App, Bounds, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledImage,
+    App, Bounds, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Pixels, Render,
+    Styled,
     UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,
 };
-use gpui::prelude::FluentBuilder;
 
 const THUMBNAIL_MARGIN: usize = 16;
 
@@ -418,8 +417,8 @@ impl Render for PlaylistViewSection {
                                                 }),
                                             {
                                                 let entity = entity.clone();
-                                                move |bounds, _, cx| {
-                                                    entity.update(cx, |this, cx| {
+                                                move |bounds| {
+                                                    entity.update((), |this, cx| {
                                                         this.menu_button_bounds = Some(bounds);
                                                         cx.notify();
                                                     });
@@ -620,8 +619,8 @@ impl Render for PlaylistViewSection {
             }),
             {
                 let entity = entity.clone();
-                move |bounds, _, cx| {
-                    entity.update(cx, |this, cx| {
+                move |bounds| {
+                    entity.update((), |this, cx| {
                         this.root_bounds = Some(bounds);
                         cx.notify();
                     });

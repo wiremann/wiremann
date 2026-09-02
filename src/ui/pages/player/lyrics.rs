@@ -5,13 +5,12 @@ use crate::ui::components::bounds_observer::observe_bounds;
 use crate::ui::components::icons::{Icons, icon};
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
-use gpui::prelude::FluentBuilder;
 use std::cell::RefCell;
 
 use crate::ui::components::virtual_list::{VirtualListScrollController, vlist};
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Bounds, Context, Entity, FontWeight, Global,
-    InteractiveElement, IntoElement, ParentElement, Pixels, Render, ScrollHandle, Styled, Window,
+    Animation, AnimationExt, App, AppContext, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement,
+    Pixels, Render, ScrollHandle, Styled, Window,
     div, gradient_color_stop, linear, linear_gradient, percentage, px, relative, rgba,
 };
 
@@ -36,7 +35,6 @@ pub enum LyricsStatus {
 
 pub struct LyricsState(pub Entity<LyricsStateInner>);
 
-impl Global for LyricsState {}
 
 impl Default for LyricsStateInner {
     fn default() -> Self {
@@ -233,7 +231,7 @@ impl Render for LyricLineView {
 
                                         let line_idx = self.idx;
 
-                                        move |bounds, _, _cx| {
+                                        move |bounds| {
                                             bounds_cache
                                                 .borrow_mut()
                                                 .insert((line_idx, word_idx), bounds);
@@ -459,8 +457,8 @@ impl Render for LyricsView {
                             {
                                 let entity = list_entity.clone();
 
-                                move |bounds, _, cx| {
-                                    entity.update(cx, |this, cx| {
+                                move |bounds| {
+                                    entity.update((), |this, cx| {
                                         let height = bounds.size.height;
 
                                         if let Some(existing) = this.measured_heights.get_mut(idx)
@@ -514,8 +512,8 @@ impl Render for LyricsView {
                     )),
             );
 
-        observe_bounds("lyrics_panel_bounds", root, move |bounds, _, cx| {
-            entity.update(cx, |this, cx| {
+        observe_bounds("lyrics_panel_bounds", root, move |bounds| {
+            entity.update((), |this, cx| {
                 this.panel_bounds = Some(bounds);
 
                 cx.notify();

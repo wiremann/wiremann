@@ -80,7 +80,7 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             ImageProcessorEvent::UpdateImageLookup(lookup) => {
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     for (id, image_id) in lookup {
                         if let Some(track) = this.library.tracks.get_mut(id) {
                             Arc::make_mut(track).image_id = Some(*image_id);
@@ -116,7 +116,7 @@ impl Controller {
                     });
                 }
 
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     if let Some(playlist) = this.library.playlists.get_mut(id) {
                         playlist.image_id = Some(*image_id);
                     }

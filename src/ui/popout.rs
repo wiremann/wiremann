@@ -11,8 +11,7 @@ use crate::{
     },
 };
 use gpui::{
-    App, Context, Entity, FontWeight, Global, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Pixels, Render, Size, StatefulInteractiveElement, Styled, StyledImage, Window,
+    App, Context, Entity, FontWeight, IntoElement, ObjectFit, Pixels, Render, Size, Styled, Window,
     div, img, px, size,
 };
 
@@ -28,14 +27,12 @@ pub struct PopOutState {
     pub previous_size: Option<Size<Pixels>>,
 }
 
-impl Global for PopOutState {}
 
 /// Handle to the root [`Wiremann`] view, used to repaint the tree after
 /// toggling pop-out mode.
 #[derive(Clone)]
 pub struct PopOutHandle(pub Entity<Wiremann>);
 
-impl Global for PopOutHandle {}
 
 /// The fixed size of the pop-out player window.
 pub fn pop_out_size() -> Size<Pixels> {

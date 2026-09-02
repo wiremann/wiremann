@@ -5,8 +5,8 @@ use crate::ui::{
     theme::Theme,
 };
 use gpui::{
-    Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, div,
+    Context, Entity, IntoElement, Render,
+    Styled, Window, div,
 };
 
 #[derive(Clone)]

@@ -20,11 +20,10 @@ use lyrics::LyricsView;
 use queue::Queue;
 
 use gpui::{
-    App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
-    ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
-    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative, rgba,
+    App, AppContext, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement, ObjectFit, Pixels, Render,
+    ScrollHandle, Styled, UniformListScrollHandle, Window, div, gradient_color_stop, img, px,
+    relative, rgba,
 };
-use gpui::prelude::FluentBuilder;
 
 #[derive(Clone)]
 pub struct PlayerPage {
@@ -176,8 +175,8 @@ impl Render for PlayerPage {
                                     {
                                         let entity = cx.entity();
 
-                                        move |bounds, _, cx| {
-                                            entity.update(cx, |this, cx| {
+                                        move |bounds| {
+                                            entity.update((), |this, cx| {
                                                 this.album_bounds = Some(bounds);
                                                 cx.notify();
                                             });
@@ -198,8 +197,8 @@ impl Render for PlayerPage {
                                     {
                                         let entity = cx.entity();
 
-                                        move |bounds, _, cx| {
-                                            entity.update(cx, |this, cx| {
+                                        move |bounds| {
+                                            entity.update((), |this, cx| {
                                                 this.album_bounds = Some(bounds);
                                                 cx.notify();
                                             });

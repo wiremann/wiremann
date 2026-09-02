@@ -1,7 +1,6 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, img, prelude::FluentBuilder, px, rems,
+    App, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Render, ScrollHandle,
+    Styled, Window, div, img, px, rems,
 };
 
 use crate::{

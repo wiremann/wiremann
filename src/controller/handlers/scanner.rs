@@ -20,7 +20,7 @@ impl Controller {
 
                 trace!(thread_id = ?std::thread::current().id(), "controller handling UpsertTracks batch size={}", tracks.len());
 
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     this.library.tracks.reserve(tracks.len());
 
                     for (scanned, playlist_id) in tracks {
@@ -55,7 +55,7 @@ impl Controller {
             ScannerEvent::InsertTracksIntoPlaylist(pid, tids) => {
                 let start = Instant::now();
                 trace!(thread_id = ?std::thread::current().id(), "controller handling InsertTracksIntoPlaylist pid={:?} count={}", pid, tids.len());
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     if let Some(playlist) = this.library.playlists.get_mut(pid) {
                         for tid in tids {
                             if !playlist.tracks.contains(tid) {
@@ -75,7 +75,7 @@ impl Controller {
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::AddTrackSource(id, source) => {
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     if let Some(track) = this.library.tracks.get_mut(id) {
                         Arc::make_mut(track).sources.push(source.clone());
                     }
@@ -86,7 +86,7 @@ impl Controller {
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::RemoveTrackSource(id, path) => {
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     if let Some(track) = this.library.tracks.get_mut(id)
                         && let Some(source) =
                             track.sources.iter().position(|this| this.path == *path)
@@ -100,7 +100,7 @@ impl Controller {
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
             ScannerEvent::InsertPlaylist(playlist) => {
-                self.state.update(cx, |this, cx| {
+                self.state.update(&mut *cx, |this, cx| {
                     this.library.playlists.insert(playlist.id, playlist.clone());
 
                     cx.notify();
@@ -112,15 +112,15 @@ impl Controller {
             ScannerEvent::ScanStarted => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().clone().0;
 
-                scanning_status.update(cx, |this, cx| {
+                scanning_status.update(&mut *cx, |this, cx| {
                     this.is_scanning = true;
                     this.is_discovering = true;
 
                     cx.notify();
                 });
 
-                view.update(cx, |this, cx| {
-                    this.toast_manager.update(cx, |this, cx| {
+                view.update(&mut *cx, |this, cx| {
+                    this.toast_manager.update(&mut *cx, |this, cx| {
                         this.info("Scanning started...", cx);
                         this.scanning_status(cx);
                     });
@@ -130,7 +130,7 @@ impl Controller {
             ScannerEvent::Discovered(discovered) => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
-                scanning_status.update(cx, |this, cx| {
+                scanning_status.update(&mut *cx, |this, cx| {
                     if !this.is_discovering {
                         this.is_discovering = true;
                     }
@@ -143,7 +143,7 @@ impl Controller {
             ScannerEvent::Processed { processed, total } => {
                 let scanning_status = cx.global_mut::<ScanningStatus>().0.clone();
 
-                scanning_status.update(cx, |this, cx| {
+                scanning_status.update(&mut *cx, |this, cx| {
                     if this.is_discovering {
                         this.is_discovering = false;
                     }
@@ -229,9 +229,9 @@ impl Controller {
                     );
                 }
 
-                view.update(cx, |this, cx| {
-                    this.toast_manager.update(cx, |this, cx| {
-                        this.toasts.update(cx, |list, _| {
+                view.update(&mut *cx, |this, cx| {
+                    this.toast_manager.update(&mut *cx, |this, cx| {
+                        this.toasts.update(&mut *cx, |list, _| {
                             for t in list.iter_mut() {
                                 if matches!(t.kind, ToastKind::ScanProgress(_))
                                     && t.phase != ToastPhase::Exiting
@@ -246,7 +246,7 @@ impl Controller {
                 });
 
                 let status = cx.global::<ScanningStatus>().0.clone();
-                status.update(cx, |s, _| {
+                status.update(&mut *cx, |s, _| {
                     s.is_scanning = false;
                     s.is_discovering = false;
                     s.is_processing = false;

@@ -1,58 +1,22 @@
-use gpui::{
-    AnyElement, App, AvailableSpace, Bounds, ContentMask, Context, Div, Element, ElementId, Entity,
-    GlobalElementId, Hitbox, InteractiveElement, IntoElement, Pixels, Render, ScrollHandle, Size,
-    SmoothScrollState, Stateful, StatefulInteractiveElement, Styled, Window, div, point, px, size,
-};
-use smallvec::SmallVec;
-use std::{cell::RefCell, cmp, ops::Range, rc::Rc};
-
-#[derive(Clone, Copy, Debug)]
-pub struct DeferredGridScroll {
-    pub item_index: usize,
-}
-
-#[derive(Debug, Default)]
-pub struct VirtualGridScrollState {
-    pub deferred_scroll: Option<DeferredGridScroll>,
-    pub smooth_scroll: SmoothScrollState,
-}
+use gpui::{Context, ElementId, Entity, IntoElement, Pixels, ScrollHandle, div, px};
+use gpui::Styled;
+use std::{ops::Range, rc::Rc};
 
 #[derive(Clone)]
 pub struct VirtualGridScrollController {
-    pub state: Rc<RefCell<VirtualGridScrollState>>,
+    list: gpui::VirtualListScrollController,
 }
 
 impl VirtualGridScrollController {
     pub fn new() -> Self {
         Self {
-            state: Rc::new(RefCell::new(VirtualGridScrollState::default())),
+            list: gpui::VirtualListScrollController::new(),
         }
     }
 
     pub fn scroll_to_item(&self, item_index: usize) {
-        self.state.borrow_mut().deferred_scroll = Some(DeferredGridScroll { item_index });
+        let _ = self.list.scroll_to_item(item_index);
     }
-}
-
-pub struct VirtualGrid {
-    id: ElementId,
-    base: Stateful<Div>,
-    scroll_handle: ScrollHandle,
-    item_count: usize,
-    min_card_width: Pixels,
-    footer_height: Pixels,
-    cell_padding: Pixels,
-    content_height: Pixels,
-    scroll_state: Rc<RefCell<VirtualGridScrollState>>,
-    render: Box<
-        dyn for<'a> Fn(
-            Range<usize>,
-            usize,
-            &'a mut Window,
-            &'a mut App,
-        ) -> SmallVec<[AnyElement; 32]>,
-    >,
-    overscan: usize,
 }
 
 pub fn vgrid<R, V>(
@@ -64,230 +28,47 @@ pub fn vgrid<R, V>(
     vertical_padding: Pixels,
     scroll_handle: ScrollHandle,
     controller: &VirtualGridScrollController,
-    f: impl 'static + Fn(&mut V, Range<usize>, usize, &mut Window, &mut Context<V>) -> Vec<R>,
-) -> VirtualGrid
+    f: impl 'static
+        + Fn(
+            &mut V,
+            Range<usize>,
+            usize,
+            &mut gpui::core::window::Window,
+            &mut gpui::Context<V>,
+        ) -> Vec<R>,
+) -> gpui::VirtualList
 where
-    R: IntoElement,
-    V: Render,
+    R: IntoElement + 'static,
+    V: 'static,
 {
-    let id = id.into();
+    let columns = 4;
+    let row_count = item_count.div_ceil(columns);
+    let row_height = min_card_width + footer_height + vertical_padding + vertical_padding;
+    let heights = Rc::new(vec![row_height; row_count]);
 
-    let render = move |range: Range<usize>, cols: usize, window: &mut Window, cx: &mut App| {
-        view.update(cx, |this, cx| {
-            f(this, range, cols, window, cx)
-                .into_iter()
-                .map(gpui::IntoElement::into_any_element)
-                .collect()
-        })
-    };
-
-    let base = div()
-        .id(id.clone())
-        .size_full()
-        .overflow_scroll()
-        .track_scroll(&scroll_handle);
-
-    VirtualGrid {
+    gpui::vlist(
+        view,
         id,
-        base,
+        heights,
         scroll_handle,
-        item_count,
-        min_card_width,
-        footer_height,
-        cell_padding: vertical_padding,
-        content_height: px(0.0),
-        scroll_state: controller.state.clone(),
-        render: Box::new(render),
-        overscan: 1,
-    }
-}
-
-pub struct FrameState {
-    items: SmallVec<[AnyElement; 32]>,
-}
-
-impl IntoElement for VirtualGrid {
-    type Element = Self;
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
-impl Element for VirtualGrid {
-    type RequestLayoutState = FrameState;
-    type PrepaintState = Option<Hitbox>;
-
-    fn id(&self) -> Option<ElementId> {
-        Some(self.id.clone())
-    }
-
-    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-        None
-    }
-
-    fn request_layout(
-        &mut self,
-        global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (gpui::LayoutId, Self::RequestLayoutState) {
-        let layout_id = self.base.interactivity().request_layout(
-            global_id,
-            inspector_id,
-            window,
-            cx,
-            |style, window: &mut Window, cx| window.request_layout(style, None, cx),
-        );
-
-        (
-            layout_id,
-            FrameState {
-                items: SmallVec::new(),
-            },
-        )
-    }
-
-    fn prepaint(
-        &mut self,
-        global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        layout: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Self::PrepaintState {
-        let viewport_height = bounds.size.height;
-
-        let available_width_px: f32 = bounds.size.width.into();
-        let min_card_width_px: f32 = self.min_card_width.into();
-        let footer_height_px: f32 = self.footer_height.into();
-        let cell_padding_px: f32 = self.cell_padding.into();
-
-        let mut cols = (available_width_px / min_card_width_px).floor() as usize;
-        if cols == 0 {
-            cols = 1;
-        }
-
-        let cell_width_px = available_width_px / (cols as f32);
-        let row_height_px = cell_width_px + footer_height_px + (cell_padding_px * 2.0);
-        let row_height = px(row_height_px);
-
-        let rows = (self.item_count + cols - 1) / cols;
-
-        self.content_height = px(rows as f32 * row_height_px);
-        let mut logical_scroll = self.scroll_handle.offset().y;
-
-        if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {
-            let target = deferred.item_index.min(self.item_count.saturating_sub(1));
-            let target_row = target / cols;
-            let item_top = target_row as f32 * row_height_px;
-            let target_scroll = -item_top.max(0.0);
-            self.scroll_handle
-                .set_offset(point(px(0.0), px(target_scroll)));
-            logical_scroll = px(target_scroll);
-        }
-
-        let max_scroll = (self.content_height - viewport_height).max(px(0.0));
-
-        logical_scroll = logical_scroll.clamp(-max_scroll, px(0.0));
-
-        self.scroll_handle
-            .set_offset(point(px(0.0), logical_scroll));
-
-        let visual_scroll = {
-            let mut state = self.scroll_state.borrow_mut();
-            state.smooth_scroll.set_target(logical_scroll);
-            if state.smooth_scroll.update() {
-                window.refresh();
+        controller.list.clone(),
+        move |view, rows, window, cx| {
+            let Some(row) = rows.next() else {
+                return Vec::new();
+            };
+            let start = row * columns;
+            let end = (start + columns).min(item_count);
+            let items = f(view, start..end, columns, window, cx);
+            if items.is_empty() {
+                Vec::new()
+            } else {
+                vec![
+                    div()
+                        .h(px(row_height.value()))
+                        .flex()
+                        .children(items),
+                ]
             }
-            state.smooth_scroll.current()
-        };
-
-        let visual_scroll_px: f32 = visual_scroll.into();
-        let viewport_height_px: f32 = viewport_height.into();
-
-        let mut start_row = ((-visual_scroll_px) / row_height_px).floor() as isize;
-        let mut end_row =
-            ((-visual_scroll_px + viewport_height_px) / row_height_px).ceil() as isize;
-
-        if start_row < 0 {
-            start_row = 0;
-        }
-        if end_row < 0 {
-            end_row = 0;
-        }
-
-        let start_row_usize = start_row as usize;
-        let mut end_row_usize = end_row as usize;
-        end_row_usize = cmp::min(end_row_usize + self.overscan, rows);
-
-        let visible_start_item = start_row_usize.saturating_mul(cols);
-        let visible_end_item = cmp::min(end_row_usize.saturating_mul(cols), self.item_count);
-
-        let items = (self.render)(visible_start_item..visible_end_item, cols, window, cx);
-
-        let content_mask = ContentMask { bounds };
-
-        window.with_content_mask(Some(content_mask), |window| {
-            for (mut item, ix) in items.into_iter().zip(visible_start_item..visible_end_item) {
-                let row = ix / cols;
-                let col = ix % cols;
-
-                let y = px(row as f32 * row_height_px) + visual_scroll;
-                let cell_width = bounds.size.width / (cols as f32);
-                let origin = bounds.origin + point(cell_width * (col as f32), y);
-
-                item.layout_as_root(
-                    size(
-                        AvailableSpace::Definite(cell_width),
-                        AvailableSpace::Definite(row_height),
-                    ),
-                    window,
-                    cx,
-                );
-                item.prepaint_at(origin, window, cx);
-
-                layout.items.push(item);
-            }
-        });
-
-        self.base.interactivity().prepaint(
-            global_id,
-            inspector_id,
-            bounds,
-            Size {
-                width: bounds.size.width,
-                height: self.content_height,
-            },
-            window,
-            cx,
-            |_style, _, hitbox, _, _| hitbox,
-        )
-    }
-
-    fn paint(
-        &mut self,
-        global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        layout: &mut Self::RequestLayoutState,
-        hitbox: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        self.base.interactivity().paint(
-            global_id,
-            inspector_id,
-            bounds,
-            hitbox.as_ref(),
-            window,
-            cx,
-            |_, window, cx| {
-                for item in &mut layout.items {
-                    item.paint(window, cx);
-                }
-            },
-        );
-    }
+        },
+    )
 }

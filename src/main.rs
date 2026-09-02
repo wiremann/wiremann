@@ -10,6 +10,8 @@
     clippy::too_many_lines,
     clippy::new_without_default
 )]
+extern crate gpui as wgpui;
+
 pub mod app;
 pub mod audio;
 pub mod cacher;

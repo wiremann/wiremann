@@ -4,7 +4,7 @@ mod titlebar;
 use crate::controller::Controller;
 use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
-use crate::ui::components::slider::{SliderEvent, SliderState};
+use crate::ui::components::slider::SliderState;
 use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::helpers::slider_to_duration;
@@ -18,10 +18,9 @@ use crate::ui::popout::{PopOutPlayer, PopOutState};
 use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
-use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
+    Animation, AnimationExt as _, AppContext, Context, ElementId, Entity, EntityFactory,
+    IntoElement, Render, Styled, Window, div, px,
 };
 use std::time::Duration;
 use titlebar::Titlebar;
@@ -43,6 +42,10 @@ impl Wiremann {
                 .max(100.0)
                 .default_value(100.0)
                 .step(1.0)
+                .on_change(|value, cx| {
+                    let controller = cx.global::<Controller>().clone();
+                    controller.set_volume(value / 100.0, cx);
+                })
         });
 
         let playback_slider_state = cx.new(|_| {
@@ -51,46 +54,17 @@ impl Wiremann {
                 .max(100.0)
                 .default_value(0.0)
                 .step(1.0)
-        });
-
-        cx.subscribe(
-            &vol_slider_state,
-            |_, _, event: &SliderEvent, cx| match event {
-                SliderEvent::Change(value) => {
+                .on_change(|value, cx| {
                     let controller = cx.global::<Controller>().clone();
-
-                    controller.set_volume(*value / 100.0, cx);
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-
-        cx.subscribe(
-            &playback_slider_state,
-            |_, _, event: &SliderEvent, cx| match event {
-                SliderEvent::Change(value) => {
-                    let controller = cx.global::<Controller>();
                     let state = controller.state.read(cx);
-                    let current = if let Some(id) = state.playback.current {
-                        state.library.tracks.get(&id)
-                    } else {
-                        None
-                    };
-
-                    let duration = if let Some(track) = current {
-                        track.duration
-                    } else {
-                        Duration::from_secs(0)
-                    };
-
-                    controller.seek(slider_to_duration(*value, duration));
-
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
+                    let current = state
+                        .playback
+                        .current
+                        .and_then(|id| state.library.tracks.get(&id));
+                    let duration = current.map_or(Duration::ZERO, |track| track.duration);
+                    controller.seek(slider_to_duration(value, duration));
+                })
+        });
 
         cx.set_global(Theme::default());
         cx.set_global(DominantColors::default());
