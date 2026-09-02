@@ -20,7 +20,7 @@ use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
+    Animation, AnimationExt as _, AppContext, Context, ElementId, Entity,
     InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
 };
 use std::time::Duration;
