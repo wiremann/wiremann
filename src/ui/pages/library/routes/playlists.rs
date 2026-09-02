@@ -1,7 +1,6 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, img, prelude::FluentBuilder, px, rems,
+    App, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Render, ScrollHandle,
+    Styled, Window, div, img, px, rems,
 };
 
 use crate::{
@@ -170,7 +169,7 @@ impl Render for PlaylistsSection {
                                     .on_click({
                                         move |_, _, cx| {
                                             let controller = cx.global::<Controller>().clone();
-                                            cx.spawn(async move |_| {
+                                            cx.spawn(async move {
                                                 if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
                                                     controller.scan_dir(folder.path().into());
                                                 }

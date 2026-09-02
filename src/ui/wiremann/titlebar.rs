@@ -6,11 +6,9 @@ use crate::ui::components::image_cache::ImageCache;
 use crate::ui::components::Page;
 use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
-use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, StatefulInteractiveElement, Styled,
-    StyledImage, Window, div, img, px, white,
+    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, EntityFactory, IntoElement, MouseButton,
+    Render, Styled, Window, div, img, px, white,
 };
 use std::time::Duration;
 

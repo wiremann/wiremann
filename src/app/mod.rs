@@ -12,16 +12,15 @@ use crate::{
     controller::{Controller, state::AppState},
     errors::AppError,
     scanner::Scanner,
-    ui::{assets::Assets, popout::PopOutHandle, res_handler::ResHandler, wiremann::Wiremann},
+    ui::{assets::Assets, popout::PopOutHandle, wiremann::Wiremann},
 };
 pub use paths::*;
 
-use gpui::{AppContext, Application, Result};
+use gpui::{AppWindowExt, Application, EntityFactory, Result};
 use raw_window_handle::HasWindowHandle;
-use std::sync::Arc;
 use tracing::info;
 
-use events::{spawn_event_loop, subscribe_controller_events};
+use events::spawn_event_loop;
 use window::build_window_options;
 use workers::{WorkerConfig, calculate_worker_config, spawn_worker};
 
@@ -62,7 +61,7 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
                 let (mut image_processor, image_processor_tx, image_processor_rx) =
                     ImageProcessor::new(app_paths.clone());
 
-                let raw_window_handle = window.window_handle().ok().map(|this| this.as_raw());
+                let raw_window_handle = window.winit_window().window_handle().ok().map(|this| this.as_raw());
 
                 let (mut system_integration, system_integration_tx, system_integration_rx) =
                     SystemIntegration::new(raw_window_handle, app_paths);
@@ -106,13 +105,8 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
 
                 cx.set_global(PopOutHandle(view.clone()));
 
-                let res_handler = cx.new(|_| ResHandler {});
-                let arc_res = Arc::new(res_handler.clone());
-
                 info!("Spawning event loop...");
-                spawn_event_loop(cx, controller.clone(), arc_res.clone());
-
-                subscribe_controller_events(cx, &res_handler, controller.clone(), view.clone());
+                spawn_event_loop(cx, controller.clone(), view.clone());
 
                 view
             })

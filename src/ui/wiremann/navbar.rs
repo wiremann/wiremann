@@ -1,10 +1,9 @@
 use super::Page;
 use crate::ui::theme::Theme;
 
-use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, px,
+    Animation, AnimationExt as _, Context, ElementId, FontWeight, IntoElement, Render, Styled,
+    Window, div, px,
 };
 
 #[derive(Clone)]

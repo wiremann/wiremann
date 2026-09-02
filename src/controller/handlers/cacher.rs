@@ -15,7 +15,7 @@ impl Controller {
         match event {
             CacherEvent::AppState(state) => {
                 let playback_state = state.playback.clone();
-                self.state.update(cx, |this, _| {
+                self.state.update(&mut *cx, |this, _| {
                     *this = state.clone();
                 });
 
@@ -37,13 +37,13 @@ impl Controller {
                     None
                 };
 
-                view.update(cx, |this, cx| {
-                    this.player_page.update(cx, |this, cx| {
-                        this.controlbar.update(cx, |this, cx| {
-                            this.vol_slider_state.update(cx, |this, cx| {
+                view.update(&mut *cx, |this, cx| {
+                    this.player_page.update(&mut *cx, |this, cx| {
+                        this.controlbar.update(&mut *cx, |this, cx| {
+                            this.vol_slider_state.update(&mut *cx, |this, cx| {
                                 this.set_value(playback_state.volume * 100.0, cx);
                             });
-                            this.playback_slider_state.update(cx, |this, cx| {
+                            this.playback_slider_state.update(&mut *cx, |this, cx| {
                                 if let Some(duration) = duration {
                                     this.set_value(
                                         duration_to_slider(playback_state.position, duration),
@@ -249,7 +249,7 @@ impl Controller {
                 {
                     let lyrics_state = cx.global::<LyricsState>().0.clone();
 
-                    lyrics_state.update(cx, |this, cx| {
+                    lyrics_state.update(&mut *cx, |this, cx| {
                         this.lyrics.clone_from(lyrics);
                         this.track_id = Some(current);
                         this.status = if lyrics.is_some() {

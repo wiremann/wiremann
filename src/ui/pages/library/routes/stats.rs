@@ -1,6 +1,6 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
+    App, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Render, ScrollHandle,
+    Styled, Window,
     div, gradient_color_stop, img, linear_gradient, px, rems,
 };
 

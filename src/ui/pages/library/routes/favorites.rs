@@ -1,9 +1,7 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
+    App, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Render, Styled,
     UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
-use gpui::prelude::FluentBuilder;
 
 use crate::{
     controller::{Controller, state::TrackId},

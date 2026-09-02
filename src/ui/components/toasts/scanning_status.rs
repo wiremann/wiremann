@@ -1,8 +1,7 @@
 use crate::ui::components::icons::{icon, Icons};
 use crate::ui::theme::Theme;
 use gpui::{
-    App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, div, px, relative,
+    App, AppContext, Context, Entity, EntityFactory, IntoElement, Render, Styled, Window, div, px, relative,
 };
 
 #[derive(Clone)]
@@ -128,5 +127,3 @@ impl ScanningStatus {
         }))
     }
 }
-
-impl gpui::Global for ScanningStatus {}

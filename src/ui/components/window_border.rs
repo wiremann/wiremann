@@ -1,9 +1,6 @@
 use crate::ui::theme::Theme;
-use gpui::{
-    canvas, div, point, prelude::FluentBuilder, px, transparent_black, AnyElement, App, Bounds,
-    CursorStyle, Decorations, Edges, HitboxBehavior, Hsla, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Pixels, Point, RenderOnce, ResizeEdge, Size, Styled, Window,
-};
+use gpui::{App, Bounds, Decorations, Description, Edges, ElementId, Hsla, IntoElement, MouseButton, Pixels, Point, RenderOnce, ResizeEdge, Size, Window, div, point, px, public_window_callback, transparent_black};
+use gpui::Styled;
 
 #[cfg(not(target_os = "linux"))]
 const SHADOW_SIZE: Pixels = px(0.0);
@@ -16,53 +13,35 @@ pub(crate) const BORDER_RADIUS: Pixels = px(0.0);
 #[cfg(not(target_os = "windows"))]
 pub(crate) const BORDER_RADIUS: Pixels = px(8.0);
 
-/// Renders a custom window border and resize handles for client-decorated windows,
-/// mirroring Pulsar's `window_border` component.
-#[derive(Default, IntoElement)]
+/// Renders the client-decoration border and keeps resize initiation at the
+/// public WGPUI window boundary.
+#[derive(Default)]
 pub struct WindowBorder {
-    children: Vec<AnyElement>,
+    children: Vec<Description>,
 }
 
-/// Create a new window border.
-pub fn window_border() -> WindowBorder {
-    WindowBorder::new()
-}
+pub fn window_border() -> WindowBorder { WindowBorder::new() }
 
 impl WindowBorder {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
+    pub fn new() -> Self { Self::default() }
+
+    pub fn child<E: IntoElement>(mut self, child: E) -> Self {
+        self.children.push(child.into_description());
+        self
     }
 }
 
-/// Get the paddings that should be applied to the root content so that the
-/// window border/shadow remains visible around it.
-pub fn window_paddings(window: &Window) -> Edges<Pixels> {
+pub fn window_paddings(window: &Window) -> Edges {
     match window.window_decorations() {
         Decorations::Server => Edges::all(px(0.0)),
         Decorations::Client { tiling } => {
             let mut paddings = Edges::all(SHADOW_SIZE);
-            if tiling.top {
-                paddings.top = px(0.0);
-            }
-            if tiling.bottom {
-                paddings.bottom = px(0.0);
-            }
-            if tiling.left {
-                paddings.left = px(0.0);
-            }
-            if tiling.right {
-                paddings.right = px(0.0);
-            }
+            if tiling.top { paddings.top = px(0.0); }
+            if tiling.bottom { paddings.bottom = px(0.0); }
+            if tiling.left { paddings.left = px(0.0); }
+            if tiling.right { paddings.right = px(0.0); }
             paddings
         }
-    }
-}
-
-impl ParentElement for WindowBorder {
-    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
-        self.children.extend(elements);
     }
 }
 
@@ -72,130 +51,75 @@ impl RenderOnce for WindowBorder {
         let decorations = window.window_decorations();
         window.set_client_inset(SHADOW_SIZE);
 
-        div()
+        let mut backdrop = div()
             .id("window-backdrop")
-            .bg(transparent_black())
-            .map(|div| match decorations {
-                Decorations::Server => div,
-                Decorations::Client { tiling, .. } => div
-                    .bg(transparent_black())
-                    .child(
-                        canvas(
-                            |_bounds, window, _| {
-                                window.insert_hitbox(
-                                    Bounds::new(
-                                        point(px(0.0), px(0.0)),
-                                        window.window_bounds().get_bounds().size,
-                                    ),
-                                    HitboxBehavior::Normal,
-                                )
-                            },
-                            move |_bounds, hitbox, window, _| {
-                                let mouse = window.mouse_position();
-                                let size = window.window_bounds().get_bounds().size;
-                                let Some(edge) = resize_edge(mouse, RESIZE_HANDLE_SIZE, size)
-                                else {
-                                    return;
-                                };
-                                window.set_cursor_style(
-                                    match edge {
-                                        ResizeEdge::Top | ResizeEdge::Bottom => {
-                                            CursorStyle::ResizeUpDown
-                                        }
-                                        ResizeEdge::Left | ResizeEdge::Right => {
-                                            CursorStyle::ResizeLeftRight
-                                        }
-                                        ResizeEdge::TopLeft | ResizeEdge::BottomRight => {
-                                            CursorStyle::ResizeUpLeftDownRight
-                                        }
-                                        ResizeEdge::TopRight | ResizeEdge::BottomLeft => {
-                                            CursorStyle::ResizeUpRightDownLeft
-                                        }
-                                    },
-                                    &hitbox,
-                                );
-                            },
-                        )
-                        .size_full()
-                        .absolute(),
-                    )
-                    .when(!(tiling.top || tiling.right), |div| {
-                        div.rounded_tr(BORDER_RADIUS)
-                    })
-                    .when(!(tiling.top || tiling.left), |div| {
-                        div.rounded_tl(BORDER_RADIUS)
-                    })
-                    .when(!tiling.top, |div| div.pt(SHADOW_SIZE))
-                    .when(!tiling.bottom, |div| div.pb(SHADOW_SIZE))
-                    .when(!tiling.left, |div| div.pl(SHADOW_SIZE))
-                    .when(!tiling.right, |div| div.pr(SHADOW_SIZE))
-                    .on_mouse_down(MouseButton::Left, move |_, window, _| {
-                        let size = window.window_bounds().get_bounds().size;
-                        let pos = window.mouse_position();
-
-                        match resize_edge(pos, RESIZE_HANDLE_SIZE, size) {
-                            Some(edge) => window.start_window_resize(edge),
-                            None => {}
-                        };
-                    }),
-            })
             .size_full()
-            .child(
-                div()
-                    .map(|div| match decorations {
-                        Decorations::Server => div,
-                        Decorations::Client { tiling } => div
-                            .when(!(tiling.top || tiling.right), |div| {
-                                div.rounded_tr(BORDER_RADIUS)
-                            })
-                            .when(!(tiling.top || tiling.left), |div| {
-                                div.rounded_tl(BORDER_RADIUS)
-                            })
-                            .border_color(theme.border)
-                            .when(!tiling.top, |div| div.border_t(BORDER_SIZE))
-                            .when(!tiling.bottom, |div| div.border_b(BORDER_SIZE))
-                            .when(!tiling.left, |div| div.border_l(BORDER_SIZE))
-                            .when(!tiling.right, |div| div.border_r(BORDER_SIZE))
-                            .when(!tiling.is_tiled(), |div| {
-                                div.shadow(vec![gpui::BoxShadow {
-                                    color: Hsla {
-                                        h: 0.,
-                                        s: 0.,
-                                        l: 0.,
-                                        a: 0.3,
-                                    },
-                                    blur_radius: SHADOW_SIZE / 2.,
-                                    spread_radius: px(0.),
-                                    offset: point(px(0.0), px(0.0)),
-                                }])
-                            }),
-                    })
-                    .on_mouse_move(|_e, _, cx| {
-                        cx.stop_propagation();
-                    })
-                    .bg(transparent_black())
-                    .size_full()
-                    .children(self.children),
-            )
+            .bg(transparent_black());
+
+        if let Decorations::Client { tiling } = decorations {
+            backdrop = backdrop
+                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS))
+                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS))
+                .when(!tiling.top, |element| element.pt(SHADOW_SIZE))
+                .when(!tiling.bottom, |element| element.pb(SHADOW_SIZE))
+                .when(!tiling.left, |element| element.pl(SHADOW_SIZE))
+                .when(!tiling.right, |element| element.pr(SHADOW_SIZE))
+                .on_mouse_down(MouseButton::Left, public_window_callback(|_, window, _app| {
+                    let size = window.bounds().size;
+                    let position = window.mouse_position();
+                    if let Some(edge) = resize_edge(position, RESIZE_HANDLE_SIZE, size)
+                        && let Err(error) = window.start_window_resize(edge)
+                    {
+                        tracing::warn!(?error, "unable to start client-window resize");
+                    }
+                }));
+        }
+
+        let mut content = div()
+            .id("window-content")
+            .size_full()
+            .bg(transparent_black())
+            .children(self.children);
+
+        if let Decorations::Client { tiling } = decorations {
+            content = content
+                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS))
+                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS))
+                .border_color(theme.border)
+                .when(!tiling.top, |element| element.border_t(BORDER_SIZE))
+                .when(!tiling.bottom, |element| element.border_b(BORDER_SIZE))
+                .when(!tiling.left, |element| element.border_l(BORDER_SIZE))
+                .when(!tiling.right, |element| element.border_r(BORDER_SIZE))
+                .when(!tiling.is_tiled(), |element| {
+                    element.shadow(vec![gpui::BoxShadow {
+                        color: Hsla { h: 0.0, s: 0.0, l: 0.0, a: 0.3 },
+                        blur_radius: SHADOW_SIZE / 2.0,
+                        spread_radius: px(0.0),
+                        offset: point(px(0.0), px(0.0)),
+                    }])
+                });
+        }
+
+        backdrop.child(content)
     }
 }
 
-fn resize_edge(pos: Point<Pixels>, shadow_size: Pixels, size: Size<Pixels>) -> Option<ResizeEdge> {
-    let edge = if pos.y < shadow_size && pos.x < shadow_size {
+fn resize_edge(position: Point<Pixels>, resize_size: Pixels, size: Size<Pixels>) -> Option<ResizeEdge> {
+    let edge = if position.y < resize_size && position.x < resize_size {
         ResizeEdge::TopLeft
-    } else if pos.y < shadow_size && pos.x > size.width - shadow_size {
+    } else if position.y < resize_size && position.x > size.width - resize_size {
         ResizeEdge::TopRight
-    } else if pos.y < shadow_size {
+    } else if position.y < resize_size {
         ResizeEdge::Top
-    } else if pos.y > size.height - shadow_size && pos.x < shadow_size {
+    } else if position.y > size.height - resize_size && position.x < resize_size {
         ResizeEdge::BottomLeft
-    } else if pos.y > size.height - shadow_size && pos.x > size.width - shadow_size {
+    } else if position.y > size.height - resize_size && position.x > size.width - resize_size {
         ResizeEdge::BottomRight
-    } else if pos.y > size.height - shadow_size {
+    } else if position.y > size.height - resize_size {
         ResizeEdge::Bottom
-    } else if pos.x < shadow_size {
+    } else if position.x < resize_size {
         ResizeEdge::Left
-    } else if pos.x > size.width - shadow_size {
+    } else if position.x > size.width - resize_size {
         ResizeEdge::Right
     } else {
         return None;

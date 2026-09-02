@@ -1,6 +1,6 @@
 use gpui::{
-    App, AppContext, Context, Entity, FontWeight, Global, InteractiveElement, IntoElement,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Window, div, px, rgba,
+    App, AppContext, Context, Entity, EntityFactory, FontWeight, IntoElement, Render, ScrollHandle, Styled,
+    Window, div, px, rgba,
     rgb,
 };
 
@@ -15,7 +15,6 @@ pub struct KeybindsOverlay {
 #[derive(Clone)]
 pub struct KeybindsOverlayHandle(pub Entity<KeybindsOverlay>);
 
-impl Global for KeybindsOverlayHandle {}
 
 impl KeybindsOverlay {
     pub fn new(cx: &mut App) -> Entity<Self> {

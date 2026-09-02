@@ -65,5 +65,3 @@ impl ImageCache {
         }
     }
 }
-
-impl gpui::Global for ImageCache {}

@@ -479,6 +479,3 @@ impl Default for DominantColors {
         }
     }
 }
-
-impl gpui::Global for Theme {}
-impl gpui::Global for DominantColors {}

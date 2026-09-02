@@ -24,7 +24,7 @@ use crate::{
 use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
-use gpui::{App, Entity, Global, Rgba, rgb};
+use gpui::{App, Entity, Rgba, rgb};
 use tracing::info;
 use okmain::rgb::Rgb;
 use rand::rng;
@@ -164,7 +164,7 @@ impl Controller {
     }
 
     pub fn delete_playlist(&self, id: PlaylistId, cx: &mut App) {
-        self.state.update(cx, |this, cx| {
+        self.state.update(&mut *cx, |this, cx| {
             this.library.playlists.remove(&id);
 
             if this.playback.current_playlist == Some(id) {
@@ -206,7 +206,7 @@ impl Controller {
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
-        self.state.update(cx, |this, cx| {
+        self.state.update(&mut *cx, |this, cx| {
             if let Some(playlist) = this.library.playlists.get(&id) {
                 this.playback.current_playlist = Some(playlist.id);
                 this.queue.tracks.clone_from(&playlist.tracks);
@@ -225,7 +225,7 @@ impl Controller {
     }
 
     pub fn load_album(&self, id: AlbumId, cx: &mut App) {
-        self.state.update(cx, |this, cx| {
+        self.state.update(&mut *cx, |this, cx| {
             if let Some(album) = this.library.albums.get(&id) {
                 this.playback.current_playlist = None;
                 this.queue.tracks.clone_from(&album.tracks);
@@ -244,7 +244,7 @@ impl Controller {
     }
 
     pub fn load_artist(&self, id: ArtistId, cx: &mut App) {
-        self.state.update(cx, |this, cx| {
+        self.state.update(&mut *cx, |this, cx| {
             if let Some(artist) = this.library.artists.get(&id) {
                 this.playback.current_playlist = None;
                 this.queue.tracks.clone_from(&artist.tracks);
@@ -263,7 +263,7 @@ impl Controller {
     }
 
     pub fn load_track(&self, track_id: TrackId, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             let queue = &mut this.queue;
 
             let insert_pos = this.playback.current_index + 1;
@@ -311,7 +311,7 @@ impl Controller {
     }
 
     pub fn set_repeat(&self, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.repeat = !this.playback.repeat;
         });
         let state = self.state.read(cx).playback.clone();
@@ -321,7 +321,7 @@ impl Controller {
     }
 
     pub fn set_mute(&self, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.mute = !this.playback.mute;
 
             let _ = self
@@ -339,7 +339,7 @@ impl Controller {
     }
 
     pub fn set_volume(&self, vol: f32, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.volume = vol;
         });
 
@@ -356,7 +356,7 @@ impl Controller {
     }
 
     pub fn set_shuffle(&self, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.shuffling = !this.playback.shuffling;
 
             if this.queue.tracks.is_empty() {
@@ -393,7 +393,7 @@ impl Controller {
     }
 
     pub fn next(&self, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.current_index =
                 (this.playback.current_index + 1).clamp(0, this.library.tracks.len());
         });
@@ -409,7 +409,7 @@ impl Controller {
             .send(CacherCommand::WritePlaybackState(state.playback));
     }
     pub fn prev(&self, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.playback.current_index = this.playback.current_index.saturating_sub(1);
         });
 
@@ -581,7 +581,7 @@ impl Controller {
     }
 
     pub fn toggle_favorite(&self, id: TrackId, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             this.toggle_favorite(id);
         });
 
@@ -614,7 +614,7 @@ impl Controller {
     }
 
     pub fn finalize_metrics_session(&self, cx: &mut App, completed: bool) {
-        let should_send = self.state.update(cx, |this, _| {
+        let should_send = self.state.update(&mut *cx, |this, _| {
             let Some(session) = this.metrics_session.take() else {
                 return false;
             };
@@ -648,7 +648,7 @@ impl Controller {
     }
 
     pub fn start_metrics_session(&self, track_id: TrackId, cx: &mut App) {
-        self.state.update(cx, |this, _| {
+        self.state.update(&mut *cx, |this, _| {
             let now = Self::now_secs();
 
             let metrics = this.metrics.tracks.entry(track_id).or_default();
@@ -839,7 +839,6 @@ impl Controller {
     }
 }
 
-impl Global for Controller {}
 
 fn reveal_in_os(path: &std::path::Path) {
     #[cfg(target_os = "windows")]

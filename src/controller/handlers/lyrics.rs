@@ -17,7 +17,7 @@ impl Controller {
                 {
                     let lyrics_state = cx.global::<LyricsState>().0.clone();
 
-                    lyrics_state.update(cx, |this, cx| {
+                    lyrics_state.update(&mut *cx, |this, cx| {
                         this.lyrics.clone_from(lyrics);
                         this.track_id = Some(current);
 

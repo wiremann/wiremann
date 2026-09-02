@@ -8,9 +8,8 @@ use crate::ui::{
     theme::Theme,
 };
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, EntityFactory, IntoElement, Render,
+    Styled, Window, div, px,
 };
 use std::time::{Duration, Instant};
 

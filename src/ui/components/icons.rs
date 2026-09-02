@@ -1,7 +1,6 @@
 use gpui::{
-    AnyElement, App, AppContext, Context, Entity, Hsla, IntoElement, Radians, Render, RenderOnce,
-    SharedString, StyleRefinement, Styled, TextColor, Transformation, Window,
-    prelude::FluentBuilder as _, svg, white,
+    App, Context, Entity, EntityFactory, Hsla, IntoElement, Render, RenderOnce, SharedString, Transformation,
+    Window, svg, white,
 };
 
 pub trait IconNamed {
@@ -11,7 +10,7 @@ pub trait IconNamed {
 #[derive(IntoElement)]
 pub struct Icon {
     path: SharedString,
-    style: StyleRefinement,
+    size: f32,
     color: Option<Hsla>,
     transform: Option<Transformation>,
 }
@@ -20,7 +19,7 @@ impl Default for Icon {
     fn default() -> Self {
         Self {
             path: "".into(),
-            style: StyleRefinement::default(),
+            size: 16.0,
             color: None,
             transform: None,
         }
@@ -47,7 +46,7 @@ impl Icon {
     }
 
     #[must_use]
-    pub fn rotate(mut self, radians: impl Into<Radians>) -> Self {
+    pub fn rotate(mut self, radians: f32) -> Self {
         self.transform = Some(Transformation::rotate(radians));
         self
     }
@@ -57,36 +56,55 @@ impl Icon {
         self.transform = Some(transform);
         self
     }
-}
 
-impl Styled for Icon {
-    fn style(&mut self) -> &mut StyleRefinement {
-        &mut self.style
+    #[must_use]
+    pub fn size_4(mut self) -> Self {
+        self.size = 16.0;
+        self
     }
 
-    fn text_color(mut self, color: impl Into<TextColor>) -> Self {
-        self.color = Some(color.into().to_hsla());
+    #[must_use]
+    pub fn size_5(mut self) -> Self {
+        self.size = 20.0;
+        self
+    }
+
+    #[must_use]
+    pub fn size_6(mut self) -> Self {
+        self.size = 24.0;
+        self
+    }
+
+    #[must_use]
+    pub fn size_8(mut self) -> Self {
+        self.size = 32.0;
+        self
+    }
+
+    #[must_use]
+    pub fn size_16(mut self) -> Self {
+        self.size = 64.0;
+        self
+    }
+
+    #[must_use]
+    pub fn size_full(mut self) -> Self {
+        self.size = 32.0;
+        self
+    }
+
+    #[must_use]
+    pub fn text_color(mut self, color: impl Into<Hsla>) -> Self {
+        self.color = Some(color.into());
         self
     }
 }
 
 impl RenderOnce for Icon {
-    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let color = self
-            .color
-            .unwrap_or_else(|| window.text_style().color.to_hsla());
-
-        let text_size = window.text_style().font_size.to_pixels(window.rem_size());
-
-        let has_size = self.style.size.width.is_some() || self.style.size.height.is_some();
-
-        let mut svg = svg().flex_none();
-
-        *svg.style() = self.style;
-
-        svg.flex_shrink_0()
-            .text_color(color)
-            .when(!has_size, |this| this.size(text_size))
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        svg()
+            .size(self.size)
+            .text_color(self.color.unwrap_or_else(white))
             .path(self.path)
             .when_some(self.transform, |this, transform| {
                 this.with_transformation(transform)
@@ -95,30 +113,14 @@ impl RenderOnce for Icon {
 }
 
 impl Render for Icon {
-    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let color = self.color.unwrap_or_else(white);
-
-        let text_size = window.text_style().font_size.to_pixels(window.rem_size());
-
-        let has_size = self.style.size.width.is_some() || self.style.size.height.is_some();
-
-        let mut svg = svg().flex_none();
-
-        *svg.style() = self.style.clone();
-
-        svg.flex_shrink_0()
-            .text_color(color)
-            .when(!has_size, |this| this.size(text_size))
+    fn render(&mut self, _window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        svg()
+            .size(self.size)
+            .text_color(self.color.unwrap_or_else(white))
             .path(self.path.clone())
             .when_some(self.transform, |this, transform| {
                 this.with_transformation(transform)
             })
-    }
-}
-
-impl From<Icon> for AnyElement {
-    fn from(icon: Icon) -> Self {
-        icon.into_any_element()
     }
 }
 
