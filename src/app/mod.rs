@@ -50,6 +50,12 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
             cx.open_window(window_options, move |window, cx| {
                 info!("Initializing engines...");
 
+                if std::env::var_os("WIREMANN_DEBUG_REFRESH").is_some() {
+                    window
+                        .performance_debug()
+                        .flash_tile_refreshes_for(std::time::Duration::from_secs(30));
+                }
+
                 assets.load_fonts(window).expect("Could not load fonts");
 
                 let (mut audio, audio_tx, audio_rx) = Audio::new();

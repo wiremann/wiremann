@@ -164,7 +164,7 @@ impl Render for PlayerPage {
                             .child(if let Some(thumbnail) = thumbnail {
                                 observe_bounds(
                                     "album_bounds",
-                                    div().flex().flex_1().child(
+                                    div().w_full().flex().flex_1().child(
                                         img(thumbnail)
                                             .object_fit(ObjectFit::Cover)
                                             .size_full()
@@ -186,7 +186,7 @@ impl Render for PlayerPage {
                             } else {
                                 observe_bounds(
                                     "album_placeholder_bounds",
-                                    div().flex().flex_1().child(
+                                    div().w_full().flex().flex_1().child(
                                         img("icons/placeholder.svg")
                                             .object_fit(ObjectFit::Contain)
                                             .size_full()

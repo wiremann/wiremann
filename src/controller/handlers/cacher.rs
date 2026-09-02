@@ -68,9 +68,20 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             CacherEvent::AlbumArt(image) => {
+                let image_id = {
+                    let state = self.state.read(cx);
+                    state
+                        .playback
+                        .current
+                        .and_then(|track_id| state.library.tracks.get(&track_id))
+                        .and_then(|track| track.image_id)
+                };
                 let image_cache = cx.global_mut::<ImageCache>();
 
                 image_cache.current = Some(image.clone());
+                if let Some(image_id) = image_id {
+                    image_cache.add(image_id, image.clone());
+                }
 
                 let image = image.clone();
                 let width = image.size(0).width.0 as u32;

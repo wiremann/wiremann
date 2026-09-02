@@ -41,23 +41,22 @@ impl Controller {
                 let last_pos = self.state.read(cx).playback.position;
 
                 if *pos != last_pos {
-                    view.update(&mut *cx, |this, cx| {
-                        this.player_page.update(&mut *cx, |this, cx| {
-                            this.controlbar.update(&mut *cx, |this, cx| {
-                                this.playback_slider_state.update(&mut *cx, |this, cx| {
-                                    let duration = {
-                                        let state = cx.global::<Controller>().state.read(cx);
-                                        state
-                                            .playback
-                                            .current
-                                            .and_then(|id| state.library.tracks.get(&id))
-                                            .map_or(Duration::default(), |track| track.duration)
-                                    };
-                                    this.set_value(duration_to_slider(*pos, duration), cx);
-                                    cx.notify();
-                                });
-                            });
-                        });
+                    let playback_slider_state = {
+                        let player_page_entity = view.read(cx).player_page.clone();
+                        let player_page = player_page_entity.read(cx);
+                        let controlbar = player_page.controlbar.read(cx);
+                        controlbar.playback_slider_state.clone()
+                    };
+                    playback_slider_state.update(&mut *cx, |slider, cx| {
+                        let duration = {
+                            let state = cx.global::<Controller>().state.read(cx);
+                            state
+                                .playback
+                                .current
+                                .and_then(|id| state.library.tracks.get(&id))
+                                .map_or(Duration::default(), |track| track.duration)
+                        };
+                        slider.set_value(duration_to_slider(*pos, duration), cx);
                         cx.notify();
                     });
                     let should_persist = self.state.update(&mut *cx, |this, cx| {

@@ -11,6 +11,7 @@ impl Controller {
             ImageProcessorEvent::InsertAlbumArt(image_id, image) => {
                 let image_cache = cx.global_mut::<ImageCache>();
                 image_cache.current = Some(image.clone());
+                image_cache.add(*image_id, image.clone());
 
                 let image = image.clone();
                 let width = image.size(0).width.0 as u32;
