@@ -4,7 +4,7 @@ use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
 use gpui::{
-    App, AppContext, Context, Entity, EntityFactory, ImageSource, IntoElement, ObjectFit, Render, ScrollStrategy,
+    App, Context, Entity, EntityFactory, ImageSource, IntoElement, ObjectFit, Render, ScrollStrategy,
     Styled,
     UniformListScrollHandle, Window, div, img, px, uniform_list,
 };
@@ -172,7 +172,7 @@ impl Queue {
             0
         };
 
-        if !self.stop_auto_scroll.read(cx) {
+        if !*self.stop_auto_scroll.read(cx) {
             self.scroll_handle
                 .scroll_to_item(idx, ScrollStrategy::Nearest);
         }
@@ -196,13 +196,13 @@ impl Render for Queue {
         let current_changed = self.last_current != current;
 
         if queue_changed {
-            self.views.update(cx, |map, _| map.clear());
+            self.views.update((), |map, _| map.clear());
 
             self.last_tracks.clone_from(&tracks);
             self.last_order.clone_from(&order);
         }
 
-        if (queue_changed || current_changed) && !self.stop_auto_scroll.read(cx) {
+        if (queue_changed || current_changed) && !*self.stop_auto_scroll.read(cx) {
             let this = self.clone();
             cx.defer(move |cx| {
                 this.scroll_to_item(cx);
@@ -218,10 +218,10 @@ impl Render for Queue {
 
         div()
             .id("queue_container")
-            .on_hover(move |hovered, _, cx| stop_auto_scroll.update(cx, |this, _| *this = *hovered))
+            .on_hover(move |hovered, _, cx| stop_auto_scroll.update(cx, |this, _| *this = hovered))
             .size_full()
             .child(
-                uniform_list("queue", len, move |range, _, cx| {
+                uniform_list("queue", len, cx.processor(move |_, range, _, cx| {
                     let visible_tracks: Vec<TrackId> =
                         range.clone().map(|i| tracks[queue_order[i]]).collect();
 
@@ -233,7 +233,7 @@ impl Render for Queue {
 
                     controller.request_track_thumbnails(&thumb_tracks, cx);
 
-                    views.update(cx, |map, _| {
+                    views.update((), |map, _| {
                         map.retain(|id, _| visible_tracks.contains(id));
                     });
 
@@ -246,7 +246,7 @@ impl Render for Queue {
                             if let Some(track) = state.library.tracks.get(real_index) {
                                 div()
                                     .id(format!("track_{:?}", track.id.0))
-                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
+                                    .child(gpui::entity_view(Queue::get_or_create_item(&views, track.clone(), cx)))
                                     .on_click({
                                         let id = track.id;
                                         move |_, _, cx| {
@@ -263,7 +263,7 @@ impl Render for Queue {
                             }
                         })
                         .collect()
-                })
+                }))
                 .w_full()
                 .h_full()
                 .flex()

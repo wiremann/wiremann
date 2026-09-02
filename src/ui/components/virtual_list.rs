@@ -1,4 +1,4 @@
-use gpui::{Context, ElementId, Entity, IntoElement, Pixels, Render, ScrollHandle};
+use gpui::{Context, ElementId, Entity, IntoElement, Pixels, ScrollHandle};
 use std::{ops::Range, rc::Rc};
 
 pub use gpui::VirtualListScrollController;

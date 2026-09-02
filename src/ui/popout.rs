@@ -14,6 +14,7 @@ use gpui::{
     App, Context, Entity, FontWeight, IntoElement, ObjectFit, Pixels, Render, Size, Styled, Window,
     div, img, px, size,
 };
+use gpui::IntoAnyElement;
 
 /// Global toggle for "pop out" (compact player window) mode.
 ///
@@ -236,7 +237,7 @@ impl Render for PopOutPlayer {
                     .px_6()
                     .pt_2()
                     .pb_4()
-                    .child(self.controlbar.clone()),
+                    .child(gpui::entity_view(self.controlbar.clone())),
             )
     }
 }

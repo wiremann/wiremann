@@ -207,6 +207,7 @@ impl Render for FavoritesSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
+        let render_controller = controller.clone();
 
         let state = controller.state.read(cx);
         let favorite_ids = state
@@ -325,19 +326,19 @@ impl Render for FavoritesSection {
                         .id("favorites_list_container")
                         .size_full()
                         .child(
-                            uniform_list("favorites", len, move |range, _, cx| {
+                            uniform_list("favorites", len, cx.processor(move |_, range, _, cx| {
                                 let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
                                 let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
                                 let thumb_tracks: Vec<TrackId> =
                                     (start..end).map(|i| favorite_ids[i]).collect();
 
-                                controller.request_track_thumbnails(&thumb_tracks, cx);
+                                 render_controller.request_track_thumbnails(&thumb_tracks, cx);
 
                                 range
                                     .map(|i| Self::render_track(i + 1, favorite_ids[i], cx))
                                     .collect()
-                            })
+                            }))
                             .w_full()
                             .h_full()
                             .flex()

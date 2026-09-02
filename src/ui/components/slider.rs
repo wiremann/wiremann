@@ -129,7 +129,7 @@ impl RenderOnce for Slider {
             .items_center()
             .on_mouse_down(MouseButton::Left, public_window_callback({
                 let state = self.state.clone();
-                move |event, _window, _app| {
+                move |event: &gpui::InputEvent, _window, _app| {
                     if let gpui::InputEvent::MouseDown(event) = event {
                         state.update((), |state, cx| {
                             state.update_from_position(point(event.position[0], event.position[1]), cx);
@@ -139,7 +139,7 @@ impl RenderOnce for Slider {
             }))
             .on_mouse_move(public_window_callback({
                 let state = self.state.clone();
-                move |event, _window, _app| {
+                move |event: &gpui::MouseMoveEvent, _window, _app| {
                     if event.dragging() {
                         state.update((), |state, cx| {
                             state.update_from_position(point(event.position[0], event.position[1]), cx);

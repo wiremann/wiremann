@@ -1,8 +1,9 @@
 use gpui::{
-    Animation, AnimationExt, Context, ElementId, FontWeight, IntoElement, Render, Styled, Window,
+    Animation, AnimationExt, App, Context, ElementId, FontWeight, IntoElement, Render, Styled, Window,
     div,
     gradient_color_stop, linear_gradient, px, transparent_black,
 };
+use gpui::IntoAnyElement;
 
 use crate::ui::{
     components::{
@@ -46,6 +47,7 @@ impl Sidebar {
         section: LibraryRoutes,
         current: LibraryRoutes,
         theme: Theme,
+        mut app: App,
     ) -> impl IntoElement {
         let active = current == section;
 
@@ -85,9 +87,9 @@ impl Sidebar {
                         }),
                 ),
             move |bounds| {
-                if *cx.global::<LibraryRoutes>() == section {
-                    let sidebar_top = cx.global::<SidebarBounds>().top;
-                    let indicator = cx.global_mut::<SidebarIndicator>();
+                if *app.global::<LibraryRoutes>() == section {
+                    let sidebar_top = app.global::<SidebarBounds>().top;
+                    let indicator = app.global_mut::<SidebarIndicator>();
 
                     indicator.top = bounds.top().to_f64() as f32 - sidebar_top;
                     indicator.height = bounds.size.height.to_f64() as f32;
@@ -111,6 +113,7 @@ impl Render for Sidebar {
         let (prev_section, prev_top, prev_height) = *indicator_state.read(cx);
 
         let duration = std::time::Duration::from_millis(250);
+        let mut app = cx.app();
         observe_bounds(
             "sidebar_root",
             div()
@@ -169,7 +172,7 @@ impl Render for Sidebar {
                         indicator
                             .with_animation(
                                 ElementId::Name(format!("sidebar_indicator_{:?}", current).into()),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint),
                                 move |this, delta| {
                                     let y = prev_top + (indicator_data.top - prev_top) * delta;
 
@@ -189,6 +192,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Home,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::Heart,
@@ -196,6 +200,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Favorites,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::Chart,
@@ -203,6 +208,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Stats,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::section_header("COLLECTION", theme))
                 .child(Self::item(
@@ -211,6 +217,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Tracks,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::Disc,
@@ -218,6 +225,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Albums,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::User,
@@ -225,6 +233,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Artists,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::Playlist,
@@ -232,6 +241,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Playlists,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::section_header("SYSTEM", theme))
                 .child(Self::item(
@@ -240,6 +250,7 @@ impl Render for Sidebar {
                     LibraryRoutes::Plugins,
                     current,
                     theme,
+                    app.clone(),
                 ))
                 .child(Self::item(
                     Icons::Settings,
@@ -247,10 +258,11 @@ impl Render for Sidebar {
                     LibraryRoutes::Settings,
                     current,
                     theme,
+                    app.clone(),
                 ))
-                .child(div().flex_grow()),
-            |bounds, _, cx| {
-                cx.global_mut::<SidebarBounds>().top = bounds.top().to_f64() as f32;
+                .child(div().flex_grow(1.0)),
+            move |bounds| {
+                app.global_mut::<SidebarBounds>().top = bounds.top().to_f64() as f32;
             },
         )
     }

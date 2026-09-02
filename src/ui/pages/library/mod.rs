@@ -21,10 +21,12 @@ use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, EntityFactory, IntoElement, Render,
+    Animation, AnimationExt, App, Context, ElementId, Entity, EntityFactory, IntoElement, Render,
+    entity_view,
     ScrollHandle, Styled,
     UniformListScrollHandle, Window, div, px,
 };
+use gpui::IntoAnyElement;
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -165,41 +167,41 @@ impl Render for LibraryPage {
         let sidebar_width = self.sidebar_width.read(cx).width();
 
         let section_el = match section {
-            LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
-            LibraryRoutes::Favorites => div().w_full().h_full().child(self.favorites.clone()),
-            LibraryRoutes::Stats => div().w_full().h_full().child(self.stats.clone()),
-            LibraryRoutes::Tracks => div().w_full().h_full().child(self.tracks.clone()),
-            LibraryRoutes::Albums => div().w_full().h_full().child(self.albums.clone()),
-            LibraryRoutes::Artists => div().w_full().h_full().child(self.artists.clone()),
-            LibraryRoutes::Playlists => div().w_full().h_full().child(self.playlists.clone()),
-            LibraryRoutes::Settings => div().w_full().h_full().child(self.settings.clone()),
-            LibraryRoutes::Plugins => div().w_full().h_full().child(self.plugins.clone()),
+            LibraryRoutes::Home => div().w_full().h_full().child(entity_view(self.home.clone())),
+            LibraryRoutes::Favorites => div().w_full().h_full().child(entity_view(self.favorites.clone())),
+            LibraryRoutes::Stats => div().w_full().h_full().child(entity_view(self.stats.clone())),
+            LibraryRoutes::Tracks => div().w_full().h_full().child(entity_view(self.tracks.clone())),
+            LibraryRoutes::Albums => div().w_full().h_full().child(entity_view(self.albums.clone())),
+            LibraryRoutes::Artists => div().w_full().h_full().child(entity_view(self.artists.clone())),
+            LibraryRoutes::Playlists => div().w_full().h_full().child(entity_view(self.playlists.clone())),
+            LibraryRoutes::Settings => div().w_full().h_full().child(entity_view(self.settings.clone())),
+            LibraryRoutes::Plugins => div().w_full().h_full().child(entity_view(self.plugins.clone())),
             LibraryRoutes::Album(id) => {
-                self.album.update(cx, |this, cx| {
-                    this.album_id.update(cx, |this, _| *this = Some(id));
+                self.album.update((), |this, cx| {
+                    this.album_id.update((), |this, _| *this = Some(id));
                     cx.notify()
                 });
-                div().w_full().h_full().child(self.album.clone())
+                div().w_full().h_full().child(entity_view(self.album.clone()))
             }
             LibraryRoutes::Artist(id) => {
-                self.artist.update(cx, |this, cx| {
-                    this.artist_id.update(cx, |this, _| *this = Some(id));
+                self.artist.update((), |this, cx| {
+                    this.artist_id.update((), |this, _| *this = Some(id));
                     cx.notify()
                 });
-                div().w_full().h_full().child(self.artist.clone())
+                div().w_full().h_full().child(entity_view(self.artist.clone()))
             }
             LibraryRoutes::Playlist(id) => {
-                self.playlist.update(cx, |this, cx| {
+                self.playlist.update((), |this, cx| {
                     if *this.playlist_id.read(cx) != Some(id) {
-                        this.playlist_id.update(cx, |this, _| *this = Some(id));
-                        this.menu_open.update(cx, |open, cx| {
+                        this.playlist_id.update((), |this, _| *this = Some(id));
+                        this.menu_open.update((), |open, cx| {
                             *open = false;
                             cx.notify();
                         });
                     }
                     cx.notify()
                 });
-                div().w_full().h_full().child(self.playlist.clone())
+                div().w_full().h_full().child(entity_view(self.playlist.clone()))
             }
         };
         let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
@@ -219,7 +221,7 @@ impl Render for LibraryPage {
                     .w(px(sidebar_width))
                     .h_full()
                     .flex_shrink_0()
-                    .child(self.sidebar.clone()),
+                    .child(entity_view(self.sidebar.clone())),
             )
             .child(ResizeHandle::new(&self.sidebar_width))
             .child(

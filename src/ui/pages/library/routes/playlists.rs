@@ -7,7 +7,6 @@ use crate::{
     controller::{Controller, state::PlaylistId},
     ui::{
         components::{
-            Page,
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},
@@ -115,6 +114,7 @@ impl Render for PlaylistsSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
+        let render_controller = controller.clone();
 
         let state = controller.state.read(cx);
 
@@ -230,8 +230,8 @@ impl Render for PlaylistsSection {
                         px(2.0),
                         self.scroll_handle.clone(),
                         &self.grid_controller,
-                        move |_, range, _, _, cx| {
-                            controller
+                         move |_, range, _, _, cx| {
+                             render_controller
                                 .request_playlist_thumbnails(&playlist_ids[range.clone()], cx);
 
                             range

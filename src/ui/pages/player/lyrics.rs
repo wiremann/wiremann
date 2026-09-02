@@ -9,10 +9,11 @@ use std::cell::RefCell;
 
 use crate::ui::components::virtual_list::{VirtualListScrollController, vlist};
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement,
+    Animation, AnimationExt, App, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement,
     Pixels, Render, ScrollHandle, Styled, Window,
     div, gradient_color_stop, linear, linear_gradient, percentage, px, relative, rgba,
 };
+use gpui::IntoAnyElement;
 
 use std::rc::Rc;
 use std::time::Duration;
@@ -387,7 +388,7 @@ impl Render for LyricsView {
 
         if self.last_track_id != lyrics_state.track_id {
             self.last_track_id = lyrics_state.track_id;
-            self.views.update(cx, |this, _| this.clear());
+            self.views.update((), |this, _| this.clear());
             self.word_bounds.borrow_mut().clear();
             self.measured_heights.clear();
 
@@ -428,8 +429,9 @@ impl Render for LyricsView {
         let measured_heights = Rc::new(self.measured_heights.clone());
         let word_bounds = self.word_bounds.clone();
         let list_entity = entity.clone();
+        let entity = cx.entity();
         let list = vlist(
-            cx.entity(),
+            entity.clone(),
             "lyrics",
             measured_heights.clone(),
             self.scroll_handle.clone(),
@@ -446,14 +448,14 @@ impl Render for LyricsView {
                                 .id(("lyrics_line", idx))
                                 .w_full()
                                 .min_w_0()
-                                .child(LyricsView::get_or_create_line(
+                                .child(gpui::entity_view(LyricsView::get_or_create_line(
                                     &views,
                                     line,
                                     idx,
                                     sync_type.clone(),
                                     word_bounds.clone(),
                                     cx,
-                                )),
+                                ))),
                             {
                                 let entity = list_entity.clone();
 

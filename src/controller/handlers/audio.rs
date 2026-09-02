@@ -45,17 +45,13 @@ impl Controller {
                         this.player_page.update(&mut *cx, |this, cx| {
                             this.controlbar.update(&mut *cx, |this, cx| {
                                 this.playback_slider_state.update(&mut *cx, |this, cx| {
-                                    let state = cx.global::<Controller>().state.read(cx);
-                                    let current = if let Some(id) = state.playback.current {
-                                        state.library.tracks.get(&id)
-                                    } else {
-                                        None
-                                    };
-
-                                    let duration = if let Some(track) = current {
-                                        track.duration
-                                    } else {
-                                        Duration::default()
+                                    let duration = {
+                                        let state = cx.global::<Controller>().state.read(cx);
+                                        state
+                                            .playback
+                                            .current
+                                            .and_then(|id| state.library.tracks.get(&id))
+                                            .map_or(Duration::default(), |track| track.duration)
                                     };
                                     this.set_value(duration_to_slider(*pos, duration), cx);
                                     cx.notify();

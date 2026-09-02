@@ -5,6 +5,7 @@ use gpui::{
     Animation, AnimationExt as _, Context, ElementId, FontWeight, IntoElement, Render, Styled,
     Window, div, px,
 };
+use gpui::IntoAnyElement;
 
 #[derive(Clone)]
 pub struct NavBar;
@@ -70,8 +71,8 @@ impl Render for NavBar {
                             .detach();
 
                             this.with_animation(
-                                ElementId::NamedInteger("pill_move".into(), page as u64),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                ElementId::NamedInteger("pill_move", page as u64),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint),
                                 move |this, delta| {
                                     let x = prev_offset
                                         + (active_highlight_offset - prev_offset) * delta;

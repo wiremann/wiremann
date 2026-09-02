@@ -21,6 +21,7 @@ use gpui::{
     Styled,
     UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,
 };
+use gpui::IntoAnyElement;
 
 const THUMBNAIL_MARGIN: usize = 16;
 
@@ -499,7 +500,7 @@ impl Render for PlaylistViewSection {
             .child(
                 div().flex_1().relative().px_12().pb_2().child(
                     div().id("tracks_list_container").size_full().child(
-                        uniform_list("tracks", len, move |range, _, cx| {
+                        uniform_list("tracks", len, cx.processor(move |_, range, _, cx| {
                             let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
                             let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
@@ -511,7 +512,7 @@ impl Render for PlaylistViewSection {
                             range
                                 .map(|i| Self::render_track(i + 1, track_ids[i], cx))
                                 .collect()
-                        })
+                        }))
                         .w_full()
                         .h_full()
                         .flex()
@@ -605,7 +606,7 @@ impl Render for PlaylistViewSection {
                                             let controller =
                                                 cx.global::<Controller>().clone();
                                             controller.delete_playlist(id, cx);
-                                            menu_open_handle.update(cx, |open, cx| {
+                                            menu_open_handle.update((), |open, cx| {
                                                 *open = false;
                                                 cx.notify();
                                             });

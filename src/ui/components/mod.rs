@@ -1,5 +1,4 @@
 pub mod bounds_observer;
-mod element_ext;
 pub mod icons;
 pub mod image_cache;
 pub mod keybinds_overlay;

@@ -7,9 +7,10 @@ use crate::ui::components::Page;
 use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, EntityFactory, IntoElement, MouseButton,
-    Render, Styled, Window, div, img, px, white,
+    Animation, AnimationExt, App, Context, ElementId, Entity, EntityFactory, IntoElement, MouseButton,
+    Render, Styled, Window, div, img, px, public_window_callback, white,
 };
+use gpui::IntoAnyElement;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -81,7 +82,7 @@ impl Render for Titlebar {
                         .px_4()
                         .py_1()
                         .text_color(white())
-                        .child(self.navbar.clone()),
+                        .child(gpui::entity_view(self.navbar.clone())),
                 )
             })
             .child(
@@ -110,7 +111,7 @@ impl Render for Titlebar {
                                 window.prevent_default();
                                 cx.stop_propagation();
                             })
-                            .on_click(|_, window, cx| toggle_pop_out(window, cx))
+                            .on_click(public_window_callback(|_, window, cx| toggle_pop_out(window, cx)))
                             .child(icon(Icons::PopOut)),
                     )
                     .when(!popout_enabled, |this| {

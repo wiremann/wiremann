@@ -1,4 +1,4 @@
-use gpui::{Context, ElementId, Entity, IntoElement, Pixels, ScrollHandle, div, px};
+use gpui::{ElementId, Entity, IntoElement, Pixels, ScrollHandle, div, px};
 use gpui::Styled;
 use std::{ops::Range, rc::Rc};
 
@@ -52,7 +52,7 @@ where
         heights,
         scroll_handle,
         controller.list.clone(),
-        move |view, rows, window, cx| {
+        move |view, mut rows, window, cx| {
             let Some(row) = rows.next() else {
                 return Vec::new();
             };

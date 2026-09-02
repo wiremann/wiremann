@@ -20,7 +20,7 @@ use lyrics::LyricsView;
 use queue::Queue;
 
 use gpui::{
-    App, AppContext, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement, ObjectFit, Pixels, Render,
+    App, Bounds, Context, Entity, EntityFactory, FontWeight, IntoElement, ObjectFit, Pixels, Render,
     ScrollHandle, Styled, UniformListScrollHandle, Window, div, gradient_color_stop, img, px,
     relative, rgba,
 };
@@ -104,12 +104,12 @@ impl Render for PlayerPage {
         };
 
         let gradient_pos = self.album_bounds.map(|bounds| {
-            let center_x = bounds.origin.x + bounds.size.width / 2.0;
-            let center_y = bounds.origin.y + bounds.size.height / 2.0;
+            let center_x = bounds.origin.x.value() + bounds.size.width.value() / 2.0;
+            let center_y = bounds.origin.y.value() + bounds.size.height.value() / 2.0;
 
             (
-                center_x / px(window.viewport_size().width.to_f64() as f32),
-                center_y / px(window.viewport_size().height.to_f64() as f32),
+                center_x / window.viewport_size().width.value(),
+                center_y / window.viewport_size().height.value(),
             )
         });
         let (gx, gy) = gradient_pos.unwrap_or((0.5, 0.4));
@@ -297,13 +297,13 @@ impl Render for PlayerPage {
                                     .on_click({
                                         let controller = controller.clone();
                                         move |_, _, cx| {
-                                            if let Some(id) = cx
+                                            let current_id = cx
                                                 .global::<Controller>()
                                                 .state
                                                 .read(cx)
                                                 .playback
-                                                .current
-                                            {
+                                                .current;
+                                            if let Some(id) = current_id {
                                                 controller.toggle_favorite(id, cx);
                                             }
                                         }
@@ -464,7 +464,7 @@ impl Render for PlayerPage {
                                     .child(icon(Icons::FolderOpen).size_4()),
                             ),
                     )
-                    .child(self.controlbar.clone()),
+                    .child(gpui::entity_view(self.controlbar.clone())),
             )
             .when(!is_portrait && *show_panel.read(cx), |this| {
                 this.child(ResizeHandle::new(&self.panel_width))
@@ -586,7 +586,7 @@ impl Render for PlayerPage {
                                     .id("queue_container")
                                     .w_full()
                                     .h_full()
-                                    .child(self.queue.clone())
+                                    .child(gpui::entity_view(self.queue.clone()))
                                     .child(floating_scrollbar(
                                         "queue_scrollbar",
                                         queue_scroll_handle,
@@ -598,7 +598,7 @@ impl Render for PlayerPage {
                                     .w_full()
                                     .h_full()
                                     .px_8()
-                                    .child(self.lyrics.clone())
+                                    .child(gpui::entity_view(self.lyrics.clone()))
                                     .child(floating_scrollbar(
                                         "lyrics_scrollbar",
                                         lyrics_scroll_handle,

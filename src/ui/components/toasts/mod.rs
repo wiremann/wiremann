@@ -8,7 +8,7 @@ use crate::ui::{
     theme::Theme,
 };
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, EntityFactory, IntoElement, Render,
+    Animation, AnimationExt, App, Context, ElementId, Entity, EntityFactory, IntoAnyElement, IntoElement, Render,
     Styled, Window, div, px,
 };
 use std::time::{Duration, Instant};
@@ -76,7 +76,7 @@ impl Render for ToastManager {
                         ToastKind::ScanProgress(el) => div()
                             .id(format!("toast_scan_{id}"))
                             .relative()
-                            .child(el.clone())
+                            .child(gpui::entity_view(el.clone()))
                             .on_click(move |_, _, cx| {
                                 toasts.update(cx, |list, _| {
                                     for t in list.iter_mut() {
@@ -156,7 +156,7 @@ impl Render for ToastManager {
                         if prev_phase == phase {
                             match phase {
                                 ToastPhase::Entering | ToastPhase::Exiting => {
-                                    this.left_72().opacity(0.0).into_any_element()
+                                    this.left(px(72.0)).opacity(0.0).into_any_element()
                                 }
                                 ToastPhase::Idle => {
                                     this.left(px(0.0)).opacity(1.0).into_any_element()
@@ -179,8 +179,8 @@ impl Render for ToastManager {
                             .detach();
 
                             this.with_animation(
-                                ElementId::NamedInteger("toast_anim".into(), id),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                ElementId::NamedInteger("toast_anim", id),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint),
                                 move |this, delta| match (prev_phase, phase) {
                                     (ToastPhase::Entering, ToastPhase::Idle) => {
                                         let x = 80.0 * (1.0 - delta);
@@ -210,14 +210,15 @@ impl ToastManager {
         let toasts: Entity<Vec<Toast>> = cx.new(|_| Vec::new());
 
         let toasts_clone = toasts.clone();
+        let background_executor = cx.background_executor();
 
-        cx.spawn(async move |cx| {
+        cx.spawn(async move {
             loop {
-                cx.background_executor()
+                background_executor
                     .timer(Duration::from_millis(128))
                     .await;
 
-                toasts_clone.update(cx, |toasts, _| {
+                toasts_clone.update((), |toasts, _| {
                     toasts.retain_mut(|t| {
                         let now = Instant::now();
 

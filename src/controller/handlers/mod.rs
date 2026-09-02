@@ -10,6 +10,6 @@ use super::{
     Duration, Entity, HashSet, ImageCache, ImageKind, ImageProcessorCommand, ImageProcessorEvent,
     Instant, LyricsEvent, PathBuf, PlaybackStatus, PlaylistId, Rgb, Rgba, ScannerCommand,
     ScannerEvent, ScanningStatus, SystemIntegrationCommand, SystemIntegrationEvent, ToastKind,
-    ToastPhase, TrackId, Wiremann, drop_image_from_app, duration_to_slider,
+    ToastPhase, TrackId, Wiremann, duration_to_slider,
     pick_playlist_thumbnail_tracks, rgb,
 };

@@ -47,6 +47,7 @@ impl ScrollableHandle {
 /// Retained scrollbar description backed by WGPUI's tested scrollbar
 /// controller. This keeps pointer capture, paging, wheel propagation, and
 /// drag clamping in the framework instead of duplicating legacy paint code.
+#[derive(gpui::IntoElement)]
 pub struct Scrollbar {
     id: Option<ElementId>,
     scroll_handle: Option<ScrollableHandle>,

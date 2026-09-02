@@ -1,7 +1,5 @@
 use crate::controller::state::PlaylistId;
 use crate::controller::state::TrackId;
-use gpui::RenderImage;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[must_use]
@@ -28,20 +26,6 @@ pub fn duration_to_slider(pos: Duration, duration: Duration) -> f32 {
     } else {
         (pos.as_millis() as f32 / duration_ms as f32) * 100.0
     }
-}
-
-pub fn drop_image_from_app(cx: &mut gpui::App, image: Arc<RenderImage>) {
-    cx.defer(move |cx| {
-        for window in cx.windows() {
-            let image = image.clone();
-
-            window
-                .update(cx, move |_, window, _| {
-                    let _ = window.drop_image(image);
-                })
-                .ok();
-        }
-    });
 }
 
 pub fn fingerprint_tracks(ids: impl IntoIterator<Item = TrackId>) -> u128 {

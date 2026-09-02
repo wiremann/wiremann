@@ -7,7 +7,6 @@ use crate::{
     controller::{Controller, state::ArtistId},
     ui::{
         components::{
-            Page,
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},
@@ -113,6 +112,7 @@ impl Render for ArtistsSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
+        let render_controller = controller.clone();
 
         let state = controller.state.read(cx);
 
@@ -178,8 +178,8 @@ impl Render for ArtistsSection {
                         px(2.0),
                         self.scroll_handle.clone(),
                         &self.grid_controller,
-                        move |_, range, _, _, cx| {
-                            controller.request_artist_thumbnails(&artist_ids[range.clone()], cx);
+                         move |_, range, _, _, cx| {
+                             render_controller.request_artist_thumbnails(&artist_ids[range.clone()], cx);
 
                             range
                                 .map(|i| Self::render_artist(artist_ids[i], cx))

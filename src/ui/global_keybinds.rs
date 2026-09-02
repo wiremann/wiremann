@@ -154,7 +154,7 @@ fn player(_: &Player, cx: &mut App) {
 fn toggle_keybinds(_: &ToggleKeybinds, cx: &mut App) {
     use crate::ui::components::keybinds_overlay::KeybindsOverlayHandle;
 
-    let handle = cx.try_global::<KeybindsOverlayHandle>().cloned();
+    let handle = cx.try_global::<KeybindsOverlayHandle>();
     if let Some(handle) = handle {
         handle.0.update(cx, |overlay, cx| overlay.toggle(cx));
     }

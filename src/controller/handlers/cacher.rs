@@ -1,7 +1,7 @@
 use super::{
     App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
     ImageKind, ImageProcessorCommand, PlaybackStatus, Rgb, Rgba, SystemIntegrationCommand,
-    Wiremann, drop_image_from_app, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
+    Wiremann, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
 };
 use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
@@ -63,9 +63,7 @@ impl Controller {
                         thumbnail_cache.add(*id, image.clone())
                     };
 
-                    if let Some(img) = evicted {
-                        drop_image_from_app(cx, img);
-                    }
+                    drop(evicted);
                 }
                 cx.notify(view.entity_id());
             }
@@ -75,8 +73,8 @@ impl Controller {
                 image_cache.current = Some(image.clone());
 
                 let image = image.clone();
-                let width = image.size(0).width.0.cast_unsigned();
-                let height = image.size(0).height.0.cast_unsigned();
+                let width = image.size(0).width.0 as u32;
+                let height = image.size(0).height.0 as u32;
                 if let Some(image) = image.as_bytes(0) {
                     fn rgb_to_rgba(color: Rgb<u8>) -> Rgba {
                         rgb((u32::from(color.r) << 16)
@@ -144,9 +142,7 @@ impl Controller {
                     image_cache.add(*id, thumbnail.clone())
                 };
 
-                if let Some(img) = evicted {
-                    drop_image_from_app(cx, img);
-                }
+                drop(evicted);
                 cx.notify(view.entity_id());
             }
             CacherEvent::MissingAlbumArt(id) => {

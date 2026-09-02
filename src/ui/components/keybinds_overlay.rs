@@ -1,5 +1,5 @@
 use gpui::{
-    App, AppContext, Context, Entity, EntityFactory, FontWeight, IntoElement, Render, ScrollHandle, Styled,
+    App, Context, Entity, EntityFactory, FontWeight, IntoElement, Render, ScrollHandle, Styled,
     Window, div, px, rgba,
     rgb,
 };

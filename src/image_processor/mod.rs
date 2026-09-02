@@ -14,7 +14,6 @@ use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
 use gpui::RenderImage;
 use image::{DynamicImage, EncodableLayout, Frame, imageops};
-use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -434,7 +433,7 @@ fn render_album_art(
         ImageKind::Playlist => unreachable!(),
     };
 
-    let render_image = Arc::new(RenderImage::new(smallvec![Frame::new(image)]));
+    let render_image = Arc::new(RenderImage::new(vec![Frame::new(image)])?);
 
     Ok(render_image)
 }
@@ -496,7 +495,7 @@ fn render_playlist_thumbnail(
 
     let frame = Frame::new(image);
 
-    let render_image = Arc::new(RenderImage::new(smallvec![frame]));
+    let render_image = RenderImage::new(vec![frame]).ok().map(Arc::new);
 
-    (Some(render_image), hash)
+    (render_image, hash)
 }

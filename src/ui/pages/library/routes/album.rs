@@ -16,7 +16,7 @@ use crate::{
 use gpui::Entity;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, IntoElement, ObjectFit, Render, Styled,
-    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
+    UniformListScrollHandle, Window, div, img, rems, uniform_list,
 };
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -407,7 +407,7 @@ impl Render for AlbumViewSection {
             .child(
                 div().flex_1().relative().px_12().pb_2().child(
                     div().id("tracks_list_container").size_full().child(
-                        uniform_list("tracks", len, move |range, _, cx| {
+                        uniform_list("tracks", len, cx.processor(move |_, range, _, cx| {
                             let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
                             let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
@@ -419,7 +419,7 @@ impl Render for AlbumViewSection {
                             range
                                 .map(|i| Self::render_track(i + 1, track_ids[i], cx))
                                 .collect()
-                        })
+                        }))
                         .w_full()
                         .h_full()
                         .flex()

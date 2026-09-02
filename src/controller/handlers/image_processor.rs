@@ -1,4 +1,4 @@
-use super::{Controller, App, ImageProcessorEvent, Entity, Wiremann, ControllerError, ImageCache, CacherCommand, ImageKind, SystemIntegrationCommand, drop_image_from_app, Arc, ImageProcessorCommand};
+use super::{Controller, App, ImageProcessorEvent, Entity, Wiremann, ControllerError, ImageCache, CacherCommand, ImageKind, SystemIntegrationCommand, Arc, ImageProcessorCommand};
 
 impl Controller {
     pub fn handle_image_processor_event(
@@ -13,8 +13,8 @@ impl Controller {
                 image_cache.current = Some(image.clone());
 
                 let image = image.clone();
-                let width = image.size(0).width.0.cast_unsigned();
-                let height = image.size(0).height.0.cast_unsigned();
+                let width = image.size(0).width.0 as u32;
+                let height = image.size(0).height.0 as u32;
                 if let Some(image) = image.as_bytes(0) {
                     let image = image.to_vec();
                     let _ = self.cacher_tx.send(CacherCommand::WriteImage {
@@ -54,8 +54,8 @@ impl Controller {
             }
             ImageProcessorEvent::InsertThumbnails(thumbnails, kind) => {
                 for (id, image) in thumbnails {
-                    let width = image.size(0).width.0.cast_unsigned();
-                    let height = image.size(0).height.0.cast_unsigned();
+                    let width = image.size(0).width.0 as u32;
+                    let height = image.size(0).height.0 as u32;
                     if let Some(image) = image.as_bytes(0) {
                         let image = image.to_vec();
                         let _ = self.cacher_tx.send(CacherCommand::WriteImage {
@@ -73,9 +73,7 @@ impl Controller {
                         thumbnail_cache.add(*id, image.clone())
                     };
 
-                    if let Some(img) = evicted {
-                        drop_image_from_app(cx, img);
-                    }
+                    drop(evicted);
                 }
                 cx.notify(view.entity_id());
             }
@@ -103,8 +101,8 @@ impl Controller {
                     .image_processor_tx
                     .send(ImageProcessorCommand::PlaylistJobFinished(*id));
 
-                let width = image.size(0).width.0.cast_unsigned();
-                let height = image.size(0).height.0.cast_unsigned();
+                let width = image.size(0).width.0 as u32;
+                let height = image.size(0).height.0 as u32;
                 if let Some(image) = image.as_bytes(0) {
                     let image = image.to_vec();
                     let _ = self.cacher_tx.send(CacherCommand::WriteImage {

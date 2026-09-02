@@ -49,6 +49,8 @@ pub enum ImageProcessorError {
     GarbSizeError(#[from] garb::SizeError),
     #[error("Recv Error occurred: `{0}`")]
     RecvError(#[from] RecvError),
+    #[error("Image decode error occurred: `{0}`")]
+    ImageDecodeError(#[from] gpui::ImageDecodeError),
 }
 
 #[derive(Error, Debug)]
@@ -71,6 +73,8 @@ pub enum CacherError {
     RonSpannedError(#[from] ron::de::SpannedError),
     #[error("SQLx Error occurred: `{0}`")]
     SqlxError(#[from] sqlx::Error),
+    #[error("Image decode error occurred: `{0}`")]
+    ImageDecodeError(#[from] gpui::ImageDecodeError),
 }
 
 #[derive(Error, Debug)]

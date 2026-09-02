@@ -19,8 +19,8 @@ use crate::ui::theme::{DominantColors, Theme};
 use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
 use gpui::{
-    Animation, AnimationExt as _, AppContext, Context, ElementId, Entity, EntityFactory,
-    IntoElement, Render, Styled, Window, div, px,
+    Animation, AnimationExt as _, Context, ElementId, Entity,
+    IntoAnyElement, IntoElement, Render, Styled, Window, div, entity_view, px,
 };
 use std::time::Duration;
 use titlebar::Titlebar;
@@ -121,8 +121,8 @@ impl Render for Wiremann {
         };
 
         let page_el = match page {
-            Page::Player => div().w_full().h_full().child(self.player_page.clone()),
-            Page::Library => div().w_full().h_full().child(self.library_page.clone()),
+            Page::Player => div().w_full().h_full().child(entity_view(self.player_page.clone())),
+            Page::Library => div().w_full().h_full().child(entity_view(self.library_page.clone())),
         };
 
         let content = if popout_enabled {
@@ -131,7 +131,7 @@ impl Render for Wiremann {
                 .w_full()
                 .h_full()
                 .min_h_0()
-                .child(self.popout_player.clone())
+                .child(entity_view(self.popout_player.clone()))
                 .into_any_element()
         } else {
             div()
@@ -158,7 +158,7 @@ impl Render for Wiremann {
 
                         this.child(page_el)
                             .with_animation(
-                                ElementId::NamedInteger("page_slide".into(), page as u64),
+                                ElementId::NamedInteger("page_slide", page as u64),
                                 Animation::new(duration).with_easing(ease_in_out_expo()),
                                 move |this, delta| {
                                     let offset = 360.0 * direction * (1.0 - delta);
@@ -182,10 +182,10 @@ impl Render for Wiremann {
             .justify_center()
             .items_center()
             .bg(theme.app_bg)
-            .child(self.titlebar.clone())
+            .child(entity_view(self.titlebar.clone()))
             .child(content)
-            .when(!popout_enabled, |this| this.child(self.toast_manager.clone()))
-            .when(!popout_enabled, |this| this.child(self.keybinds_overlay.clone()))
+            .when(!popout_enabled, |this| this.child(entity_view(self.toast_manager.clone())))
+            .when(!popout_enabled, |this| this.child(entity_view(self.keybinds_overlay.clone())))
             .into_any_element(),
         )
     }

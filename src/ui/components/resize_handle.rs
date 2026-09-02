@@ -55,7 +55,7 @@ impl RenderOnce for ResizeHandle {
             .h_full()
             .flex_shrink_0()
             .cursor_col_resize()
-            .on_mouse_move(public_window_callback(move |event, window, _app| {
+            .on_mouse_move(public_window_callback(move |event: &gpui::MouseMoveEvent, window, _app| {
                 if event.dragging() {
                     let position = point(event.position[0], event.position[1]);
                     let viewport_width = window.bounds().size.width;

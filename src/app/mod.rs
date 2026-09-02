@@ -32,8 +32,6 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
     Application::new()
         .with_assets(assets.clone())
         .run(move |cx| {
-            assets.load_fonts(cx).expect("Could not load fonts");
-
             let WorkerConfig {
                 metadata: metadata_workers,
                 thumbnail: thumbnail_workers,
@@ -49,8 +47,10 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
 
             info!("Spawning application window...");
 
-            cx.open_window(window_options, |window, cx| {
+            cx.open_window(window_options, move |window, cx| {
                 info!("Initializing engines...");
+
+                assets.load_fonts(window).expect("Could not load fonts");
 
                 let (mut audio, audio_tx, audio_rx) = Audio::new();
 
@@ -113,7 +113,8 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
             .expect("Application panicked.");
 
             cx.activate(true);
-        });
+        })
+        .map_err(|error| AppError::AnyHowError(anyhow::anyhow!(error.to_string())))?;
 
     Ok(())
 }

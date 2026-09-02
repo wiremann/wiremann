@@ -1,5 +1,5 @@
 use crate::ui::theme::Theme;
-use gpui::{App, Bounds, Decorations, Description, Edges, ElementId, Hsla, IntoElement, MouseButton, Pixels, Point, RenderOnce, ResizeEdge, Size, Window, div, point, px, public_window_callback, transparent_black};
+use gpui::{App, Decorations, Description, Edges, Hsla, IntoElement, MouseButton, Pixels, Point, RenderOnce, ResizeEdge, Size, Window, div, point, px, public_window_callback, transparent_black};
 use gpui::Styled;
 
 #[cfg(not(target_os = "linux"))]
@@ -15,7 +15,7 @@ pub(crate) const BORDER_RADIUS: Pixels = px(8.0);
 
 /// Renders the client-decoration border and keeps resize initiation at the
 /// public WGPUI window boundary.
-#[derive(Default)]
+#[derive(Default, gpui::IntoElement)]
 pub struct WindowBorder {
     children: Vec<Description>,
 }
@@ -33,13 +33,13 @@ impl WindowBorder {
 
 pub fn window_paddings(window: &Window) -> Edges {
     match window.window_decorations() {
-        Decorations::Server => Edges::all(px(0.0)),
+        Decorations::Server => Edges::all(0.0),
         Decorations::Client { tiling } => {
-            let mut paddings = Edges::all(SHADOW_SIZE);
-            if tiling.top { paddings.top = px(0.0); }
-            if tiling.bottom { paddings.bottom = px(0.0); }
-            if tiling.left { paddings.left = px(0.0); }
-            if tiling.right { paddings.right = px(0.0); }
+            let mut paddings = Edges::all(SHADOW_SIZE.value());
+            if tiling.top { paddings.top = 0.0; }
+            if tiling.bottom { paddings.bottom = 0.0; }
+            if tiling.left { paddings.left = 0.0; }
+            if tiling.right { paddings.right = 0.0; }
             paddings
         }
     }
@@ -58,8 +58,8 @@ impl RenderOnce for WindowBorder {
 
         if let Decorations::Client { tiling } = decorations {
             backdrop = backdrop
-                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS))
-                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS))
+                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS.value()))
+                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS.value()))
                 .when(!tiling.top, |element| element.pt(SHADOW_SIZE))
                 .when(!tiling.bottom, |element| element.pb(SHADOW_SIZE))
                 .when(!tiling.left, |element| element.pl(SHADOW_SIZE))
@@ -83,8 +83,8 @@ impl RenderOnce for WindowBorder {
 
         if let Decorations::Client { tiling } = decorations {
             content = content
-                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS))
-                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS))
+                .when(!(tiling.top || tiling.right), |element| element.rounded_tr(BORDER_RADIUS.value()))
+                .when(!(tiling.top || tiling.left), |element| element.rounded_tl(BORDER_RADIUS.value()))
                 .border_color(theme.border)
                 .when(!tiling.top, |element| element.border_t(BORDER_SIZE))
                 .when(!tiling.bottom, |element| element.border_b(BORDER_SIZE))
@@ -93,7 +93,7 @@ impl RenderOnce for WindowBorder {
                 .when(!tiling.is_tiled(), |element| {
                     element.shadow(vec![gpui::BoxShadow {
                         color: Hsla { h: 0.0, s: 0.0, l: 0.0, a: 0.3 },
-                        blur_radius: SHADOW_SIZE / 2.0,
+                        blur_radius: px(SHADOW_SIZE.value() / 2.0),
                         spread_radius: px(0.0),
                         offset: point(px(0.0), px(0.0)),
                     }])
