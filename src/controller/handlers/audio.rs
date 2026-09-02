@@ -182,6 +182,7 @@ impl Controller {
                         cx.notify();
                     });
                 }
+                drop(state);
                 self.state.update(&mut *cx, |this, cx| {
                     this.playback.current = Some(*track_id);
 
