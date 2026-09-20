@@ -182,14 +182,17 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::Stop);
 
         let library = self.state.read(cx).library.clone();
+        tracing::info!(action = "WriteLibraryState", tracks = library.tracks.len(), "enqueuing WriteLibraryState");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteLibraryState(library));
         let playback = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?playback.current, index = playback.current_index, "enqueuing WritePlaybackState");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(playback));
         let queue = self.state.read(cx).queue.clone();
+        tracing::info!(action = "WriteQueueState", queue_len = queue.tracks.len(), "enqueuing WriteQueueState");
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
     }
 
@@ -225,6 +228,7 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_playlist)");
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -244,6 +248,7 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_album)");
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -263,6 +268,7 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_artist)");
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -295,6 +301,7 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_track)");
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -319,6 +326,7 @@ impl Controller {
             this.playback.repeat = !this.playback.repeat;
         });
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_repeat)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -337,6 +345,7 @@ impl Controller {
                 }));
         });
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_mute)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -354,6 +363,7 @@ impl Controller {
             .send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
 
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, volume = state.volume, mute = state.mute, "enqueuing WritePlaybackState (set_volume)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -388,9 +398,11 @@ impl Controller {
         });
 
         let state = self.state.read(cx).clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (set_shuffle)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (set_shuffle)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));
@@ -405,9 +417,11 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (next)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (next)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));
@@ -420,9 +434,11 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
+        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (prev)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (prev)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));

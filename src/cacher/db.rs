@@ -4,6 +4,7 @@ use crate::controller::state::{
 };
 use crate::errors::CacherError;
 use sqlx::{Row, Sqlite, SqlitePool, Transaction};
+use tracing::info;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -608,6 +609,7 @@ impl Db {
     }
 
     pub async fn write_queue(&self, state: &QueueState) -> Result<(), CacherError> {
+        info!(queue_len = state.tracks.len(), "Db::write_queue start");
         let mut tx = self.pool.begin().await?;
         sqlx::query("DELETE FROM queue_tracks")
             .execute(&mut *tx)
@@ -633,6 +635,7 @@ impl Db {
         }
 
         tx.commit().await?;
+        info!(queue_len = state.tracks.len(), "Db::write_queue committed");
         Ok(())
     }
 

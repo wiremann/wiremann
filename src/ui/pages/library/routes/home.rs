@@ -902,51 +902,31 @@ impl Render for HomeSection {
                     )),
             ),
     )
-    .child(
-        observe_bounds(
-            "home_content_available",
-            div()
-                .flex_1()
-                .min_h_0()
-                .min_w_0()
-                .relative()
-                .pt_4()
-                .pb_8()
-                .child(
-                    div()
-                        .id("home_scroll")
-                        .w_full()
-                        .h_full()
-                        .min_w_0()
-                        .overflow_y_scroll()
-                        .track_scroll(&scroll_handle)
-                        .flex()
-                        .flex_col()
-                        .gap_y_8()
-                        .children(rows),
-                ),
-            {
-                let entity = cx.entity();
-
-                move |bounds, _, cx| {
-                    let avail_width = bounds.size.width.to_f64();
-
-                    entity.update(cx, |this, cx| {
-                        let old = *this.avail_width.read(cx);
-                        let diff = (old - avail_width).abs();
-
-                        if diff > 0.5 {
-                            this.avail_width.update(cx, |v, _| *v = avail_width);
-                            println!(
-                                "Home available width changed: {old} -> {avail_width}"
-                            );
-                            cx.notify();
-                        }
-                    })
-                }
-            },
-        )
-    )
+.child(
+    div()
+        .flex_1()
+        .min_h_0()
+        .min_w_0()
+        .bg(rgb(0x32f221))
+        .p_4()
+        .child(
+            observe_bounds(
+                "debug",
+                div()
+                    .size_full()
+                    .bg(rgb(0xff0000)),
+                {
+                    move |bounds, _, _| {
+                        println!(
+                            "OBSERVED: {} x {}",
+                            bounds.size.width,
+                            bounds.size.height
+                        );
+                    }
+                },
+            ),
+        ),
+)
     .child(floating_scrollbar(
         "home_scrollbar",
         scroll_handle,

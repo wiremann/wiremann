@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::Path;
 
 use super::schema::{CachedPlaybackState, ImageKind};
+use tracing::info;
 
 #[derive(Clone)]
 pub enum CacheJob {
@@ -24,6 +25,10 @@ pub enum CacheJob {
         image: Vec<u8>,
     },
     LoadAppState,
+    /// Internal ack sent from controller back to app_state_worker indicating
+    /// the loaded AppState has been applied and the worker may process
+    /// pre-load queued jobs.
+    AckAppState,
     LoadThumbnails(HashSet<ImageId>, ImageKind),
     LoadAlbumArt(ImageId),
     LoadPlaylistThumbnail(ImageId),
@@ -43,6 +48,8 @@ pub fn write_playback_state_to_disk(
 
     let ron = ron::ser::to_string_pretty(&payload, PrettyConfig::default())?;
 
+    info!(current = ?state.current, index = state.current_index, volume = state.volume, "write_playback_state_to_disk start");
+
     {
         let mut file = fs::File::create(tmp_path.clone())?;
         file.write_all(ron.as_bytes())?;
@@ -50,6 +57,8 @@ pub fn write_playback_state_to_disk(
     }
 
     fs::rename(tmp_path, final_path)?;
+
+    info!(current = ?state.current, index = state.current_index, "write_playback_state_to_disk complete");
 
     Ok(())
 }

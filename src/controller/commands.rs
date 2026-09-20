@@ -52,6 +52,11 @@ pub enum CacherCommand {
     WriteFavorites(Vec<TrackId>),
     WriteMetrics(ListenMetrics),
 
+    /// Acknowledge that the controller has applied the initial AppState loaded
+    /// from the cacher. Used to avoid race where pre-load writes overwrite
+    /// the persisted state before the controller applies it.
+    AckAppStateLoaded,
+
     GetImage(HashSet<ImageId>, ImageKind),
     WriteImage {
         id: ImageId,

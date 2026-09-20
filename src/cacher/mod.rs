@@ -15,7 +15,7 @@ use crossbeam_channel::{Receiver, Sender};
 pub use db::Db;
 pub use io::CacheJob;
 pub use schema::{CachedImage, CachedTrackSource, ImageKind};
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct Cacher {
@@ -53,12 +53,15 @@ impl Cacher {
         loop {
             match self.rx.recv()? {
                 CacherCommand::WriteLibraryState(state) => {
+                    info!(action = "CacherCommand::WriteLibraryState", tracks = state.tracks.len(), "received command, forwarding to app_state_worker");
                     let _ = app_state_tx.send(CacheJob::WriteLibraryState(state));
                 }
                 CacherCommand::WritePlaybackState(state) => {
+                    info!(action = "CacherCommand::WritePlaybackState", current = ?state.current, index = state.current_index, "received command, forwarding to app_state_worker");
                     let _ = app_state_tx.send(CacheJob::WritePlaybackState(state));
                 }
                 CacherCommand::WriteQueueState(state) => {
+                    info!(action = "CacherCommand::WriteQueueState", queue_len = state.tracks.len(), "received command, forwarding to app_state_worker");
                     let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
                 }
                 CacherCommand::WriteFavorites(ids) => {
@@ -113,6 +116,9 @@ impl Cacher {
                 },
                 CacherCommand::GetAppState => {
                     let _ = app_state_tx.send(CacheJob::LoadAppState);
+                }
+                CacherCommand::AckAppStateLoaded => {
+                    let _ = app_state_tx.send(CacheJob::AckAppState);
                 }
                 CacherCommand::GetImage(ids, kind) => match kind {
                     ImageKind::ThumbnailSmall => {
@@ -175,47 +181,83 @@ impl Cacher {
                 }
             };
 
+            // Initial load: send AppState to controller immediately so it can
+            // apply persisted state before we process any queued writes.
+            match rt.block_on(db.load_app_state(&cacher.app_paths.cache)) {
+                Ok(state) => {
+                    let _ = cacher.tx.send(CacherEvent::AppState(state));
+                }
+                Err(e) => {
+                    error!(error = ?e, "failed to load app state on startup");
+                }
+            }
+
+            // Collect any jobs that arrived before controller acknowledged
+            // applying the AppState. They will be processed after the ack.
+            let mut backlog: Vec<CacheJob> = Vec::new();
+            loop {
+                match rx.recv() {
+                    Ok(CacheJob::AckAppState) => break,
+                    Ok(job) => backlog.push(job),
+                    Err(_) => break,
+                }
+            }
+
+            // Helper closure to process jobs (reused for backlog and main loop)
+            let process_job = |job: CacheJob| {
+                let result: Result<(), CacherError> = match job {
+                    CacheJob::WriteLibraryState(state) => {
+                        info!(action = "app_state_worker::WriteLibraryState", tracks = state.tracks.len(), "processing WriteLibraryState");
+                        let mut state = state;
+                        while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
+                            state = later;
+                        }
+                        rt.block_on(db.write_library(&state)).map_err(Into::into)
+                    }
+                    CacheJob::WriteQueueState(state) => {
+                        info!(action = "app_state_worker::WriteQueueState", queue_len = state.tracks.len(), "processing WriteQueueState");
+                        rt.block_on(db.write_queue(&state)).map_err(Into::into)
+                    }
+                    CacheJob::WriteFavorites(ids) => {
+                        info!(action = "app_state_worker::WriteFavorites", count = ids.len(), "processing WriteFavorites");
+                        rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
+                    }
+                    CacheJob::WriteMetrics(metrics) => {
+                        info!(action = "app_state_worker::WriteMetrics", metrics = metrics.tracks.len(), "processing WriteMetrics");
+                        rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
+                    }
+                    CacheJob::WritePlaybackState(state) => {
+                        info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
+                        io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)
+                    }
+                    CacheJob::LoadAppState => {
+                        info!(action = "app_state_worker::LoadAppState", "processing LoadAppState");
+                        let state = rt.block_on(db.load_app_state(&cacher.app_paths.cache));
+                        match state {
+                            Ok(state) => {
+                                let _ = cacher.tx.send(CacherEvent::AppState(state));
+                                Ok(())
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+                    _ => Ok(()),
+                };
+
+                if let Err(err) = result {
+                    error!(error = ?err, "Error occurred");
+                }
+            };
+
+            // Process backlog now that controller should have applied AppState
+            for job in backlog {
+                process_job(job);
+            }
+
+            // Main processing loop
             loop {
                 while let Ok(job) = rx.recv() {
-                    let result: Result<(), CacherError> = match job {
-                        CacheJob::WriteLibraryState(state) => {
-                            // Coalesce: a scan can queue many snapshots while it runs;
-                            // any later snapshot queued behind this one supersedes it,
-                            // so drain them and persist only the final state.
-                            let mut state = state;
-                            while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
-                                state = later;
-                            }
-                            rt.block_on(db.write_library(&state)).map_err(Into::into)
-                        }
-                        CacheJob::WriteQueueState(state) => {
-                            rt.block_on(db.write_queue(&state)).map_err(Into::into)
-                        }
-                        CacheJob::WriteFavorites(ids) => {
-                            rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
-                        }
-                        CacheJob::WriteMetrics(metrics) => {
-                            rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
-                        }
-                        CacheJob::WritePlaybackState(state) => {
-                            io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)
-                        }
-                        CacheJob::LoadAppState => {
-                            let state = rt.block_on(db.load_app_state(&cacher.app_paths.cache));
-                            match state {
-                                Ok(state) => {
-                                    let _ = cacher.tx.send(CacherEvent::AppState(state));
-                                    Ok(())
-                                }
-                                Err(e) => Err(e),
-                            }
-                        }
-                        _ => Ok(()),
-                    };
-
-                    if let Err(err) = result {
-                        error!(error = ?err, "Error occurred");
-                    }
+                    process_job(job);
                 }
             }
         });
