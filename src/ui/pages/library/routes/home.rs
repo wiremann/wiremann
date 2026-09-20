@@ -680,7 +680,7 @@ impl Render for HomeSection {
         };
 
         let mut rows: Vec<Div> = Vec::new();
-        let avail_width = *self.avail_width.read(cx) as f32;
+        let avail_width = (*self.avail_width.read(cx) - 96.0) as f32;
 
         if track_count == 0 {
             rows.push(
@@ -865,72 +865,75 @@ impl Render for HomeSection {
         let scroll_handle = self.scroll_handle.clone();
 
         div()
-    .w_full()
-    .h_full()
-    .min_w_0()
-    .flex()
-    .flex_col()
-    .px_8()
-    .child(
-        div()
-            .py_4()
+            .w_full()
+            .h_full()
+            .min_w_0()
             .flex()
             .flex_col()
-            .justify_center()
+            .px_8()
+            .relative()
+            .child(observe_bounds(
+                "home-content-width",
+                div().w_full().h_0().min_w_0().absolute(),
+                {
+                    let avail_width = self.avail_width.clone();
+
+                    move |bounds, _, cx| {
+                        let width = bounds.size.width.to_f64();
+
+                        avail_width.update(cx, |v, _| {
+                            *v = width;
+                        });
+
+                        println!("HOME WIDTH: {}", bounds.size.width);
+                    }
+                },
+            ))
             .child(
                 div()
-                    .text_size(rems(2.0))
-                    .font_weight(FontWeight::BOLD)
-                    .tracking_tight()
-                    .text_color(theme.library_home_section_title)
-                    .child("Home")
+                    .py_4()
+                    .flex()
+                    .flex_col()
+                    .justify_center()
                     .child(
                         div()
-                            .h(px(2.0))
-                            .w_16()
+                            .text_size(rems(2.0))
+                            .font_weight(FontWeight::BOLD)
+                            .tracking_tight()
+                            .text_color(theme.library_home_section_title)
+                            .child("Home")
+                            .child(
+                                div()
+                                    .h(px(2.0))
+                                    .w_16()
+                                    .mt_1()
+                                    .bg(theme.library_home_section_title),
+                            ),
+                    )
+                    .child(
+                        div()
                             .mt_1()
-                            .bg(theme.library_home_section_title),
+                            .text_sm()
+                            .text_color(theme.library_home_section_meta)
+                            .child(format!(
+                                "{track_count} tracks · {album_count} albums · \
+                         {artist_count} artists · {playlist_count} playlists"
+                            )),
                     ),
             )
             .child(
                 div()
-                    .mt_1()
-                    .text_sm()
-                    .text_color(theme.library_home_section_meta)
-                    .child(format!(
-                        "{track_count} tracks · {album_count} albums · {artist_count} artists · {playlist_count} playlists"
-                    )),
-            ),
-    )
-.child(
-    div()
-        .flex_1()
-        .min_h_0()
-        .min_w_0()
-        .bg(rgb(0x32f221))
-        .p_4()
-        .child(
-            observe_bounds(
-                "debug",
-                div()
-                    .size_full()
-                    .bg(rgb(0xff0000)),
-                {
-                    move |bounds, _, _| {
-                        println!(
-                            "OBSERVED: {} x {}",
-                            bounds.size.width,
-                            bounds.size.height
-                        );
-                    }
-                },
-            ),
-        ),
-)
-    .child(floating_scrollbar(
-        "home_scrollbar",
-        scroll_handle,
-        RightPad::Pad,
-    ))
+                    .flex_1()
+                    .min_h_0()
+                    .min_w_0()
+                    .bg(rgb(0x32f221))
+                    .p_4()
+                    .children(rows),
+            )
+            .child(floating_scrollbar(
+                "home_scrollbar",
+                scroll_handle,
+                RightPad::Pad,
+            ))
     }
 }
