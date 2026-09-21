@@ -702,39 +702,39 @@ impl Render for HomeSection {
                     ),
             );
         } else {
-            // if has_stats {
-            //     rows.push(Self::stats_summary_banner(
-            //         &stats,
-            //         home_top_track,
-            //         home_top_artist,
-            //         theme,
-            //     ));
-            // }
-
-            if !top_track_ids.is_empty() {
-                let top_children = top_track_ids
-                    .into_iter()
-                    .map(|id| Self::render_track_card("top", id, cx))
-                    .collect::<Vec<_>>();
-
-                rows.push(
-                    div()
-                        .w_full()
-                        .flex()
-                        .flex_col()
-                        .gap_3()
-                        .child(Self::section_header(
-                            "Top Tracks",
-                            Some(LibraryRoutes::Tracks),
-                            cx,
-                        ))
-                        .child(Self::responsive_grid(
-                            top_children,
-                            px(avail_width),
-                            px(180.0),
-                        )),
-                );
+            if has_stats {
+                rows.push(Self::stats_summary_banner(
+                    &stats,
+                    home_top_track,
+                    home_top_artist,
+                    theme,
+                ));
             }
+
+            // if !top_track_ids.is_empty() {
+            //     let top_children = top_track_ids
+            //         .into_iter()
+            //         .map(|id| Self::render_track_card("top", id, cx))
+            //         .collect::<Vec<_>>();
+
+            //     rows.push(
+            //         div()
+            //             .w_full()
+            //             .flex()
+            //             .flex_col()
+            //             .gap_3()
+            //             .child(Self::section_header(
+            //                 "Top Tracks",
+            //                 Some(LibraryRoutes::Tracks),
+            //                 cx,
+            //             ))
+            //             .child(Self::responsive_grid(
+            //                 top_children,
+            //                 px(avail_width),
+            //                 px(180.0),
+            //             )),
+            //     );
+            // }
 
             // if !recent_track_ids.is_empty() {
             //     let recent_children = recent_track_ids
@@ -921,15 +921,7 @@ impl Render for HomeSection {
                             )),
                     ),
             )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .min_w_0()
-                    .bg(rgb(0x32f221))
-                    .p_4()
-                    .children(rows),
-            )
+            .child(div().flex_1().min_h_0().min_w_0().p_4().children(rows))
             .child(floating_scrollbar(
                 "home_scrollbar",
                 scroll_handle,
