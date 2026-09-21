@@ -560,13 +560,11 @@ impl Controller {
             if let Some(artist) = artists.get(aid) {
                 if let Some(image_id) = artist.image_id {
                     cache_ids.push(image_id);
-                } else if let Some(track_id) = artist.tracks.first() {
-                    if let Some(track) = tracks.get(track_id) {
-                        if let Some(image_id) = track.image_id {
+                } else if let Some(track_id) = artist.tracks.first()
+                    && let Some(track) = tracks.get(track_id)
+                        && let Some(image_id) = track.image_id {
                             cache_ids.push(image_id);
                         }
-                    }
-                }
             }
         }
 
@@ -629,8 +627,7 @@ impl Controller {
     fn now_secs() -> u64 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
+            .map_or(0, |d| d.as_secs())
     }
 
     pub fn finalize_metrics_session(&self, cx: &mut App, completed: bool) {
@@ -733,9 +730,9 @@ impl Controller {
 
         let mut agg = HashMap::<ArtistId, u32>::new();
 
-        for (id, m) in state.metrics.tracks.iter() {
+        for (id, m) in &state.metrics.tracks {
             if let Some(track) = state.library.tracks.get(id) {
-                for artist_id in track.artists.iter() {
+                for artist_id in &track.artists {
                     *agg.entry(*artist_id).or_default() += m.play_count;
                 }
             }
@@ -775,7 +772,7 @@ impl Controller {
 
         let mut top_tracks = Vec::new();
 
-        for (id, m) in state.metrics.tracks.iter() {
+        for (id, m) in &state.metrics.tracks {
             let Some(track) = state.library.tracks.get(id) else {
                 continue;
             };
@@ -804,7 +801,7 @@ impl Controller {
 
             top_tracks.push((*id, m.clone()));
 
-            for artist_id in track.artists.iter() {
+            for artist_id in &track.artists {
                 *artist_plays.entry(*artist_id).or_default() += m.play_count;
             }
 
@@ -902,7 +899,7 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
 
     for id in candidates {
         if let Some(track) = library_tracks.get(&id)
-            && albums.insert(track.album.clone())
+            && albums.insert(track.album)
             && let Some(source) = track.get_valid_source()
         {
             chosen.push(source.path.clone());
@@ -920,7 +917,7 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
             }
 
             if let Some(track) = library_tracks.get(id)
-                && albums.insert(track.album.clone())
+                && albums.insert(track.album)
                 && let Some(source) = track.get_valid_source()
             {
                 chosen.push(source.path.clone());

@@ -63,7 +63,7 @@ impl Render for NavBar {
                                 let pill_state = pill_state.clone();
                                 async move |_, cx| {
                                     cx.background_executor().timer(duration).await;
-                                    let _ = pill_state.update(cx, |state, _| {
+                                    let () = pill_state.update(cx, |state, _| {
                                         *state = (page, active_highlight_offset);
                                     });
                                 }
@@ -103,7 +103,7 @@ impl Render for NavBar {
                     })
                     .on_click(|_, _, cx| {
                         cx.stop_propagation();
-                        *cx.global_mut::<Page>() = Page::Library
+                        *cx.global_mut::<Page>() = Page::Library;
                     })
                     .when(page == Page::Library, |this| {
                         this.text_color(theme.switcher_text_active)
@@ -130,7 +130,7 @@ impl Render for NavBar {
                     })
                     .on_click(|_, _, cx| {
                         cx.stop_propagation();
-                        *cx.global_mut::<Page>() = Page::Player
+                        *cx.global_mut::<Page>() = Page::Player;
                     })
                     .when(page == Page::Player, |this| {
                         this.text_color(theme.switcher_text_active)

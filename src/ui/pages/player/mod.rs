@@ -25,7 +25,7 @@ use gpui::{
     StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative,
     rgba,
 };
-use gpui::{prelude::FluentBuilder, rgb};
+use gpui::prelude::FluentBuilder;
 
 #[derive(Clone)]
 pub struct PlayerPage {
@@ -139,7 +139,7 @@ impl Render for PlayerPage {
                 gradient_color_stop(dominant_colors.color1.blend(dominant_colors.color2), 0.0),
                 gradient_color_stop(rgba(0x00000000), 1.0),
             )))
-            .when(is_portrait, |parent| parent.flex_col())
+            .when(is_portrait, gpui::Styled::flex_col)
             .child(
                 // Main content: album art + title + controls + controlbar
                 div()
@@ -289,8 +289,7 @@ impl Render for PlayerPage {
                                     })
                                     .when(
                                         current_id
-                                            .map(|id| controller.is_favorite(id, cx))
-                                            .unwrap_or(false),
+                                            .is_some_and(|id| controller.is_favorite(id, cx)),
                                         |this| {
                                             this.text_color(theme.player_icons_text_active)
                                                 .bg(theme.player_icons_bg_active)

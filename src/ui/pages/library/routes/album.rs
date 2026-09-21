@@ -17,7 +17,7 @@ use gpui::Entity;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
+    UniformListScrollHandle, Window, div, img, rems, uniform_list,
 };
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -47,9 +47,7 @@ impl AlbumViewSection {
                 .join(", ");
 
             let album = track
-                .album(&state.library)
-                .map(|album| album.name.to_string())
-                .unwrap_or_else(|| "Unknown".to_string());
+                .album(&state.library).map_or_else(|| "Unknown".to_string(), |album| album.name.to_string());
 
             (
                 track.clone(),
@@ -274,7 +272,7 @@ impl Render for AlbumViewSection {
                                 div()
                                     .text_base()
                                     .text_color(theme.library_album_section_header_meta)
-                                    .child(format!("{} Tracks", len)),
+                                    .child(format!("{len} Tracks")),
                             )
                             .child(
                                 div()

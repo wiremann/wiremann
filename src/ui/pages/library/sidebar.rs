@@ -161,7 +161,7 @@ impl Render for Sidebar {
                             async move |_, cx| {
                                 cx.background_executor().timer(duration).await;
 
-                                let _ = indicator_state.update(cx, |state, _| {
+                                let () = indicator_state.update(cx, |state, _| {
                                     *state = (current, indicator_data.top, indicator_data.height);
                                 });
                             }
@@ -170,7 +170,7 @@ impl Render for Sidebar {
 
                         indicator
                             .with_animation(
-                                ElementId::Name(format!("sidebar_indicator_{:?}", current).into()),
+                                ElementId::Name(format!("sidebar_indicator_{current:?}").into()),
                                 Animation::new(duration).with_easing(gpui::ease_out_quint()),
                                 move |this, delta| {
                                     let y = prev_top + (indicator_data.top - prev_top) * delta;

@@ -129,7 +129,7 @@ impl SystemIntegration {
                         } else {
                             Some(artist.as_str())
                         },
-                        cover_url: cover_url.as_deref(),
+                        cover_url,
                         duration: Some(Duration::from_secs(duration)),
                     }) {
                         Ok(()) => eprintln!("[wiremann] set_metadata OK"),

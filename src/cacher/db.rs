@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Operations against the on-disk SQLite database that backs all data which
+/// Operations against the on-disk `SQLite` database that backs all data which
 /// grows with use: the library, queue, favorites and listen metrics.
 ///
 /// The playback session (`session.ron`) and image/lyrics blob caches are kept
@@ -704,11 +704,11 @@ impl Db {
                 "INSERT INTO track_metrics (track_id, play_count, play_time_secs, first_played, last_played, skip_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )
             .bind(track_hex(*id))
-            .bind(m.play_count as i64)
+            .bind(i64::from(m.play_count))
             .bind(m.play_time.as_secs() as i64)
             .bind(m.first_played.map(|v| v as i64))
             .bind(m.last_played.map(|v| v as i64))
-            .bind(m.skip_count as i64)
+            .bind(i64::from(m.skip_count))
             .execute(&mut *tx)
             .await?;
         }
@@ -743,7 +743,7 @@ impl Db {
     }
 
     /// Loads the full [`crate::controller::state::AppState`]: structured data
-    /// from SQLite plus the playback session from its RON file.
+    /// from `SQLite` plus the playback session from its RON file.
     pub async fn load_app_state(
         &self,
         cache_dir: &Path,

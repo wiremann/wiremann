@@ -21,7 +21,7 @@ pub struct Titlebar {
 
 impl Render for Titlebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>().clone();
+        let theme = *cx.global::<Theme>();
         let page = *cx.global::<Page>();
         let popout_enabled = cx.global::<PopOutState>().enabled;
         let is_maximized = window.is_maximized();
@@ -32,7 +32,7 @@ impl Render for Titlebar {
         let current_track = state
             .playback
             .current
-            .and_then(|id| state.library.tracks.get(&id).map(|t| t.clone()));
+            .and_then(|id| state.library.tracks.get(&id).cloned());
         let current_image = cx.global::<ImageCache>().current.clone();
 
         let show_mini_player = !popout_enabled && page != Page::Player && current_track.is_some();
@@ -253,18 +253,15 @@ fn mini_player(
                 .flex_shrink_0()
                 .rounded_md()
                 .overflow_hidden()
-                .child(match current_image {
-                    Some(img_src) => img(img_src.clone())
-                        .object_fit(gpui::ObjectFit::Contain)
+                .child(if let Some(img_src) = current_image { img(img_src.clone())
+                .object_fit(gpui::ObjectFit::Contain)
+                .size_full()
+                .into_any_element() } else {
+                    let text_color = theme.titlebar_window_icons_text;
+                    icon(Icons::Music)
                         .size_full()
-                        .into_any_element(),
-                    None => {
-                        let text_color = theme.titlebar_window_icons_text;
-                        icon(Icons::Music)
-                            .size_full()
-                            .text_color(text_color)
-                            .into_any_element()
-                    }
+                        .text_color(text_color)
+                        .into_any_element()
                 }),
         )
         .child(

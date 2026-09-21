@@ -8,7 +8,6 @@ use crate::{
     controller::{Controller, state::ArtistId},
     ui::{
         components::{
-            Page,
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},

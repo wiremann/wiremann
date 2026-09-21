@@ -42,8 +42,7 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
             } = calculate_worker_config();
 
             println!(
-                "Worker configuration: \nMetadata: {:?}\nThumbnail: {:?}\nCacher: {:?}",
-                metadata_workers, thumbnail_workers, cacher_workers
+                "Worker configuration: \nMetadata: {metadata_workers:?}\nThumbnail: {thumbnail_workers:?}\nCacher: {cacher_workers:?}"
             );
             let app_icon = gpui::WindowIcon::from_png_bytes(ICON_PNG).ok();
             let window_options = build_window_options(app_icon, cx);

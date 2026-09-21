@@ -340,7 +340,7 @@ impl Scanner {
                             .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
-                    if discovered % 16 == 0 {
+                    if discovered.is_multiple_of(16) {
                         tx.send(ScannerEvent::Discovered(discovered)).ok();
                     }
 

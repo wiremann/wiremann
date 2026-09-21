@@ -69,6 +69,7 @@ pub struct ResizeHandle {
 }
 
 impl ResizeHandle {
+    #[must_use]
     pub fn new(state: &Entity<ResizeState>) -> Self {
         Self {
             state: state.clone(),

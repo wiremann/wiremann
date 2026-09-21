@@ -75,8 +75,8 @@ pub fn read_metadata(track_source: TrackSource) -> Result<ScannedTrack, ScannerE
             artists = vec![parsed_artist.to_string()];
             // If the tag had a correct title (no "Artist - " prefix), keep it.
             // Otherwise use the parsed title from filename.
-            if title.eq_ignore_ascii_case(&format!("{} - {}", parsed_artist, parsed_title))
-                || title.eq_ignore_ascii_case(&format!("{}: {}", parsed_artist, parsed_title))
+            if title.eq_ignore_ascii_case(&format!("{parsed_artist} - {parsed_title}"))
+                || title.eq_ignore_ascii_case(&format!("{parsed_artist}: {parsed_title}"))
                 || title.is_empty()
             {
                 title = parsed_title.to_string();
@@ -110,7 +110,7 @@ pub fn read_album_art(path: &Path) -> Result<Option<Box<[u8]>>, ScannerError> {
 }
 
 /// If the title looks like "Artist - Title" but the artist field is empty or
-/// mismatched, split it apart. This is common for YouTube rips and poor tags.
+/// mismatched, split it apart. This is common for `YouTube` rips and poor tags.
 fn clean_title_from_artists(title: &mut String, artists: &mut Vec<String>) {
     if let Some(idx) = title.find(" - ") {
         let prefix = title[..idx].trim();

@@ -2,9 +2,8 @@ use crate::ui::components::bounds_observer::observe_bounds;
 use gpui::{
     App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
-    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems, rgb,
+    Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
 };
-use std::collections::HashMap;
 
 use crate::{
     controller::{
@@ -680,7 +679,7 @@ impl Render for HomeSection {
         };
 
         let mut rows: Vec<Div> = Vec::new();
-        let avail_width = (*self.avail_width.read(cx) - 96.0) as f32;
+        let _avail_width = (*self.avail_width.read(cx) - 96.0) as f32;
 
         if track_count == 0 {
             rows.push(
@@ -701,165 +700,13 @@ impl Render for HomeSection {
                             .child("Add some tracks to get started."),
                     ),
             );
-        } else {
-            if has_stats {
-                rows.push(Self::stats_summary_banner(
-                    &stats,
-                    home_top_track,
-                    home_top_artist,
-                    theme,
-                ));
-            }
-
-            // if !top_track_ids.is_empty() {
-            //     let top_children = top_track_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_track_card("top", id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Top Tracks",
-            //                 Some(LibraryRoutes::Tracks),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 top_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
-
-            // if !recent_track_ids.is_empty() {
-            //     let recent_children = recent_track_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_track_card("recent", id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Recently Played",
-            //                 Some(LibraryRoutes::Tracks),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 recent_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
-
-            // if !top_artist_ids.is_empty() {
-            //     let top_artist_children = top_artist_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_artist_card(id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Top Artists",
-            //                 Some(LibraryRoutes::Artists),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 top_artist_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
-
-            // if !album_ids.is_empty() {
-            //     let album_children = album_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_album_card(id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Albums",
-            //                 Some(LibraryRoutes::Albums),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 album_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
-
-            // if !artist_ids.is_empty() {
-            //     let artist_children = artist_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_artist_card(id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Artists",
-            //                 Some(LibraryRoutes::Artists),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 artist_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
-
-            // if !playlist_ids.is_empty() {
-            //     let playlist_children = playlist_ids
-            //         .into_iter()
-            //         .map(|id| Self::render_playlist_card(id, cx))
-            //         .collect::<Vec<_>>();
-
-            //     rows.push(
-            //         div()
-            //             .w_full()
-            //             .flex()
-            //             .flex_col()
-            //             .gap_3()
-            //             .child(Self::section_header(
-            //                 "Playlists",
-            //                 Some(LibraryRoutes::Playlists),
-            //                 cx,
-            //             ))
-            //             .child(Self::responsive_grid(
-            //                 playlist_children,
-            //                 px(avail_width),
-            //                 px(180.0),
-            //             )),
-            //     );
-            // }
+        } else if has_stats {
+            rows.push(Self::stats_summary_banner(
+                &stats,
+                home_top_track,
+                home_top_artist,
+                theme,
+            ));
         }
 
         let scroll_handle = self.scroll_handle.clone();

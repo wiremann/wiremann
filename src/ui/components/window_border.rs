@@ -25,11 +25,13 @@ pub struct WindowBorder {
 }
 
 /// Create a new window border.
+#[must_use]
 pub fn window_border() -> WindowBorder {
     WindowBorder::new()
 }
 
 impl WindowBorder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ..Default::default()
@@ -39,6 +41,7 @@ impl WindowBorder {
 
 /// Get the paddings that should be applied to the root content so that the
 /// window border/shadow remains visible around it.
+#[must_use]
 pub fn window_paddings(window: &Window) -> Edges<Pixels> {
     match window.window_decorations() {
         Decorations::Server => Edges::all(px(0.0)),
@@ -134,10 +137,7 @@ impl RenderOnce for WindowBorder {
                         let size = window.window_bounds().get_bounds().size;
                         let pos = window.mouse_position();
 
-                        match resize_edge(pos, RESIZE_HANDLE_SIZE, size) {
-                            Some(edge) => window.start_window_resize(edge),
-                            None => {}
-                        };
+                        if let Some(edge) = resize_edge(pos, RESIZE_HANDLE_SIZE, size) { window.start_window_resize(edge) }
                     }),
             })
             .size_full()

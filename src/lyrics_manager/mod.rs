@@ -123,7 +123,7 @@ impl LyricsManager {
                                 [stripped, title.as_str()]
                             };
 
-                        for attempt in attempts.iter() {
+                        for attempt in &attempts {
                             if attempt.is_empty() {
                                 continue;
                             }

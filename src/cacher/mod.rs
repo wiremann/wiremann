@@ -212,20 +212,16 @@ impl Cacher {
                         while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
                             state = later;
                         }
-                        rt.block_on(db.write_library(&state)).map_err(Into::into)
-                    }
+                        rt.block_on(db.write_library(&state))}
                     CacheJob::WriteQueueState(state) => {
                         info!(action = "app_state_worker::WriteQueueState", queue_len = state.tracks.len(), "processing WriteQueueState");
-                        rt.block_on(db.write_queue(&state)).map_err(Into::into)
-                    }
+                        rt.block_on(db.write_queue(&state))}
                     CacheJob::WriteFavorites(ids) => {
                         info!(action = "app_state_worker::WriteFavorites", count = ids.len(), "processing WriteFavorites");
-                        rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
-                    }
+                        rt.block_on(db.write_favorites(&ids))}
                     CacheJob::WriteMetrics(metrics) => {
                         info!(action = "app_state_worker::WriteMetrics", metrics = metrics.tracks.len(), "processing WriteMetrics");
-                        rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
-                    }
+                        rt.block_on(db.write_metrics(&metrics))}
                     CacheJob::WritePlaybackState(state) => {
                         info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
                         io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)

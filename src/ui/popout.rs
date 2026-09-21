@@ -38,6 +38,7 @@ pub struct PopOutHandle(pub Entity<Wiremann>);
 impl Global for PopOutHandle {}
 
 /// The fixed size of the pop-out player window.
+#[must_use]
 pub fn pop_out_size() -> Size<Pixels> {
     size(px(460.0), px(717.0))
 }

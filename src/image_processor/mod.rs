@@ -271,7 +271,7 @@ impl ImageProcessor {
                         id, hash, thumbnail,
                     ));
                 } else {
-                    warn!("Failed to generate playlist thumbnail")
+                    warn!("Failed to generate playlist thumbnail");
                 }
             }
         });
@@ -301,7 +301,7 @@ fn fetch_album_art_online(
         let query = if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
             (*title_attempt).to_string()
         } else {
-            format!("{} {title_attempt}", artist)
+            format!("{artist} {title_attempt}")
         };
 
         if let Some(cover_url) = deezer_search(&query, 3) {
@@ -312,7 +312,7 @@ fn fetch_album_art_online(
 
     // Fallback: try artist + album when the album name is real.
     if !album.is_empty() && album != "Unknown Album" {
-        let q2 = format!("{} {}", artist, album);
+        let q2 = format!("{artist} {album}");
         if let Some(cover_url) = deezer_search(&q2, 1) {
             download_and_send_album_art(events_tx, id, &cover_url);
             return;
@@ -362,9 +362,7 @@ fn download_and_send_album_art(
 ) {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
-        .build()
-        .ok()
-        .expect("Failed to build HTTP client");
+        .build().expect("Failed to build HTTP client");
 
     let img_bytes = match client.get(cover_url).send() {
         Ok(r) => match r.bytes() {
@@ -411,7 +409,7 @@ fn urlencoding(input: &str) -> String {
             }
             b' ' => result.push_str("%20"),
             _ => {
-                result.push_str(&format!("%{:02X}", byte));
+                result.push_str(&format!("%{byte:02X}"));
             }
         }
     }

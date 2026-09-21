@@ -116,7 +116,7 @@ impl Render for KeybindsOverlay {
                             .track_scroll(&scroll_handle)
                             .children(shortcuts.into_iter().map(|(key, action)| {
                                 div()
-                                    .id(format!("shortcut_{}", action))
+                                    .id(format!("shortcut_{action}"))
                                     .w_full()
                                     .flex()
                                     .items_center()

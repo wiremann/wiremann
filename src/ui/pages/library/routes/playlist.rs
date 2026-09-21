@@ -53,9 +53,7 @@ impl PlaylistViewSection {
                 .join(", ");
 
             let album = track
-                .album(&state.library)
-                .map(|album| album.name.to_string())
-                .unwrap_or_else(|| "Unknown".to_string());
+                .album(&state.library).map_or_else(|| "Unknown".to_string(), |album| album.name.to_string());
 
             (
                 track.clone(),
@@ -325,7 +323,7 @@ impl Render for PlaylistViewSection {
                                 div()
                                     .text_base()
                                     .text_color(theme.library_playlist_section_header_meta)
-                                    .child(format!("{} Tracks", len)),
+                                    .child(format!("{len} Tracks")),
                             )
                             .child(
                                 div()

@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 /// A one-time import of the legacy bitcode caches (`library.bin`,
 /// `queue.bin`, `favorites.bin`, `metrics.bin`) that were used before the
-/// SQLite migration. The on-disk formats are preserved verbatim here so we can
+/// `SQLite` migration. The on-disk formats are preserved verbatim here so we can
 /// decode them into the current in-memory state types and store them in the DB.
 ///
 /// The playback session (`session.ron`) predates and postdates this migration

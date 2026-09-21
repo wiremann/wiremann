@@ -11,7 +11,7 @@ use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 /// immediately, so the worst case loss on a crash is a few seconds of position.
 const PLAYBACK_STATE_PERSIST_INTERVAL: Duration = Duration::from_secs(5);
 
-/// Helper: if the title looks like "Artist - RealTitle" and the artist is
+/// Helper: if the title looks like "Artist - `RealTitle`" and the artist is
 /// unknown or matches the prefix, split it apart.
 fn clean_track_title(title: &mut String, artist: &mut String) {
     if let Some(idx) = title.find(" - ") {
@@ -69,7 +69,7 @@ impl Controller {
 
                         if let Some(session) = this.metrics_session.as_mut() {
                             if *pos > session.last_position {
-                                let delta = *pos - session.last_position;
+                                let delta = (*pos).checked_sub(session.last_position).unwrap();
 
                                 if this.playback.status == PlaybackStatus::Playing {
                                     session.played += delta;
@@ -80,7 +80,7 @@ impl Controller {
                         }
 
                         let now = Instant::now();
-                        let should_persist = this.last_playback_write.map_or(true, |last| {
+                        let should_persist = this.last_playback_write.is_none_or(|last| {
                             now.duration_since(last) >= PLAYBACK_STATE_PERSIST_INTERVAL
                         });
 

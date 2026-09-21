@@ -23,6 +23,7 @@ pub struct VirtualGridScrollController {
 }
 
 impl VirtualGridScrollController {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             state: Rc::new(RefCell::new(VirtualGridScrollState::default())),
@@ -173,7 +174,7 @@ impl Element for VirtualGrid {
         let row_height_px = cell_width_px + footer_height_px + (cell_padding_px * 2.0);
         let row_height = px(row_height_px);
 
-        let rows = (self.item_count + cols - 1) / cols;
+        let rows = self.item_count.div_ceil(cols);
 
         self.content_height = px(rows as f32 * row_height_px);
         let mut logical_scroll = self.scroll_handle.offset().y;

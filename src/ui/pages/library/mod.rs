@@ -70,6 +70,7 @@ pub struct LibraryPage {
 }
 
 impl LibraryRoutes {
+    #[must_use]
     pub const fn index(self) -> i32 {
         match self {
             Self::Home => 0,
@@ -179,14 +180,14 @@ impl Render for LibraryPage {
             LibraryRoutes::Album(id) => {
                 self.album.update(cx, |this, cx| {
                     this.album_id.update(cx, |this, _| *this = Some(id));
-                    cx.notify()
+                    cx.notify();
                 });
                 div().w_full().h_full().child(self.album.clone())
             }
             LibraryRoutes::Artist(id) => {
                 self.artist.update(cx, |this, cx| {
                     this.artist_id.update(cx, |this, _| *this = Some(id));
-                    cx.notify()
+                    cx.notify();
                 });
                 div().w_full().h_full().child(self.artist.clone())
             }
@@ -199,7 +200,7 @@ impl Render for LibraryPage {
                             cx.notify();
                         });
                     }
-                    cx.notify()
+                    cx.notify();
                 });
                 div().w_full().h_full().child(self.playlist.clone())
             }
@@ -239,7 +240,7 @@ impl Render for LibraryPage {
                                 let section_state = section_state.clone();
                                 async move |_, cx| {
                                     cx.background_executor().timer(duration).await;
-                                    let _ = section_state.update(cx, |state, _| {
+                                    let () = section_state.update(cx, |state, _| {
                                         *state = section;
                                     });
                                 }
@@ -248,7 +249,7 @@ impl Render for LibraryPage {
 
                             this.child(section_el)
                                 .with_animation(
-                                    ElementId::Name(format!("section_slide_{:?}", section).into()),
+                                    ElementId::Name(format!("section_slide_{section:?}").into()),
                                     Animation::new(duration).with_easing(ease_in_out_expo()),
                                     move |this, delta| {
                                         let offset = 360.0 * direction * (1.0 - delta);

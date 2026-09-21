@@ -298,20 +298,24 @@ impl AppState {
 }
 
 impl LibraryState {
+    #[must_use]
     pub fn track(&self, id: TrackId) -> Option<&Arc<Track>> {
         self.tracks.get(&id)
     }
 
+    #[must_use]
     pub fn artist(&self, id: ArtistId) -> Option<&Arc<Artist>> {
         self.artists.get(&id)
     }
 
+    #[must_use]
     pub fn album(&self, id: AlbumId) -> Option<&Arc<Album>> {
         self.albums.get(&id)
     }
 }
 
 impl Track {
+    #[must_use]
     pub fn album<'a>(&self, lib: &'a LibraryState) -> Option<&'a Arc<Album>> {
         lib.album(self.album)
     }

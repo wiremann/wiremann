@@ -268,9 +268,7 @@ impl StatsSection {
             ))
             .child(Self::stat_card(
                 stats
-                    .first_listen
-                    .map(fmt_date)
-                    .unwrap_or_else(|| "—".to_string()),
+                    .first_listen.map_or_else(|| "—".to_string(), fmt_date),
                 "First listen",
                 theme,
             ))

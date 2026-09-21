@@ -61,7 +61,7 @@ impl LrcLib {
         }
         query.push(("duration", &dur_secs));
 
-        let url = format!("https://lrclib.net/{}", endpoint);
+        let url = format!("https://lrclib.net/{endpoint}");
 
         let resp = match client
             .get(&url)
@@ -112,7 +112,7 @@ impl LrcLib {
         let mut scored: Vec<(i64, &Value)> = items
             .iter()
             .filter_map(|item| {
-                let dur = item.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0) as u64;
+                let dur = item.get("duration").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as u64;
                 let diff = (dur as i64 - target_secs as i64).abs();
                 if diff > 10 {
                     return None; // skip anything more than 10s off
