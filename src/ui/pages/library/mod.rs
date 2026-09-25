@@ -1,192 +1,151 @@
 mod helpers;
+mod routes;
+mod sidebar;
 
-use crate::controller::Controller;
-use crate::controller::state::TrackId;
-use crate::ui::components::Page;
-use crate::ui::components::image_cache::ImageCache;
-use crate::ui::components::scrollbar::{RightPad, floating_scrollbar};
-use crate::ui::helpers::{fingerprint_playlists, fingerprint_tracks};
+use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
+use crate::ui::animations::ease_in_out_expo;
+use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
+use crate::ui::components::virtual_grid::VirtualGridScrollController;
+use crate::ui::pages::library::routes::album::AlbumViewSection;
+use crate::ui::pages::library::routes::albums::AlbumsSection;
+use crate::ui::pages::library::routes::artist::ArtistViewSection;
+use crate::ui::pages::library::routes::artists::ArtistsSection;
+use crate::ui::pages::library::routes::favorites::FavoritesSection;
+use crate::ui::pages::library::routes::home::HomeSection;
+use crate::ui::pages::library::routes::playlist::PlaylistViewSection;
+use crate::ui::pages::library::routes::playlists::PlaylistsSection;
+use crate::ui::pages::library::routes::plugins::PluginsSection;
+use crate::ui::pages::library::routes::settings::SettingsSection;
+use crate::ui::pages::library::routes::stats::StatsSection;
+use crate::ui::pages::library::routes::tracks::TracksSection;
+use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
-    VirtualListScrollController, Window, div, img, vlist,
+    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
+    InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
+    UniformListScrollHandle, Window, div, px,
 };
-use helpers::{LibraryRow, build_rows, render_header, render_playlist_grid, render_track_table_header, HeaderKind};
-use std::rc::Rc;
 
-const THUMBNAIL_MARGIN: usize = 16;
+#[repr(u64)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LibraryRoutes {
+    // Discovery
+    Home,
+    Favorites,
+    Stats,
+
+    // Collection
+    Tracks,
+    Albums,
+    Artists,
+    Playlists,
+
+    // Individual item views
+    Album(AlbumId),
+    Artist(ArtistId),
+    Playlist(PlaylistId),
+
+    // System
+    Settings,
+    Plugins,
+}
 
 #[derive(Clone)]
 pub struct LibraryPage {
-    scroll_handle: ScrollHandle,
-    rows: Rc<Vec<LibraryRow>>,
-    heights: Rc<Vec<Pixels>>,
-    pub sorted_tracks: Vec<&'static TrackId>,
-    grid_cols: usize,
-    last_fp: u128,
-    pub list_controller: VirtualListScrollController,
+    sidebar: Entity<Sidebar>,
+    sidebar_width: Entity<ResizeState>,
+    album: Entity<AlbumViewSection>,
+    albums: Entity<AlbumsSection>,
+    artist: Entity<ArtistViewSection>,
+    artists: Entity<ArtistsSection>,
+    playlist: Entity<PlaylistViewSection>,
+    playlists: Entity<PlaylistsSection>,
+    favorites: Entity<FavoritesSection>,
+    home: Entity<HomeSection>,
+    tracks: Entity<TracksSection>,
+    plugins: Entity<PluginsSection>,
+    settings: Entity<SettingsSection>,
+    stats: Entity<StatsSection>,
+}
+
+impl LibraryRoutes {
+    #[must_use]
+    pub const fn index(self) -> i32 {
+        match self {
+            Self::Home => 0,
+            Self::Favorites => 1,
+            Self::Stats => 2,
+
+            Self::Tracks => 3,
+            Self::Albums => 4,
+            Self::Artists => 5,
+            Self::Playlists => 6,
+
+            Self::Album(_) => 7,
+            Self::Artist(_) => 8,
+            Self::Playlist(_) => 9,
+
+            Self::Settings => 10,
+            Self::Plugins => 11,
+        }
+    }
 }
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
-        let scroll_handle = ScrollHandle::new();
-        let library = &cx.global::<Controller>().state.read(cx).library;
+        cx.set_global(SidebarIndicator {
+            top: 0.0,
+            height: 32.0,
+        });
 
-        let cols = 4;
-
-        let (rows, heights) = build_rows(library, cols);
+        cx.set_global(SidebarBounds { top: 0.0 });
 
         LibraryPage {
-            scroll_handle,
-            rows: Rc::new(rows),
-            heights: Rc::new(heights),
-            grid_cols: cols,
-            sorted_tracks: Vec::new(),
-            last_fp: 0,
-            list_controller: VirtualListScrollController::new(),
-        }
-    }
-    #[allow(clippy::too_many_lines)]
-    fn render_track(i: usize, id: &TrackId, height: Pixels, cx: &mut App) -> Div {
-        let image_id = {
-            let state = cx.global::<Controller>().state.read(cx);
-            state.library.tracks.get(id).and_then(|t| t.image_id)
-        };
-
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
-
-        let controller = cx.global::<Controller>().clone();
-        let theme = *cx.global::<Theme>();
-        let state = controller.state.read(cx).clone();
-        let is_current = Some(id) == state.playback.current.as_ref();
-
-        if let Some(track) = state.library.tracks.get(id) {
-            div()
-                .h(height)
-                .py_1()
-                .border_b_1()
-                .border_color(theme.library_track_border)
-                .child(
-                    div()
-                        .id(format!("track_{:?}", track.id.0))
-                        .size_full()
-                        .flex()
-                        .items_center()
-                        .rounded_md()
-                        .cursor_pointer()
-                        .hover(|this| this.bg(theme.library_track_bg_hover))
-                        .when(is_current, |this| this.bg(theme.library_track_bg_active))
-                        .on_click({
-                            let id = *id;
-                            move |_, _, cx| {
-                                let controller = cx.global::<Controller>().clone();
-
-                                controller.load_track(id, cx);
-
-                                *cx.global_mut::<Page>() = Page::Player;
-                            }
-                        })
-                        .child(
-                            div()
-                                .w_20()
-                                .h_full()
-                                .flex()
-                                .px_6()
-                                .items_center()
-                                .justify_start()
-                                .child(format! {"{i:02}"}),
-                        )
-                        .child(
-                            div()
-                                .w_2_3()
-                                .max_w_2_3()
-                                .h_full()
-                                .px_6()
-                                .py_1()
-                                .flex()
-                                .gap_x_3()
-                                .items_center()
-                                .justify_start()
-                                .child(match thumbnail {
-                                    Some(image) => div().size_11().flex_shrink_0().child(
-                                        img(ImageSource::Render(image.clone()))
-                                            .object_fit(ObjectFit::Contain)
-                                            .size_full()
-                                            .border_1()
-                                            .border_color(theme.border)
-                                            .rounded_sm(),
-                                    ),
-                                    None => div().size_11().flex_shrink_0().child(
-                                        img("icons/placeholder.svg")
-                                            .object_fit(ObjectFit::Contain)
-                                            .size_full()
-                                            .border_1()
-                                            .border_color(theme.border)
-                                            .rounded_sm(),
-                                    ),
-                                })
-                                .when(is_current, |this| {
-                                    this.text_color(theme.library_track_title_text_active)
-                                        .font_weight(FontWeight::MEDIUM)
-                                })
-                                .child(track.title.clone())
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_1_3()
-                                .px_6()
-                                .max_w_1_3()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .child(track.artist.clone())
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_1_3()
-                                .max_w_1_3()
-                                .px_6()
-                                .h_full()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .child(track.album.clone())
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        )
-                        .child(
-                            div()
-                                .w_24()
-                                .max_w_24()
-                                .h_full()
-                                .px_4()
-                                .flex()
-                                .items_center()
-                                .justify_start()
-                                .text_sm()
-                                .font_family("JetBrains Mono")
-                                .child(format!(
-                                    "{:02}:{:02}",
-                                    track.duration.as_secs() / 60,
-                                    track.duration.as_secs() % 60
-                                ))
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis(),
-                        ),
-                )
-        } else {
-            div().h(height).py_2()
+            sidebar: cx.new(|_| Sidebar),
+            sidebar_width: cx.new(|_| ResizeState::new(ResizeSide::Left, 256.0, 220.0, 420.0)),
+            album: cx.new(|cx| AlbumViewSection {
+                album_id: cx.new(|_| None),
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            albums: cx.new(|_| AlbumsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
+            artist: cx.new(|cx| ArtistViewSection {
+                artist_id: cx.new(|_| None),
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            artists: cx.new(|_| ArtistsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
+            playlist: cx.new(|cx| PlaylistViewSection {
+                playlist_id: cx.new(|_| None),
+                menu_open: cx.new(|_| false),
+                menu_button_bounds: None,
+                root_bounds: None,
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            playlists: cx.new(|_| PlaylistsSection {
+                scroll_handle: ScrollHandle::new(),
+                grid_controller: VirtualGridScrollController::new(),
+            }),
+            favorites: cx.new(|_| FavoritesSection {
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            home: cx.new(|cx| HomeSection {
+                scroll_handle: ScrollHandle::new(),
+                avail_width: cx.new(|_| 800.0),
+            }),
+            tracks: cx.new(|_| TracksSection {
+                scroll_handle: UniformListScrollHandle::new(),
+            }),
+            plugins: cx.new(|_| PluginsSection),
+            settings: cx.new(|_| SettingsSection),
+            stats: cx.new(|_| StatsSection {
+                scroll_handle: ScrollHandle::new(),
+            }),
         }
     }
 }
@@ -196,115 +155,112 @@ impl Render for LibraryPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
 
-        let controller = cx.global::<Controller>().clone();
-        let state = controller.state.read(cx);
-        let scroll_handle = self.scroll_handle.clone();
+        // let controller = cx.global::<Controller>().clone();
+        // let state = controller.state.read(cx);
 
-        let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
-        let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
+        // let tracks_fp = fingerprint_tracks(state.library.tracks.keys().copied());
+        // let playlists_fp = fingerprint_playlists(state.library.playlists.keys().copied());
 
-        let combined_fp = tracks_fp ^ playlists_fp;
+        // let combined_fp = tracks_fp ^ playlists_fp;
 
-        let width = window.bounds().size.width;
-        let tile = 256.0;
+        let section = *cx.global::<LibraryRoutes>();
 
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let cols = ((width.to_f64() / tile) as usize).max(1);
+        let sidebar_width = self.sidebar_width.read(cx).width();
 
-        if cols != self.grid_cols || combined_fp != self.last_fp {
-            let library = &state.library;
+        let section_el = match section {
+            LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
+            LibraryRoutes::Favorites => div().w_full().h_full().child(self.favorites.clone()),
+            LibraryRoutes::Stats => div().w_full().h_full().child(self.stats.clone()),
+            LibraryRoutes::Tracks => div().w_full().h_full().child(self.tracks.clone()),
+            LibraryRoutes::Albums => div().w_full().h_full().child(self.albums.clone()),
+            LibraryRoutes::Artists => div().w_full().h_full().child(self.artists.clone()),
+            LibraryRoutes::Playlists => div().w_full().h_full().child(self.playlists.clone()),
+            LibraryRoutes::Settings => div().w_full().h_full().child(self.settings.clone()),
+            LibraryRoutes::Plugins => div().w_full().h_full().child(self.plugins.clone()),
+            LibraryRoutes::Album(id) => {
+                self.album.update(cx, |this, cx| {
+                    this.album_id.update(cx, |this, _| *this = Some(id));
+                    cx.notify();
+                });
+                div().w_full().h_full().child(self.album.clone())
+            }
+            LibraryRoutes::Artist(id) => {
+                self.artist.update(cx, |this, cx| {
+                    this.artist_id.update(cx, |this, _| *this = Some(id));
+                    cx.notify();
+                });
+                div().w_full().h_full().child(self.artist.clone())
+            }
+            LibraryRoutes::Playlist(id) => {
+                self.playlist.update(cx, |this, cx| {
+                    if *this.playlist_id.read(cx) != Some(id) {
+                        this.playlist_id.update(cx, |this, _| *this = Some(id));
+                        this.menu_open.update(cx, |open, cx| {
+                            *open = false;
+                            cx.notify();
+                        });
+                    }
+                    cx.notify();
+                });
+                div().w_full().h_full().child(self.playlist.clone())
+            }
+        };
+        let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
+        let prev_page = *section_state.read(cx);
 
-            let (rows, heights) = build_rows(library, cols);
-
-            self.rows = Rc::new(rows);
-            self.heights = Rc::new(heights);
-            self.last_fp = combined_fp;
-            self.grid_cols = cols;
-        }
-
-        let rows = self.rows.clone();
-        let heights = self.heights.clone();
+        let direction = (section.index() - prev_page.index()).signum() as f32;
 
         div()
             .size_full()
             .bg(theme.library_bg)
             .text_color(theme.library_text)
-            .px_12()
-            .pt_10()
-            .child(vlist(
-                cx.entity(),
-                "library",
-                heights.clone(),
-                scroll_handle,
-                self.list_controller.clone(),
-                move |_this, range, _, cx| {
-                    let len = rows.len();
+            .px_2()
+            .pt_2()
+            .flex()
+            .child(
+                div()
+                    .w(px(sidebar_width))
+                    .h_full()
+                    .flex_shrink_0()
+                    .child(self.sidebar.clone()),
+            )
+            .child(ResizeHandle::new(&self.sidebar_width))
+            .child(
+                div()
+                    .id("animation_container")
+                    .w_full()
+                    .h_full()
+                    .map(move |this| {
+                        if prev_page == section {
+                            this.child(section_el).into_any_element()
+                        } else {
+                            let duration = std::time::Duration::from_millis(300);
 
-                    let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                    let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                            cx.spawn({
+                                let section_state = section_state.clone();
+                                async move |_, cx| {
+                                    cx.background_executor().timer(duration).await;
+                                    let () = section_state.update(cx, |state, _| {
+                                        *state = section;
+                                    });
+                                }
+                            })
+                            .detach();
 
-                    let thumb_track_ids: Vec<TrackId> = (start..end)
-                        .filter_map(|idx| match &rows[idx] {
-                            LibraryRow::TrackRow(_, id) => Some(*id),
-                            _ => None,
-                        })
-                        .collect();
-
-                    controller.request_track_thumbnails(&thumb_track_ids, cx);
-
-                    range
-                        .map(|idx| match &rows[idx] {
-                            LibraryRow::Header(kind) => render_header(kind, heights[idx], cx),
-
-                            LibraryRow::PlaylistGridRow(ids) => {
-                                render_playlist_grid(ids, heights[idx], cx)
-                            }
-
-                            LibraryRow::TrackTableHeader => {
-                                render_track_table_header(heights[idx], cx)
-                            }
-
-                            LibraryRow::TrackRow(i, id) => {
-                                Self::render_track(*i, id, heights[idx], cx)
-                            }
-
-                            LibraryRow::Empty(kind) => match kind {
-                                HeaderKind::Playlists => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No playlists loaded."),
-                                HeaderKind::Tracks => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No tracks loaded."),
-                                HeaderKind::Albums => div()
-                                    .w_full()
-                                    .h_48()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .text_lg()
-                                    .text_color(theme.library_empty_text)
-                                    .child("No albums loaded."),
-                            },
-                        })
-                        .collect::<Vec<_>>()
-                },
-            ))
-            .child(floating_scrollbar(
-                "queue_scrollbar",
-                self.scroll_handle.clone(),
-                RightPad::Pad,
-            ))
+                            this.child(section_el)
+                                .with_animation(
+                                    ElementId::Name(format!("section_slide_{section:?}").into()),
+                                    Animation::new(duration).with_easing(ease_in_out_expo()),
+                                    move |this, delta| {
+                                        let offset = 360.0 * direction * (1.0 - delta);
+                                        this.top(px(offset)).opacity(delta)
+                                    },
+                                )
+                                .into_any_element()
+                        }
+                    }),
+            )
     }
 }
+
+impl Global for LibraryRoutes {}

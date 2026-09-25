@@ -1,5 +1,7 @@
+pub mod db;
 pub mod images;
 pub mod io;
+pub mod legacy;
 pub mod lyrics;
 pub mod paths;
 pub mod schema;
@@ -7,13 +9,13 @@ pub mod schema;
 use crate::app::AppPaths;
 use crate::controller::commands::CacherCommand;
 use crate::controller::events::CacherEvent;
-use crate::controller::state::{LibraryState, PlaybackState, QueueState};
 use crate::errors::CacherError;
 use crossbeam_channel::{Receiver, Sender};
 
+pub use db::Db;
 pub use io::CacheJob;
 pub use schema::{CachedImage, CachedTrackSource, ImageKind};
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct Cacher {
@@ -51,13 +53,30 @@ impl Cacher {
         loop {
             match self.rx.recv()? {
                 CacherCommand::WriteLibraryState(state) => {
+                    info!(
+                        action = "CacherCommand::WriteLibraryState",
+                        tracks = state.tracks.len(),
+                        "received command, forwarding to app_state_worker"
+                    );
                     let _ = app_state_tx.send(CacheJob::WriteLibraryState(state));
                 }
                 CacherCommand::WritePlaybackState(state) => {
+                    info!(action = "CacherCommand::WritePlaybackState", current = ?state.current, index = state.current_index, "received command, forwarding to app_state_worker");
                     let _ = app_state_tx.send(CacheJob::WritePlaybackState(state));
                 }
                 CacherCommand::WriteQueueState(state) => {
+                    info!(
+                        action = "CacherCommand::WriteQueueState",
+                        queue_len = state.tracks.len(),
+                        "received command, forwarding to app_state_worker"
+                    );
                     let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
+                }
+                CacherCommand::WriteFavorites(ids) => {
+                    let _ = app_state_tx.send(CacheJob::WriteFavorites(ids));
+                }
+                CacherCommand::WriteMetrics(metrics) => {
+                    let _ = app_state_tx.send(CacheJob::WriteMetrics(metrics));
                 }
                 CacherCommand::WriteImage {
                     id,
@@ -106,6 +125,9 @@ impl Cacher {
                 CacherCommand::GetAppState => {
                     let _ = app_state_tx.send(CacheJob::LoadAppState);
                 }
+                CacherCommand::AckAppStateLoaded => {
+                    let _ = app_state_tx.send(CacheJob::AckAppState);
+                }
                 CacherCommand::GetImage(ids, kind) => match kind {
                     ImageKind::ThumbnailSmall => {
                         let _ =
@@ -142,67 +164,126 @@ impl Cacher {
         }
     }
 
-    fn write_library_state(&self, state: &LibraryState) -> Result<(), CacherError> {
-        io::write_library_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn write_playback_state(&self, state: &PlaybackState) -> Result<(), CacherError> {
-        io::write_playback_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn write_queue_state(&self, state: &QueueState) -> Result<(), CacherError> {
-        io::write_queue_state_to_disk(&self.app_paths.cache, state)
-    }
-
-    fn load_app_state(&self) -> Result<crate::controller::state::AppState, CacherError> {
-        io::load_app_state(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_library_state(&self) -> Result<LibraryState, CacherError> {
-        io::read_library_state_from_disk(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_queue_state(&self) -> Result<QueueState, CacherError> {
-        io::read_queue_state_from_disk(&self.app_paths.cache)
-    }
-
-    #[allow(dead_code)]
-    fn read_playback_state(&self) -> Result<PlaybackState, CacherError> {
-        io::read_playback_state_from_disk(&self.app_paths.cache)
-    }
-
     fn spawn_app_state_worker(&self, rx: Receiver<CacheJob>) {
         let cacher = self.clone();
 
         std::thread::spawn(move || {
+            // SQLx is async-first; run a small current-thread runtime inside
+            // this worker so every job can await the database directly.
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    error!(error = ?e, "failed to start SQLite runtime");
+                    return;
+                }
+            };
+
+            let db = match rt.block_on(Db::connect(&cacher.app_paths.cache)) {
+                Ok(db) => db,
+                Err(e) => {
+                    error!(error = ?e, "failed to open database");
+                    return;
+                }
+            };
+
+            // Initial load: send AppState to controller immediately so it can
+            // apply persisted state before we process any queued writes.
+            match rt.block_on(db.load_app_state(&cacher.app_paths.cache)) {
+                Ok(state) => {
+                    let _ = cacher.tx.send(CacherEvent::AppState(Box::new(state)));
+                }
+                Err(e) => {
+                    error!(error = ?e, "failed to load app state on startup");
+                }
+            }
+
+            // Collect any jobs that arrived before controller acknowledged
+            // applying the AppState. They will be processed after the ack.
+            let mut backlog: Vec<CacheJob> = Vec::new();
+            loop {
+                match rx.recv() {
+                    Ok(CacheJob::AckAppState) | Err(_) => break,
+                    Ok(job) => backlog.push(job),
+                }
+            }
+
+            // Helper closure to process jobs (reused for backlog and main loop)
+            let process_job = |job: CacheJob| {
+                let result: Result<(), CacherError> = match job {
+                    CacheJob::WriteLibraryState(state) => {
+                        info!(
+                            action = "app_state_worker::WriteLibraryState",
+                            tracks = state.tracks.len(),
+                            "processing WriteLibraryState"
+                        );
+                        let mut state = state;
+                        while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
+                            state = later;
+                        }
+                        rt.block_on(db.write_library(&state))
+                    }
+                    CacheJob::WriteQueueState(state) => {
+                        info!(
+                            action = "app_state_worker::WriteQueueState",
+                            queue_len = state.tracks.len(),
+                            "processing WriteQueueState"
+                        );
+                        rt.block_on(db.write_queue(&state))
+                    }
+                    CacheJob::WriteFavorites(ids) => {
+                        info!(
+                            action = "app_state_worker::WriteFavorites",
+                            count = ids.len(),
+                            "processing WriteFavorites"
+                        );
+                        rt.block_on(db.write_favorites(&ids))
+                    }
+                    CacheJob::WriteMetrics(metrics) => {
+                        info!(
+                            action = "app_state_worker::WriteMetrics",
+                            metrics = metrics.tracks.len(),
+                            "processing WriteMetrics"
+                        );
+                        rt.block_on(db.write_metrics(&metrics))
+                    }
+                    CacheJob::WritePlaybackState(state) => {
+                        info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
+                        io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)
+                    }
+                    CacheJob::LoadAppState => {
+                        info!(
+                            action = "app_state_worker::LoadAppState",
+                            "processing LoadAppState"
+                        );
+                        let state = rt.block_on(db.load_app_state(&cacher.app_paths.cache));
+                        match state {
+                            Ok(state) => {
+                                let _ = cacher.tx.send(CacherEvent::AppState(Box::new(state)));
+                                Ok(())
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+                    _ => Ok(()),
+                };
+
+                if let Err(err) = result {
+                    error!(error = ?err, "Error occurred");
+                }
+            };
+
+            // Process backlog now that controller should have applied AppState
+            for job in backlog {
+                process_job(job);
+            }
+
+            // Main processing loop
             loop {
                 while let Ok(job) = rx.recv() {
-                    let result: Result<(), CacherError> = (|| {
-                        match job {
-                            CacheJob::WriteLibraryState(state) => {
-                                cacher.write_library_state(&state)?;
-                            }
-                            CacheJob::WritePlaybackState(state) => {
-                                cacher.write_playback_state(&state)?;
-                            }
-                            CacheJob::WriteQueueState(state) => {
-                                cacher.write_queue_state(&state)?;
-                            }
-                            CacheJob::LoadAppState => {
-                                let state = cacher.load_app_state()?;
-                                let _ = cacher.tx.send(CacherEvent::AppState(state));
-                            }
-                            _ => {}
-                        }
-
-                        Ok(())
-                    })();
-
-                    if let Err(err) = result {
-                        error!(error = ?err, "Error occurred");
-                    }
+                    process_job(job);
                 }
             }
         });

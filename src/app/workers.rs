@@ -43,14 +43,14 @@ where
 pub fn calculate_worker_config() -> WorkerConfig {
     let logical = num_cpus::get().max(1);
 
+    info!("detected logical cpus = {}", logical);
+
     let usable = ((logical as f32) * 0.9).floor() as usize;
     let usable = usable.max(2);
 
-    let cacher = (usable / 4).max(1);
-    let scanner_total = usable - cacher;
-
-    let metadata = scanner_total.min(8);
-    let thumbnail = scanner_total.min(8);
+    let cacher = usable.max(4);
+    let metadata = usable.min(8);
+    let thumbnail = usable.min(8);
 
     WorkerConfig {
         metadata,

@@ -1,7 +1,9 @@
 use crate::cacher::ImageKind;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
-use crate::controller::state::{LibraryState, PlaybackState, PlaybackStatus, QueueState};
+use crate::controller::state::{
+    LibraryState, ListenMetrics, PlaybackState, PlaybackStatus, QueueState,
+};
 use crate::lyrics_manager::Lyrics;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -20,6 +22,7 @@ pub enum AudioCommand {
 
 pub enum ScannerCommand {
     ScanDir(PathBuf),
+    ScanDirRescan { path: PathBuf, playlist: PlaylistId },
     ScanTrack(PathBuf),
     StartNextScan,
 }
@@ -27,6 +30,12 @@ pub enum ScannerCommand {
 pub enum ImageProcessorCommand {
     GetThumbnails(HashSet<(TrackId, PathBuf)>, ImageKind),
     GetCurrentAlbumArt(TrackId, PathBuf),
+    FetchAlbumArtOnline {
+        id: TrackId,
+        title: String,
+        artist: String,
+        album: String,
+    },
     PlaylistThumbnail {
         id: PlaylistId,
         tracks: Vec<PathBuf>,
@@ -40,6 +49,13 @@ pub enum CacherCommand {
     WriteLibraryState(LibraryState),
     WritePlaybackState(PlaybackState),
     WriteQueueState(QueueState),
+    WriteFavorites(Vec<TrackId>),
+    WriteMetrics(ListenMetrics),
+
+    /// Acknowledge that the controller has applied the initial `AppState` loaded
+    /// from the cacher. Used to avoid race where pre-load writes overwrite
+    /// the persisted state before the controller applies it.
+    AckAppStateLoaded,
 
     GetImage(HashSet<ImageId>, ImageKind),
     WriteImage {

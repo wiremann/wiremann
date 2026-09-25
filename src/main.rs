@@ -10,8 +10,6 @@
     clippy::too_many_lines,
     clippy::new_without_default
 )]
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 pub mod app;
 pub mod audio;
 pub mod cacher;
@@ -22,6 +20,7 @@ pub mod logging;
 pub mod lyrics_manager;
 pub mod scanner;
 pub mod system_integration;
+pub mod title;
 pub mod ui;
 
 use app::{ensure_app_paths, get_app_paths};

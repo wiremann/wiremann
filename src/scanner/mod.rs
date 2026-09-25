@@ -1,8 +1,9 @@
 pub mod metadata;
 use crate::app::AppPaths;
 use crate::cacher::CachedTrackSource;
+use crate::controller::state::TrackSource;
 use crate::controller::state::{Playlist, PlaylistId, PlaylistSource};
-use crate::controller::state::{Track, TrackSource};
+use crate::scanner::metadata::ScannedTrack;
 use crate::{
     controller::{commands::ScannerCommand, events::ScannerEvent, state::TrackId},
     errors::ScannerError,
@@ -14,8 +15,10 @@ use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tracing::{info, trace};
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -24,7 +27,7 @@ pub struct Scanner {
     pub rx: Receiver<ScannerCommand>,
 
     state: State,
-    queue: VecDeque<PathBuf>,
+    queue: VecDeque<(PathBuf, Option<PlaylistId>)>,
 
     app_paths: AppPaths,
 
@@ -42,6 +45,9 @@ struct ScanProgress {
     discovery_done: AtomicBool,
     total: AtomicUsize,
     processed: AtomicUsize,
+    metadata_reads: AtomicUsize,
+    metadata_elapsed_us: AtomicUsize,
+    started_at: Mutex<Option<Instant>>,
 }
 
 type ScanRecord = Arc<DashMap<TrackSource, TrackId>>;
@@ -65,6 +71,9 @@ impl Scanner {
                 discovery_done: AtomicBool::new(false),
                 total: AtomicUsize::new(0),
                 processed: AtomicUsize::new(0),
+                metadata_reads: AtomicUsize::new(0),
+                metadata_elapsed_us: AtomicUsize::new(0),
+                started_at: Mutex::new(None),
             }),
             scan_record: Arc::new(DashMap::new()),
         };
@@ -81,13 +90,23 @@ impl Scanner {
         loop {
             match self.rx.recv()? {
                 ScannerCommand::ScanDir(path) => {
-                    self.queue.push_back(path);
+                    self.queue.push_back((path, None));
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
+                    }
+                }
+                ScannerCommand::ScanDirRescan { path, playlist } => {
+                    self.queue.push_back((path, Some(playlist)));
+
+                    if self.state == State::Idle
+                        && let Some((path, playlist)) = self.queue.pop_front()
+                    {
+                        self.state = State::Scanning;
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::StartNextScan => {
@@ -95,10 +114,10 @@ impl Scanner {
                     self.write_scan_record();
 
                     if self.state == State::Idle
-                        && let Some(path) = self.queue.pop_front()
+                        && let Some((path, playlist)) = self.queue.pop_front()
                     {
                         self.state = State::Scanning;
-                        self.scan_folder(path, &worker_tx);
+                        self.scan_folder(path, playlist, &worker_tx);
                     }
                 }
                 ScannerCommand::ScanTrack(path) => {
@@ -123,13 +142,16 @@ impl Scanner {
             let ticker = ticker.clone();
 
             std::thread::spawn(move || {
-                let mut new: Vec<(Track, Option<PlaylistId>)> = Vec::with_capacity(32);
+                info!("scanner metadata worker started");
+                let mut new: Vec<(ScannedTrack, Option<PlaylistId>)> = Vec::with_capacity(32);
                 let mut existing: HashMap<PlaylistId, Vec<TrackId>> = HashMap::with_capacity(32);
 
                 loop {
                     select! {
                         recv(worker_rx) -> job => {
                             if let Ok((path, pid)) = job {
+                                let start = std::time::Instant::now();
+                                trace!(thread_id = ?std::thread::current().id(), worker = "scanner", "received job {}", path.display());
                                 Self::handle_job(
                                     path.as_path(),
                                     pid,
@@ -139,6 +161,7 @@ impl Scanner {
                                     &mut existing,
                                     &mut new,
                                 );
+                                trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "finished job {}", path.display());
                             }
                         }
 
@@ -158,12 +181,13 @@ impl Scanner {
         scan_progress: &ScanProgress,
         tx: &Sender<ScannerEvent>,
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new: &mut Vec<(Track, Option<PlaylistId>)>,
+        new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
-        let mut incremented = false;
+        let start = Instant::now();
 
         let Ok(ts) = TrackSource::generate(path) else {
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
+            trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "handle_job early return: invalid TrackSource: {}", path.display());
             return;
         };
 
@@ -179,9 +203,15 @@ impl Scanner {
                 }
 
                 scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-                incremented = true;
+            } else {
+                // Track was already recorded by an earlier scan and there is no
+                // playlist to update. It must still count towards `processed`,
+                // otherwise `processed` never reaches `total` and the scan never
+                // emits ScanFinished.
+                scan_progress.processed.fetch_add(1, Ordering::Relaxed);
             }
         } else {
+            let read_start = Instant::now();
             if let Ok(track) = metadata::read_metadata(ts.clone()) {
                 let id = track.id;
                 new.push((track, pid));
@@ -192,27 +222,49 @@ impl Scanner {
                 }
 
                 scan_record.insert(ts, id);
+
+                scan_progress.metadata_reads.fetch_add(1, Ordering::Relaxed);
+                scan_progress
+                    .metadata_elapsed_us
+                    .fetch_add(read_start.elapsed().as_micros() as usize, Ordering::Relaxed);
             }
 
             scan_progress.processed.fetch_add(1, Ordering::Relaxed);
-            incremented = true;
         }
 
         let processed = scan_progress.processed.load(Ordering::Relaxed);
         let total = scan_progress.total.load(Ordering::Relaxed);
 
-        if incremented && (processed.is_multiple_of(16) || processed == total) {
+        if processed.is_multiple_of(16) || processed == total {
             tx.send(ScannerEvent::Processed { processed, total }).ok();
         }
         if processed == total && scan_progress.discovery_done.load(Ordering::Acquire) {
+            let reads = scan_progress.metadata_reads.load(Ordering::Relaxed);
+            let meta_us = scan_progress.metadata_elapsed_us.load(Ordering::Relaxed);
+            let started = scan_progress.started_at.lock().unwrap();
+            info!(
+                total,
+                processed,
+                metadata_reads = reads,
+                metadata_total_ms = meta_us / 1000,
+                metadata_avg_ms = if reads > 0 {
+                    meta_us.checked_div(reads).unwrap_or(0) / 1000
+                } else {
+                    0
+                },
+                scan_elapsed_ms = started.map_or(0, |t| t.elapsed().as_millis()),
+                "scan complete"
+            );
             tx.send(ScannerEvent::ScanFinished).ok();
         }
+
+        trace!(thread_id = ?std::thread::current().id(), worker = "scanner", elapsed_ms = ?start.elapsed().as_millis(), "handle_job finished: {}", path.display());
     }
 
     fn flush_batches(
         tx: &Sender<ScannerEvent>,
         existing: &mut HashMap<PlaylistId, Vec<TrackId>>,
-        new: &mut Vec<(Track, Option<PlaylistId>)>,
+        new: &mut Vec<(ScannedTrack, Option<PlaylistId>)>,
     ) {
         for (pid, batch) in existing.iter_mut() {
             if !batch.is_empty() {
@@ -230,12 +282,24 @@ impl Scanner {
         }
     }
 
-    fn scan_folder(&self, path: PathBuf, worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>) {
+    fn scan_folder(
+        &self,
+        path: PathBuf,
+        playlist_id: Option<PlaylistId>,
+        worker_tx: &Sender<(PathBuf, Option<PlaylistId>)>,
+    ) {
         self.scan_progress.total.store(0, Ordering::Relaxed);
         self.scan_progress.processed.store(0, Ordering::Relaxed);
         self.scan_progress
+            .metadata_reads
+            .store(0, Ordering::Relaxed);
+        self.scan_progress
+            .metadata_elapsed_us
+            .store(0, Ordering::Relaxed);
+        self.scan_progress
             .discovery_done
             .store(false, Ordering::Release);
+        *self.scan_progress.started_at.lock().unwrap() = Some(Instant::now());
 
         self.read_scan_record();
 
@@ -244,7 +308,7 @@ impl Scanner {
         let exts = ["mp3", "wav", "ogg", "aac", "m4a"];
 
         if path.is_dir() {
-            let playlist_id = PlaylistId(Uuid::new_v4());
+            let playlist_id = playlist_id.unwrap_or_else(|| PlaylistId(Uuid::new_v4()));
 
             let playlist = Playlist {
                 id: playlist_id,
@@ -252,7 +316,8 @@ impl Scanner {
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("Unnamed Playlist")
-                    .to_string(),
+                    .to_string()
+                    .into(),
                 source: PlaylistSource::Folder,
                 folder_path: Some(path.clone()),
                 tracks: Vec::new(),
@@ -267,7 +332,7 @@ impl Scanner {
             let tx = self.tx.clone();
 
             std::thread::spawn(move || {
-                let mut paths = Vec::with_capacity(1024);
+                let mut discovered = 0usize;
 
                 for entry in WalkDir::new(&path)
                     .into_iter()
@@ -279,26 +344,21 @@ impl Scanner {
                             .is_some_and(|ext| exts.contains(&ext))
                     })
                 {
-                    if paths.len() % 16 == 0 {
-                        tx.send(ScannerEvent::Discovered(paths.len())).ok();
+                    if discovered.is_multiple_of(16) {
+                        tx.send(ScannerEvent::Discovered(discovered)).ok();
                     }
-                    paths.push(entry.path().to_path_buf());
+
+                    // send to workers as soon as we discover the file so they can run in parallel
+                    let _ = worker_tx.send((entry.path().to_path_buf(), Some(playlist_id)));
+
+                    discovered += 1;
                 }
 
-                let total = paths.len();
-                scan_progress.total.store(total, Ordering::Relaxed);
+                scan_progress.total.store(discovered, Ordering::Relaxed);
 
                 scan_progress.discovery_done.store(true, Ordering::Release);
-
-                for path in paths {
-                    let _ = worker_tx.send((path, Some(playlist_id)));
-                }
             });
         }
-
-        self.scan_progress
-            .discovery_done
-            .store(true, Ordering::Release);
     }
 
     fn write_scan_record(&self) {

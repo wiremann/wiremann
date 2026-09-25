@@ -10,9 +10,9 @@ use crate::controller::events::{
     CacherEvent, ImageProcessorEvent, LyricsEvent, SystemIntegrationEvent,
 };
 use crate::controller::state::PlaybackStatus;
-use crate::controller::state::PlaylistId;
+use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
+use crate::controller::state::{MetricsSession, TrackListenMetrics};
 use crate::controller::state::{Track, TrackId};
-use crate::ui::components::lyrics::{LyricsState, LyricsStatus};
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::components::toasts::{ToastKind, ToastPhase};
 use crate::ui::helpers::{drop_image_from_app, duration_to_slider};
@@ -31,6 +31,7 @@ use rand::seq::{IteratorRandom, SliceRandom};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, sync::Arc};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct Controller {
@@ -59,6 +60,19 @@ pub struct Controller {
     // Lyrics manager channel
     pub lyrics_manager_tx: Sender<LyricsCommand>,
     pub lyrics_manager_rx: Receiver<LyricsEvent>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListenStats {
+    pub total_play_time: Duration,
+    pub total_plays: u64,
+    pub total_skips: u64,
+    pub total_tracks_listened: u64,
+    pub first_listen: Option<u64>,
+    pub last_listen: Option<u64>,
+    pub top_tracks: Vec<(TrackId, TrackListenMetrics)>,
+    pub top_artists: Vec<(ArtistId, u32)>,
+    pub top_albums: Vec<(AlbumId, u32)>,
 }
 
 impl Controller {
@@ -116,10 +130,17 @@ impl Controller {
     pub fn load_queue_current(&self, cx: &App) {
         let state = self.state.read(cx);
 
+        info!(
+            current_index = state.playback.current_index,
+            queue_len = state.queue.tracks.len(),
+            "load_queue_current called"
+        );
+
         if let Some(track_id) = state.queue.get_id(state.playback.current_index)
             && let Some(track) = state.library.tracks.get(&track_id)
             && let Some(source) = track.get_valid_source()
         {
+            info!(?track_id, path = ?source.path, "load_queue_current sending commands");
             self.audio_tx
                 .send(AudioCommand::Load(track_id, source.path.clone()))
                 .ok();
@@ -129,6 +150,8 @@ impl Controller {
                     source.path.clone(),
                 ))
                 .ok();
+        } else {
+            info!("load_queue_current: condition failed — check index/track/exists");
         }
     }
 
@@ -138,6 +161,63 @@ impl Controller {
 
     pub fn scan_dir(&self, path: PathBuf) {
         let _ = self.scanner_tx.send(ScannerCommand::ScanDir(path));
+    }
+
+    pub fn delete_playlist(&self, id: PlaylistId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            this.library.playlists.remove(&id);
+
+            if this.playback.current_playlist == Some(id) {
+                this.playback.current_playlist = None;
+                this.playback.current = None;
+                this.playback.current_index = 0;
+                this.playback.status = PlaybackStatus::Stopped;
+                this.queue.tracks.clear();
+                this.queue.order.clear();
+            }
+
+            cx.notify();
+        });
+
+        let _ = self.audio_tx.send(AudioCommand::Stop);
+
+        let library = self.state.read(cx).library.clone();
+        tracing::info!(
+            action = "WriteLibraryState",
+            tracks = library.tracks.len(),
+            "enqueuing WriteLibraryState"
+        );
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteLibraryState(library));
+        let playback = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?playback.current, index = playback.current_index, "enqueuing WritePlaybackState");
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WritePlaybackState(playback));
+        let queue = self.state.read(cx).queue.clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = queue.tracks.len(),
+            "enqueuing WriteQueueState"
+        );
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
+    }
+
+    pub fn rescan_playlist(&self, id: PlaylistId, cx: &mut App) {
+        let path = self
+            .state
+            .read(cx)
+            .library
+            .playlists
+            .get(&id)
+            .and_then(|p| p.folder_path.clone());
+
+        if let Some(path) = path {
+            let _ = self
+                .scanner_tx
+                .send(ScannerCommand::ScanDirRescan { path, playlist: id });
+        }
     }
 
     pub fn load_playlist(&self, id: PlaylistId, cx: &mut App) {
@@ -156,6 +236,59 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_playlist)"
+        );
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+    }
+
+    pub fn load_album(&self, id: AlbumId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            if let Some(album) = this.library.albums.get(&id) {
+                this.playback.current_playlist = None;
+                this.queue.tracks.clone_from(&album.tracks);
+                this.queue.order = (0..album.tracks.len()).collect();
+                this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
+
+                cx.notify();
+            }
+        });
+
+        self.load_queue_current(cx);
+        let state = self.state.read(cx).queue.clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_album)"
+        );
+        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+    }
+
+    pub fn load_artist(&self, id: ArtistId, cx: &mut App) {
+        self.state.update(cx, |this, cx| {
+            if let Some(artist) = this.library.artists.get(&id) {
+                this.playback.current_playlist = None;
+                this.queue.tracks.clone_from(&artist.tracks);
+                this.queue.order = (0..artist.tracks.len()).collect();
+                this.playback.current_index = 0;
+                this.playback.shuffling = false;
+                this.playback.repeat = false;
+
+                cx.notify();
+            }
+        });
+
+        self.load_queue_current(cx);
+        let state = self.state.read(cx).queue.clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_artist)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -188,6 +321,11 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_track)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -212,6 +350,7 @@ impl Controller {
             this.playback.repeat = !this.playback.repeat;
         });
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_repeat)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -230,6 +369,7 @@ impl Controller {
                 }));
         });
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_mute)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -247,6 +387,7 @@ impl Controller {
             .send(AudioCommand::SetVolume(if muted { 0.0 } else { vol }));
 
         let state = self.state.read(cx).playback.clone();
+        tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, volume = state.volume, mute = state.mute, "enqueuing WritePlaybackState (set_volume)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state));
@@ -281,9 +422,15 @@ impl Controller {
         });
 
         let state = self.state.read(cx).clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (set_shuffle)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (set_shuffle)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));
@@ -298,9 +445,15 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (next)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (next)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));
@@ -313,9 +466,15 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (prev)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
+        tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (prev)");
         let _ = self
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(state.playback));
@@ -398,6 +557,61 @@ impl Controller {
             .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
     }
 
+    pub fn request_album_thumbnails(&self, album_ids: &[AlbumId], cx: &mut App) {
+        let mut cache_ids = Vec::new();
+
+        let state = self.state.read(cx);
+        let albums = &state.library.albums;
+        let tracks = &state.library.tracks;
+
+        for aid in album_ids {
+            if let Some(album) = albums.get(aid) {
+                if let Some(image_id) = album.image_id {
+                    cache_ids.push(image_id);
+                } else if let Some(image_id) = album
+                    .tracks
+                    .iter()
+                    .find_map(|id| tracks.get(id).and_then(|t| t.image_id))
+                {
+                    cache_ids.push(image_id);
+                }
+            }
+        }
+
+        cx.global_mut::<ImageCache>().request(
+            cache_ids,
+            &self.cacher_tx,
+            ImageKind::ThumbnailLarge,
+        );
+    }
+
+    pub fn request_artist_thumbnails(&self, artist_ids: &[ArtistId], cx: &mut App) {
+        let mut cache_ids = Vec::new();
+
+        let state = self.state.read(cx);
+        let artists = &state.library.artists;
+        let tracks = &state.library.tracks;
+
+        for aid in artist_ids {
+            if let Some(artist) = artists.get(aid) {
+                if let Some(image_id) = artist.image_id {
+                    cache_ids.push(image_id);
+                } else if let Some(track_id) = artist.tracks.first()
+                    && let Some(track) = tracks.get(track_id)
+                    && let Some(image_id) = track.image_id
+                {
+                    cache_ids.push(image_id);
+                }
+            }
+        }
+
+        cx.global_mut::<ImageCache>().request(
+            cache_ids,
+            &self.cacher_tx,
+            ImageKind::ThumbnailLarge,
+        );
+    }
+
     pub fn get_lyrics(
         &self,
         id: TrackId,
@@ -416,9 +630,297 @@ impl Controller {
             })
             .ok();
     }
+
+    pub fn is_favorite(&self, id: TrackId, cx: &App) -> bool {
+        self.state.read(cx).is_favorite(id)
+    }
+
+    pub fn toggle_favorite(&self, id: TrackId, cx: &mut App) {
+        self.state.update(cx, |this, _| {
+            this.toggle_favorite(id);
+        });
+
+        let favorites = self.state.read(cx).favorites.clone();
+        let _ = self
+            .cacher_tx
+            .send(CacherCommand::WriteFavorites(favorites));
+    }
+
+    pub fn reveal_in_folder(&self, id: TrackId, cx: &App) {
+        let Some(path) = self
+            .state
+            .read(cx)
+            .library
+            .track(id)
+            .and_then(|track| track.get_valid_source())
+            .map(|source| source.path.clone())
+        else {
+            return;
+        };
+
+        reveal_in_os(&path);
+    }
+
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs())
+    }
+
+    pub fn finalize_metrics_session(&self, cx: &mut App, completed: bool) {
+        let should_send = self.state.update(cx, |this, _| {
+            let Some(session) = this.metrics_session.take() else {
+                return false;
+            };
+
+            let metrics = this.metrics.tracks.entry(session.track_id).or_default();
+
+            if session.played > Duration::ZERO {
+                metrics.play_time += session.played;
+            }
+
+            let duration = this
+                .library
+                .tracks
+                .get(&session.track_id)
+                .map(|t| t.duration)
+                .unwrap_or_default();
+
+            if !completed && duration > Duration::ZERO && session.played * 5 < duration * 4 {
+                metrics.skip_count += 1;
+            }
+
+            true
+        });
+
+        if should_send {
+            let metrics = self.state.read(cx).metrics.clone();
+            let _ = self.cacher_tx.send(CacherCommand::WriteMetrics(metrics));
+        }
+    }
+
+    pub fn start_metrics_session(&self, track_id: TrackId, cx: &mut App) {
+        self.state.update(cx, |this, _| {
+            let now = Self::now_secs();
+
+            let metrics = this.metrics.tracks.entry(track_id).or_default();
+            metrics.play_count += 1;
+            metrics.first_played.get_or_insert(now);
+            metrics.last_played = Some(now);
+
+            this.metrics_session = Some(MetricsSession {
+                track_id,
+                last_position: Duration::ZERO,
+                played: Duration::ZERO,
+            });
+        });
+
+        let metrics = self.state.read(cx).metrics.clone();
+        let _ = self.cacher_tx.send(CacherCommand::WriteMetrics(metrics));
+    }
+
+    pub fn top_tracks(&self, cx: &App, limit: usize) -> Vec<TrackId> {
+        let state = self.state.read(cx);
+
+        let mut ranked = state
+            .metrics
+            .tracks
+            .iter()
+            .filter(|(id, _)| state.library.tracks.contains_key(id))
+            .map(|(id, m)| {
+                (
+                    *id,
+                    m.play_count,
+                    m.play_time.as_secs(),
+                    m.last_played.unwrap_or(0),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then(b.2.cmp(&a.2)).then(b.3.cmp(&a.3)));
+
+        ranked
+            .into_iter()
+            .take(limit)
+            .map(|(id, _, _, _)| id)
+            .collect()
+    }
+
+    pub fn recently_played(&self, cx: &App, limit: usize) -> Vec<TrackId> {
+        let state = self.state.read(cx);
+
+        let mut ranked = state
+            .metrics
+            .tracks
+            .iter()
+            .filter(|(id, m)| state.library.tracks.contains_key(id) && m.last_played.is_some())
+            .map(|(id, m)| (*id, m.last_played.unwrap_or(0)))
+            .collect::<Vec<_>>();
+
+        ranked.sort_by_key(|(_, last_played)| std::cmp::Reverse(*last_played));
+
+        ranked.into_iter().take(limit).map(|(id, _)| id).collect()
+    }
+
+    pub fn top_artists(&self, cx: &App, limit: usize) -> Vec<ArtistId> {
+        let state = self.state.read(cx);
+
+        let mut agg = HashMap::<ArtistId, u32>::new();
+
+        for (id, m) in &state.metrics.tracks {
+            if let Some(track) = state.library.tracks.get(id) {
+                for artist_id in &track.artists {
+                    *agg.entry(*artist_id).or_default() += m.play_count;
+                }
+            }
+        }
+
+        let mut ranked = agg
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .artists
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+
+        // Break ties by name so equal play counts render in a stable order
+        // instead of flickering (the aggregate map is rebuilt every render).
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+
+        ranked
+            .into_iter()
+            .take(limit)
+            .map(|(id, _, _)| id)
+            .collect()
+    }
+
+    pub fn listen_stats(&self, cx: &App) -> ListenStats {
+        let state = self.state.read(cx);
+
+        let mut listen_summary = ListenStats::default();
+
+        let mut artist_plays = HashMap::<ArtistId, u32>::new();
+        let mut album_plays = HashMap::<AlbumId, u32>::new();
+
+        let mut top_tracks = Vec::new();
+
+        for (id, m) in &state.metrics.tracks {
+            let Some(track) = state.library.tracks.get(id) else {
+                continue;
+            };
+
+            listen_summary.total_plays += u64::from(m.play_count);
+            listen_summary.total_skips += u64::from(m.skip_count);
+            listen_summary.total_play_time += m.play_time;
+
+            if m.play_count > 0 {
+                listen_summary.total_tracks_listened += 1;
+            }
+
+            if let Some(first) = m.first_played {
+                listen_summary.first_listen = Some(match listen_summary.first_listen {
+                    Some(prev) => prev.min(first),
+                    None => first,
+                });
+            }
+
+            if let Some(last) = m.last_played {
+                listen_summary.last_listen = Some(match listen_summary.last_listen {
+                    Some(prev) => prev.max(last),
+                    None => last,
+                });
+            }
+
+            top_tracks.push((*id, m.clone()));
+
+            for artist_id in &track.artists {
+                *artist_plays.entry(*artist_id).or_default() += m.play_count;
+            }
+
+            *album_plays.entry(track.album).or_default() += m.play_count;
+        }
+
+        top_tracks.sort_by(|a, b| {
+            b.1.play_count
+                .cmp(&a.1.play_count)
+                .then(b.1.play_time.cmp(&a.1.play_time))
+                .then(b.1.last_played.cmp(&a.1.last_played))
+        });
+        listen_summary.top_tracks = top_tracks.into_iter().take(10).collect();
+
+        let mut top_artists = artist_plays
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .artists
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+        top_artists.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        listen_summary.top_artists = top_artists
+            .into_iter()
+            .take(10)
+            .map(|(id, plays, _)| (id, plays))
+            .collect();
+
+        let mut top_albums = album_plays
+            .into_iter()
+            .map(|(id, plays)| {
+                let name = state
+                    .library
+                    .albums
+                    .get(&id)
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                (id, plays, name)
+            })
+            .collect::<Vec<_>>();
+        top_albums.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        listen_summary.top_albums = top_albums
+            .into_iter()
+            .take(10)
+            .map(|(id, plays, _)| (id, plays))
+            .collect();
+
+        listen_summary
+    }
 }
 
 impl Global for Controller {}
+
+fn reveal_in_os(path: &std::path::Path) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer.exe")
+            .arg("/select,")
+            .arg(path)
+            .spawn();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn();
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Some(folder) = path.parent() {
+            let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
+        }
+    }
+}
 
 #[must_use]
 pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
@@ -434,7 +936,7 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
 
     for id in candidates {
         if let Some(track) = library_tracks.get(&id)
-            && albums.insert(track.album.clone())
+            && albums.insert(track.album)
             && let Some(source) = track.get_valid_source()
         {
             chosen.push(source.path.clone());
@@ -452,7 +954,7 @@ pub fn pick_playlist_thumbnail_tracks<S: ::std::hash::BuildHasher>(
             }
 
             if let Some(track) = library_tracks.get(id)
-                && albums.insert(track.album.clone())
+                && albums.insert(track.album)
                 && let Some(source) = track.get_valid_source()
             {
                 chosen.push(source.path.clone());

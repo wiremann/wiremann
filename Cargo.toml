@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "wiremann"
 version = "0.3.0"
 edition = "2024"
@@ -46,6 +46,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tracing-appender = "0.2.5"
 tracing-error = "0.2.1"
 color-eyre = "0.6.5"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 
 [build-dependencies]
 winres = "0.1.12"

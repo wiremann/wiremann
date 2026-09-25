@@ -1,4 +1,5 @@
-use super::{Controller, App, LyricsEvent, Entity, Wiremann, ControllerError, LyricsState, LyricsStatus, CacherCommand};
+use super::{App, CacherCommand, Controller, ControllerError, Entity, LyricsEvent, Wiremann};
+use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
 impl Controller {
     pub fn handle_lyrics_event(

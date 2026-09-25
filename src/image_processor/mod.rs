@@ -4,7 +4,9 @@ use crate::controller::commands::ImageProcessorCommand;
 use crate::controller::events::ImageProcessorEvent;
 use crate::controller::state::PlaylistId;
 use crate::controller::state::{ImageId, TrackId};
-use crate::{cacher::ImageKind, errors::ImageProcessorError, scanner::metadata};
+use crate::{
+    cacher::ImageKind, errors::ImageProcessorError, scanner::metadata, title::strip_search_suffixes,
+};
 use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
 use gpui::RenderImage;
@@ -13,8 +15,8 @@ use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use tracing::{error, warn};
+use std::time::{Duration, Instant};
+use tracing::{error, info, trace, warn};
 
 pub struct ImageProcessor {
     pub tx: Sender<ImageProcessorEvent>,
@@ -27,6 +29,7 @@ pub struct ImageProcessor {
 enum ImageJob {
     Thumbnail(TrackId, PathBuf, ImageKind, Arc<HashSet<ImageId>>),
     AlbumArt(TrackId, PathBuf),
+    AlbumArtOnline(TrackId, String, String, String),
     PlaylistThumbnail(PlaylistId, Vec<PathBuf>),
 }
 
@@ -60,7 +63,7 @@ impl ImageProcessor {
         let (playlist_thumb_tx, playlist_thumb_rx) = crossbeam_channel::unbounded();
 
         self.spawn_thumbnail_workers(&thumb_rx, thumbnail_workers);
-        self.spawn_album_art_worker(album_art_rx);
+        self.spawn_album_art_workers(&album_art_rx, 2);
         self.spawn_playlist_thumbnail_worker(playlist_thumb_rx);
 
         let mut inflight_playlists = HashSet::new();
@@ -82,7 +85,17 @@ impl ImageProcessor {
                     }
                 }
                 ImageProcessorCommand::GetCurrentAlbumArt(id, path) => {
+                    info!(track_id = ?id, ?path, "Received GetCurrentAlbumArt command");
                     let _ = album_art_tx.send(ImageJob::AlbumArt(id, path));
+                }
+                ImageProcessorCommand::FetchAlbumArtOnline {
+                    id,
+                    title,
+                    artist,
+                    album,
+                } => {
+                    info!(track_id = ?id, title = %title, artist = %artist, "Received FetchAlbumArtOnline command");
+                    let _ = album_art_tx.send(ImageJob::AlbumArtOnline(id, title, artist, album));
                 }
                 ImageProcessorCommand::PlaylistThumbnail { id, tracks } => {
                     if inflight_playlists.insert(id) {
@@ -106,6 +119,7 @@ impl ImageProcessor {
             let seen_images = self.seen_images.clone();
 
             std::thread::spawn(move || {
+                info!("image processor thumbnail worker started");
                 let mut image_batch = HashMap::with_capacity(64);
                 let mut lookup_batch = HashMap::with_capacity(64);
                 let mut last_kind = ImageKind::ThumbnailSmall;
@@ -113,8 +127,10 @@ impl ImageProcessor {
                 loop {
                     select! {
                         recv(thumb_rx) -> job => {
+                            let job_start = Instant::now();
                             if let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job &&
-                                 let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                                let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", "received job {:?} {}", id, path.display());
                                     lookup_batch.insert(id, hash);
                                     last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
@@ -133,7 +149,10 @@ impl ImageProcessor {
                                             }
                                         }
                                     }
-                            }
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "finished job {:?} {}", id, path.display());
+                                } else {
+                                    trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "skipped/invalid thumbnail job");
+                                }
                         }
 
                         recv(ticker) -> _ => {
@@ -150,41 +169,70 @@ impl ImageProcessor {
         }
     }
 
-    fn spawn_album_art_worker(&self, album_art_rx: Receiver<ImageJob>) {
-        let events_tx = self.tx.clone();
-        let cache_path = self.app_paths.cache.clone();
+    fn spawn_album_art_workers(&self, album_art_rx: &Receiver<ImageJob>, workers: usize) {
+        for _ in 0..workers {
+            let events_tx = self.tx.clone();
+            let cache_path = self.app_paths.cache.clone();
+            let album_art_rx = album_art_rx.clone();
 
-        std::thread::spawn(move || {
-            while let Ok(ImageJob::AlbumArt(id, path)) = album_art_rx.recv() {
-                match metadata::read_album_art(&path) {
-                    Ok(Some(image)) => {
-                        if let Ok(hash) = ImageId::generate(&image) {
-                            let path = CachePaths::image_cache_path(
-                                cache_path.as_path(),
-                                hash,
-                                ImageKind::AlbumArt,
-                            );
+            std::thread::spawn(move || {
+                while let Ok(job) = album_art_rx.recv() {
+                    match job {
+                        ImageJob::AlbumArt(id, path) => match metadata::read_album_art(&path) {
+                            Ok(Some(image)) => {
+                                if let Ok(hash) = ImageId::generate(&image) {
+                                    let path = CachePaths::image_cache_path(
+                                        cache_path.as_path(),
+                                        hash,
+                                        ImageKind::AlbumArt,
+                                    );
 
-                            if path.exists() {
-                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                    HashMap::from([(id, hash)]),
-                                ));
-                            } else if let Ok(album_art) =
-                                render_album_art(&image, ImageKind::AlbumArt)
-                            {
-                                let _ = events_tx
-                                    .send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
-                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                    HashMap::from([(id, hash)]),
-                                ));
+                                    if path.exists() {
+                                        let _ =
+                                            events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                                HashMap::from([(id, hash)]),
+                                            ));
+                                    } else if let Ok(album_art) =
+                                        render_album_art(&image, ImageKind::AlbumArt)
+                                    {
+                                        let _ = events_tx.send(
+                                            ImageProcessorEvent::InsertAlbumArt(hash, album_art),
+                                        );
+                                        let _ =
+                                            events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                                HashMap::from([(id, hash)]),
+                                            ));
+                                    }
+                                }
                             }
+                            Err(err) => warn!(error = ?err, "Failed to read album art"),
+                            Ok(None) => info!(
+                                track_id = ?id,
+                                path = ?path,
+                                "No embedded album art found in file"
+                            ),
+                        },
+                        ImageJob::AlbumArtOnline(id, title, artist, album) => {
+                            let start = Instant::now();
+                            fetch_album_art_online(
+                                &events_tx,
+                                &cache_path,
+                                id,
+                                &title,
+                                &artist,
+                                &album,
+                            );
+                            info!(
+                                track_id = ?id,
+                                elapsed_ms = ?start.elapsed().as_millis(),
+                                "online album art fetch finished"
+                            );
                         }
+                        _ => {} // ignore other job types sent to this channel by mistake
                     }
-                    Err(err) => warn!(error = ?err, "Failed to read album art"),
-                    _ => {}
                 }
-            }
-        });
+            });
+        }
     }
 
     fn spawn_playlist_thumbnail_worker(&self, playlist_thumb_rx: Receiver<ImageJob>) {
@@ -222,10 +270,151 @@ impl ImageProcessor {
                     let _ = events_tx.send(ImageProcessorEvent::InsertPlaylistThumbnail(
                         id, hash, thumbnail,
                     ));
-                } else { warn!("Failed to generate playlist thumbnail") }
+                } else {
+                    warn!("Failed to generate playlist thumbnail");
+                }
             }
         });
     }
+}
+
+fn fetch_album_art_online(
+    events_tx: &Sender<ImageProcessorEvent>,
+    _cache_path: &PathBuf,
+    id: TrackId,
+    title: &str,
+    artist: &str,
+    album: &str,
+) {
+    // Filenames without metadata often trail "[Official Music Video]" or
+    // similar bracket groups that pollute the search. Try the stripped title
+    // first, falling back to the raw title and album.
+    let stripped = strip_search_suffixes(title);
+    let title_attempts: &[&str] = if stripped != title && !stripped.is_empty() {
+        &[stripped, title]
+    } else {
+        &[title]
+    };
+
+    for title_attempt in title_attempts {
+        // Build search query. Skip artist when it's unset — "Unknown Artist" pollutes the search.
+        let query = if artist.is_empty() || artist.eq_ignore_ascii_case("Unknown Artist") {
+            (*title_attempt).to_string()
+        } else {
+            format!("{artist} {title_attempt}")
+        };
+
+        if let Some(cover_url) = deezer_search(&query, 3) {
+            download_and_send_album_art(events_tx, id, &cover_url);
+            return;
+        }
+    }
+
+    // Fallback: try artist + album when the album name is real.
+    if !album.is_empty() && album != "Unknown Album" {
+        let q2 = format!("{artist} {album}");
+        if let Some(cover_url) = deezer_search(&q2, 1) {
+            download_and_send_album_art(events_tx, id, &cover_url);
+            return;
+        }
+    }
+
+    warn!(track_id = ?id, "No album art found online for {title}");
+}
+
+/// Search Deezer and return the first `cover_big` URL, or `None`.
+fn deezer_search(query: &str, limit: usize) -> Option<String> {
+    let url = format!(
+        "https://api.deezer.com/search?q={}&limit={}",
+        urlencoding(query),
+        limit
+    );
+
+    let client = reqwest::blocking::Client::builder()
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
+        .timeout(Duration::from_secs(15))
+        .build()
+        .ok()?;
+
+    let resp = client.get(&url).send().ok()?;
+    let body = resp.text().ok()?;
+    let json: serde_json::Value = serde_json::from_str(&body).ok()?;
+
+    json.get("data").and_then(|d| d.as_array()).and_then(|arr| {
+        arr.iter().find_map(|entry| {
+            entry
+                .get("album")
+                .and_then(|a| a.get("cover_big"))
+                .and_then(|c| c.as_str())
+                .map(String::from)
+        })
+    })
+}
+
+fn download_and_send_album_art(
+    events_tx: &Sender<ImageProcessorEvent>,
+    id: TrackId,
+    cover_url: &str,
+) {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .expect("Failed to build HTTP client");
+
+    let img_bytes = match client.get(cover_url).send() {
+        Ok(r) => match r.bytes() {
+            Ok(b) => b.to_vec(),
+            Err(e) => {
+                warn!(error = ?e, "Failed to read cover image bytes");
+                return;
+            }
+        },
+        Err(e) => {
+            warn!(error = ?e, "Failed to download cover image");
+            return;
+        }
+    };
+
+    if let Ok(hash) = ImageId::generate(&img_bytes) {
+        match render_album_art(&img_bytes, ImageKind::AlbumArt) {
+            Ok(album_art) => {
+                let _ = events_tx.send(ImageProcessorEvent::InsertAlbumArt(hash, album_art));
+                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(HashMap::from([(
+                    id, hash,
+                )])));
+                // Also generate a small thumbnail for library lists.
+                if let Ok(thumb) = render_album_art(&img_bytes, ImageKind::ThumbnailSmall) {
+                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                        HashMap::from([(hash, thumb)]),
+                        ImageKind::ThumbnailSmall,
+                    ));
+                }
+                info!(track_id = ?id, "Fetched album art online");
+            }
+            Err(e) => warn!(error = ?e, "Failed to render downloaded album art"),
+        }
+    }
+}
+
+/// URL-encode a string for HTTP queries.
+fn urlencoding(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                result.push(byte as char);
+            }
+            b' ' => result.push_str("%20"),
+            _ => {
+                let _ = std::fmt::Write::write_fmt(&mut result, format_args!("%{byte:02X}"));
+            }
+        }
+    }
+    result
 }
 
 fn render_album_art(

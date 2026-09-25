@@ -12,7 +12,7 @@ use crate::{
     controller::{Controller, state::AppState},
     errors::AppError,
     scanner::Scanner,
-    ui::{assets::Assets, res_handler::ResHandler, wiremann::Wiremann},
+    ui::{assets::Assets, popout::PopOutHandle, res_handler::ResHandler, wiremann::Wiremann},
 };
 pub use paths::*;
 
@@ -41,6 +41,9 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
                 cacher: cacher_workers,
             } = calculate_worker_config();
 
+            println!(
+                "Worker configuration: \nMetadata: {metadata_workers:?}\nThumbnail: {thumbnail_workers:?}\nCacher: {cacher_workers:?}"
+            );
             let app_icon = gpui::WindowIcon::from_png_bytes(ICON_PNG).ok();
             let window_options = build_window_options(app_icon, cx);
 
@@ -99,6 +102,8 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
                 cx.set_global(controller.clone());
 
                 let view = cx.new(Wiremann::new);
+
+                cx.set_global(PopOutHandle(view.clone()));
 
                 let res_handler = cx.new(|_| ResHandler {});
                 let arc_res = Arc::new(res_handler.clone());

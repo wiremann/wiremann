@@ -6,7 +6,7 @@ use gpui::{Context, EventEmitter};
 pub enum Event {
     Audio(AudioEvent),
     Scanner(ScannerEvent),
-    Cacher(CacherEvent),
+    Cacher(Box<CacherEvent>),
     ImageProcessor(ImageProcessorEvent),
     SystemIntegration(SystemIntegrationEvent),
     LyricsEvent(LyricsEvent),

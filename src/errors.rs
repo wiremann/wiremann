@@ -69,6 +69,8 @@ pub enum CacherError {
     RonError(#[from] ron::Error),
     #[error("RON Spanned Error occurred: `{0}`")]
     RonSpannedError(#[from] ron::de::SpannedError),
+    #[error("SQLx Error occurred: `{0}`")]
+    SqlxError(#[from] sqlx::Error),
 }
 
 #[derive(Error, Debug)]
