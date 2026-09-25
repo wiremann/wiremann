@@ -12,11 +12,7 @@ pub fn strip_search_suffixes(title: &str) -> &str {
     let bytes = trimmed.as_bytes();
     let mut end = bytes.len();
 
-    loop {
-        let Some(&close) = bytes[..end].last() else {
-            break;
-        };
-
+    while let Some(&close) = bytes[..end].last() {
         let open = match close {
             b')' => b'(',
             b']' => b'[',

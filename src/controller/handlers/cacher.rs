@@ -17,13 +17,19 @@ impl Controller {
                 let playback_state = state.playback.clone();
                 tracing::info!(action = "CacherEvent::AppState", queue_len = state.queue.tracks.len(), current = ?state.playback.current, "applying loaded AppState");
                 self.state.update(cx, |this, _| {
-                    *this = state.clone();
+                    *this = *state.clone();
                 });
 
                 // Acknowledge to cacher that the AppState has been applied so
                 // the app-state worker can safely process any queued writes.
-                tracing::info!(action = "CacherEvent::AppState::Ack", "sending AckAppStateLoaded to cacher");
-                let _ = cx.global::<Controller>().cacher_tx.send(crate::controller::commands::CacherCommand::AckAppStateLoaded);
+                tracing::info!(
+                    action = "CacherEvent::AppState::Ack",
+                    "sending AckAppStateLoaded to cacher"
+                );
+                let _ = cx
+                    .global::<Controller>()
+                    .cacher_tx
+                    .send(crate::controller::commands::CacherCommand::AckAppStateLoaded);
 
                 self.load_queue_current(cx);
                 self.set_volume(playback_state.volume, cx);

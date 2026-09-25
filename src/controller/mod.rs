@@ -182,7 +182,11 @@ impl Controller {
         let _ = self.audio_tx.send(AudioCommand::Stop);
 
         let library = self.state.read(cx).library.clone();
-        tracing::info!(action = "WriteLibraryState", tracks = library.tracks.len(), "enqueuing WriteLibraryState");
+        tracing::info!(
+            action = "WriteLibraryState",
+            tracks = library.tracks.len(),
+            "enqueuing WriteLibraryState"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteLibraryState(library));
@@ -192,7 +196,11 @@ impl Controller {
             .cacher_tx
             .send(CacherCommand::WritePlaybackState(playback));
         let queue = self.state.read(cx).queue.clone();
-        tracing::info!(action = "WriteQueueState", queue_len = queue.tracks.len(), "enqueuing WriteQueueState");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = queue.tracks.len(),
+            "enqueuing WriteQueueState"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
     }
 
@@ -228,7 +236,11 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_playlist)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_playlist)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -248,7 +260,11 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_album)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_album)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -268,7 +284,11 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_artist)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_artist)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -301,7 +321,11 @@ impl Controller {
 
         self.load_queue_current(cx);
         let state = self.state.read(cx).queue.clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.tracks.len(), "enqueuing WriteQueueState (load_track)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.tracks.len(),
+            "enqueuing WriteQueueState (load_track)"
+        );
         let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
     }
 
@@ -398,7 +422,11 @@ impl Controller {
         });
 
         let state = self.state.read(cx).clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (set_shuffle)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (set_shuffle)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
@@ -417,7 +445,11 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (next)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (next)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
@@ -434,7 +466,11 @@ impl Controller {
         self.load_queue_current(cx);
 
         let state = self.state.read(cx).clone();
-        tracing::info!(action = "WriteQueueState", queue_len = state.queue.tracks.len(), "enqueuing WriteQueueState (prev)");
+        tracing::info!(
+            action = "WriteQueueState",
+            queue_len = state.queue.tracks.len(),
+            "enqueuing WriteQueueState (prev)"
+        );
         let _ = self
             .cacher_tx
             .send(CacherCommand::WriteQueueState(state.queue));
@@ -562,9 +598,10 @@ impl Controller {
                     cache_ids.push(image_id);
                 } else if let Some(track_id) = artist.tracks.first()
                     && let Some(track) = tracks.get(track_id)
-                        && let Some(image_id) = track.image_id {
-                            cache_ids.push(image_id);
-                        }
+                    && let Some(image_id) = track.image_id
+                {
+                    cache_ids.push(image_id);
+                }
             }
         }
 
@@ -720,7 +757,7 @@ impl Controller {
             .map(|(id, m)| (*id, m.last_played.unwrap_or(0)))
             .collect::<Vec<_>>();
 
-        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+        ranked.sort_by_key(|(_, last_played)| std::cmp::Reverse(*last_played));
 
         ranked.into_iter().take(limit).map(|(id, _)| id).collect()
     }
@@ -765,7 +802,7 @@ impl Controller {
     pub fn listen_stats(&self, cx: &App) -> ListenStats {
         let state = self.state.read(cx);
 
-        let mut stats = ListenStats::default();
+        let mut listen_summary = ListenStats::default();
 
         let mut artist_plays = HashMap::<ArtistId, u32>::new();
         let mut album_plays = HashMap::<AlbumId, u32>::new();
@@ -777,23 +814,23 @@ impl Controller {
                 continue;
             };
 
-            stats.total_plays += u64::from(m.play_count);
-            stats.total_skips += u64::from(m.skip_count);
-            stats.total_play_time += m.play_time;
+            listen_summary.total_plays += u64::from(m.play_count);
+            listen_summary.total_skips += u64::from(m.skip_count);
+            listen_summary.total_play_time += m.play_time;
 
             if m.play_count > 0 {
-                stats.total_tracks_listened += 1;
+                listen_summary.total_tracks_listened += 1;
             }
 
             if let Some(first) = m.first_played {
-                stats.first_listen = Some(match stats.first_listen {
+                listen_summary.first_listen = Some(match listen_summary.first_listen {
                     Some(prev) => prev.min(first),
                     None => first,
                 });
             }
 
             if let Some(last) = m.last_played {
-                stats.last_listen = Some(match stats.last_listen {
+                listen_summary.last_listen = Some(match listen_summary.last_listen {
                     Some(prev) => prev.max(last),
                     None => last,
                 });
@@ -814,7 +851,7 @@ impl Controller {
                 .then(b.1.play_time.cmp(&a.1.play_time))
                 .then(b.1.last_played.cmp(&a.1.last_played))
         });
-        stats.top_tracks = top_tracks.into_iter().take(10).collect();
+        listen_summary.top_tracks = top_tracks.into_iter().take(10).collect();
 
         let mut top_artists = artist_plays
             .into_iter()
@@ -829,7 +866,7 @@ impl Controller {
             })
             .collect::<Vec<_>>();
         top_artists.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
-        stats.top_artists = top_artists
+        listen_summary.top_artists = top_artists
             .into_iter()
             .take(10)
             .map(|(id, plays, _)| (id, plays))
@@ -848,13 +885,13 @@ impl Controller {
             })
             .collect::<Vec<_>>();
         top_albums.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
-        stats.top_albums = top_albums
+        listen_summary.top_albums = top_albums
             .into_iter()
             .take(10)
             .map(|(id, plays, _)| (id, plays))
             .collect();
 
-        stats
+        listen_summary
     }
 }
 

@@ -44,7 +44,7 @@ pub enum ImageProcessorEvent {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CacherEvent {
-    AppState(AppState),
+    AppState(Box<AppState>),
 
     AlbumArt(Arc<RenderImage>),
     Thumbnails(HashMap<ImageId, Arc<RenderImage>>),

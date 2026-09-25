@@ -53,7 +53,11 @@ impl Cacher {
         loop {
             match self.rx.recv()? {
                 CacherCommand::WriteLibraryState(state) => {
-                    info!(action = "CacherCommand::WriteLibraryState", tracks = state.tracks.len(), "received command, forwarding to app_state_worker");
+                    info!(
+                        action = "CacherCommand::WriteLibraryState",
+                        tracks = state.tracks.len(),
+                        "received command, forwarding to app_state_worker"
+                    );
                     let _ = app_state_tx.send(CacheJob::WriteLibraryState(state));
                 }
                 CacherCommand::WritePlaybackState(state) => {
@@ -61,7 +65,11 @@ impl Cacher {
                     let _ = app_state_tx.send(CacheJob::WritePlaybackState(state));
                 }
                 CacherCommand::WriteQueueState(state) => {
-                    info!(action = "CacherCommand::WriteQueueState", queue_len = state.tracks.len(), "received command, forwarding to app_state_worker");
+                    info!(
+                        action = "CacherCommand::WriteQueueState",
+                        queue_len = state.tracks.len(),
+                        "received command, forwarding to app_state_worker"
+                    );
                     let _ = app_state_tx.send(CacheJob::WriteQueueState(state));
                 }
                 CacherCommand::WriteFavorites(ids) => {
@@ -185,7 +193,7 @@ impl Cacher {
             // apply persisted state before we process any queued writes.
             match rt.block_on(db.load_app_state(&cacher.app_paths.cache)) {
                 Ok(state) => {
-                    let _ = cacher.tx.send(CacherEvent::AppState(state));
+                    let _ = cacher.tx.send(CacherEvent::AppState(Box::new(state)));
                 }
                 Err(e) => {
                     error!(error = ?e, "failed to load app state on startup");
@@ -197,9 +205,8 @@ impl Cacher {
             let mut backlog: Vec<CacheJob> = Vec::new();
             loop {
                 match rx.recv() {
-                    Ok(CacheJob::AckAppState) => break,
+                    Ok(CacheJob::AckAppState) | Err(_) => break,
                     Ok(job) => backlog.push(job),
-                    Err(_) => break,
                 }
             }
 
@@ -207,31 +214,54 @@ impl Cacher {
             let process_job = |job: CacheJob| {
                 let result: Result<(), CacherError> = match job {
                     CacheJob::WriteLibraryState(state) => {
-                        info!(action = "app_state_worker::WriteLibraryState", tracks = state.tracks.len(), "processing WriteLibraryState");
+                        info!(
+                            action = "app_state_worker::WriteLibraryState",
+                            tracks = state.tracks.len(),
+                            "processing WriteLibraryState"
+                        );
                         let mut state = state;
                         while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
                             state = later;
                         }
-                        rt.block_on(db.write_library(&state))}
+                        rt.block_on(db.write_library(&state))
+                    }
                     CacheJob::WriteQueueState(state) => {
-                        info!(action = "app_state_worker::WriteQueueState", queue_len = state.tracks.len(), "processing WriteQueueState");
-                        rt.block_on(db.write_queue(&state))}
+                        info!(
+                            action = "app_state_worker::WriteQueueState",
+                            queue_len = state.tracks.len(),
+                            "processing WriteQueueState"
+                        );
+                        rt.block_on(db.write_queue(&state))
+                    }
                     CacheJob::WriteFavorites(ids) => {
-                        info!(action = "app_state_worker::WriteFavorites", count = ids.len(), "processing WriteFavorites");
-                        rt.block_on(db.write_favorites(&ids))}
+                        info!(
+                            action = "app_state_worker::WriteFavorites",
+                            count = ids.len(),
+                            "processing WriteFavorites"
+                        );
+                        rt.block_on(db.write_favorites(&ids))
+                    }
                     CacheJob::WriteMetrics(metrics) => {
-                        info!(action = "app_state_worker::WriteMetrics", metrics = metrics.tracks.len(), "processing WriteMetrics");
-                        rt.block_on(db.write_metrics(&metrics))}
+                        info!(
+                            action = "app_state_worker::WriteMetrics",
+                            metrics = metrics.tracks.len(),
+                            "processing WriteMetrics"
+                        );
+                        rt.block_on(db.write_metrics(&metrics))
+                    }
                     CacheJob::WritePlaybackState(state) => {
                         info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
                         io::write_playback_state_to_disk(&cacher.app_paths.cache, &state)
                     }
                     CacheJob::LoadAppState => {
-                        info!(action = "app_state_worker::LoadAppState", "processing LoadAppState");
+                        info!(
+                            action = "app_state_worker::LoadAppState",
+                            "processing LoadAppState"
+                        );
                         let state = rt.block_on(db.load_app_state(&cacher.app_paths.cache));
                         match state {
                             Ok(state) => {
-                                let _ = cacher.tx.send(CacherEvent::AppState(state));
+                                let _ = cacher.tx.send(CacherEvent::AppState(Box::new(state)));
                                 Ok(())
                             }
                             Err(e) => Err(e),

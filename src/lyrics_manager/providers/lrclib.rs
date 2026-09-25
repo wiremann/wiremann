@@ -112,8 +112,13 @@ impl LrcLib {
         let mut scored: Vec<(i64, &Value)> = items
             .iter()
             .filter_map(|item| {
-                let dur = item.get("duration").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as u64;
-                let diff = (dur as i64 - target_secs as i64).abs();
+                let dur = item
+                    .get("duration")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0) as u64;
+                let diff = (i64::try_from(dur).unwrap_or(i64::MAX)
+                    - i64::try_from(target_secs).unwrap_or(i64::MAX))
+                .abs();
                 if diff > 10 {
                     return None; // skip anything more than 10s off
                 }

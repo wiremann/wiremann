@@ -24,9 +24,8 @@ impl Controller {
                     this.library.tracks.reserve(tracks.len());
 
                     for (scanned, playlist_id) in tracks {
-                        let track_id = match this.library.upsert_scanned_track(scanned) {
-                            Ok(id) => id,
-                            Err(_) => continue,
+                        let Ok(track_id) = this.library.upsert_scanned_track(scanned) else {
+                            continue;
                         };
 
                         if let Some(pid) = playlist_id

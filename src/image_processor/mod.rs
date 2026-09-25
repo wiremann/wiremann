@@ -362,7 +362,8 @@ fn download_and_send_album_art(
 ) {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
-        .build().expect("Failed to build HTTP client");
+        .build()
+        .expect("Failed to build HTTP client");
 
     let img_bytes = match client.get(cover_url).send() {
         Ok(r) => match r.bytes() {
@@ -409,7 +410,7 @@ fn urlencoding(input: &str) -> String {
             }
             b' ' => result.push_str("%20"),
             _ => {
-                result.push_str(&format!("%{byte:02X}"));
+                let _ = std::fmt::Write::write_fmt(&mut result, format_args!("%{byte:02X}"));
             }
         }
     }

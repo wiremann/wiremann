@@ -29,6 +29,7 @@ pub struct HomeSection {
     pub avail_width: Entity<f64>,
 }
 
+#[allow(dead_code)]
 impl HomeSection {
     fn calculate_grid_geometry(
         available_width: Pixels,
@@ -399,7 +400,7 @@ impl HomeSection {
         )
     }
 
-    fn summary_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {
+    fn summary_pill(label: &str, lines: Vec<String>, theme: &Theme) -> Div {
         div()
             .w_48()
             .px_4()
@@ -433,7 +434,7 @@ impl HomeSection {
         stats: &ListenStats,
         top_track: Option<(String, String)>,
         top_artist: Option<String>,
-        theme: Theme,
+        theme: &Theme,
     ) -> Div {
         div()
             .w_full()
@@ -649,13 +650,13 @@ impl Render for HomeSection {
         controller.request_artist_thumbnails(&artist_ids, cx);
         controller.request_playlist_thumbnails(&playlist_ids, cx);
 
-        let stats = controller.listen_stats(cx);
-        let has_stats = stats.total_plays > 0;
+        let listen_stats = controller.listen_stats(cx);
+        let has_stats = listen_stats.total_plays > 0;
 
         let (home_top_track, home_top_artist) = if has_stats {
             let state = controller.state.read(cx);
 
-            let top_track = stats.top_tracks.first().and_then(|(id, _)| {
+            let top_track = listen_stats.top_tracks.first().and_then(|(id, _)| {
                 let track = state.library.tracks.get(id)?;
 
                 let artist = track
@@ -667,7 +668,7 @@ impl Render for HomeSection {
                 Some((track.title.to_string(), artist))
             });
 
-            let top_artist = stats.top_artists.first().and_then(|(id, _)| {
+            let top_artist = listen_stats.top_artists.first().and_then(|(id, _)| {
                 let artist = state.library.artists.get(id)?;
 
                 Some(artist.name.to_string())
@@ -702,10 +703,10 @@ impl Render for HomeSection {
             );
         } else if has_stats {
             rows.push(Self::stats_summary_banner(
-                &stats,
+                &listen_stats,
                 home_top_track,
                 home_top_artist,
-                theme,
+                &theme,
             ));
         }
 

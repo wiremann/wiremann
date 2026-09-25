@@ -71,7 +71,14 @@ impl Render for Titlebar {
                             .map(|a| a.name.to_string())
                             .collect::<Vec<_>>()
                             .join(", ");
-                        parent.child(mini_player(&theme, track, &current_image, is_playing, controller.clone(), &artist))
+                        parent.child(mini_player(
+                            &theme,
+                            track,
+                            current_image.as_ref(),
+                            is_playing,
+                            &controller,
+                            &artist,
+                        ))
                     }),
             )
             .when(!popout_enabled, |this| {
@@ -228,9 +235,9 @@ impl Render for Titlebar {
 fn mini_player(
     theme: &Theme,
     track: &crate::controller::state::Track,
-    current_image: &Option<std::sync::Arc<gpui::RenderImage>>,
+    current_image: Option<&std::sync::Arc<gpui::RenderImage>>,
     is_playing: bool,
-    controller: Controller,
+    controller: &Controller,
     artist: &str,
 ) -> impl IntoElement {
     let title = track.title.to_string();
@@ -253,10 +260,12 @@ fn mini_player(
                 .flex_shrink_0()
                 .rounded_md()
                 .overflow_hidden()
-                .child(if let Some(img_src) = current_image { img(img_src.clone())
-                .object_fit(gpui::ObjectFit::Contain)
-                .size_full()
-                .into_any_element() } else {
+                .child(if let Some(img_src) = current_image {
+                    img(img_src.clone())
+                        .object_fit(gpui::ObjectFit::Contain)
+                        .size_full()
+                        .into_any_element()
+                } else {
                     let text_color = theme.titlebar_window_icons_text;
                     icon(Icons::Music)
                         .size_full()

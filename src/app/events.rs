@@ -31,7 +31,7 @@ pub fn spawn_event_loop(cx: &mut App, controller: Controller, arc_res: Arc<Entit
 
             while let Ok(e) = controller.cacher_rx.try_recv() {
                 arc_res.update(cx, |res_handler, cx| {
-                    res_handler.handle(cx, Event::Cacher(e));
+                    res_handler.handle(cx, Event::Cacher(Box::new(e)));
                 });
             }
 

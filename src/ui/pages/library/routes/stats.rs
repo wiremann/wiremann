@@ -82,7 +82,7 @@ impl StatsSection {
             .children(children)
     }
 
-    fn banner_pill(label: &str, lines: Vec<String>, theme: Theme) -> Div {
+    fn banner_pill(label: &str, lines: Vec<String>, theme: &Theme) -> Div {
         div()
             .w_56()
             .px_5()
@@ -116,7 +116,7 @@ impl StatsSection {
         stats: &ListenStats,
         top_track: Option<(String, String, u32)>,
         top_artist: Option<(String, u32)>,
-        theme: Theme,
+        theme: &Theme,
     ) -> Div {
         div()
             .w_full()
@@ -217,7 +217,7 @@ impl StatsSection {
             )
     }
 
-    fn stat_card(value: String, label: &str, theme: Theme) -> Div {
+    fn stat_card(value: String, label: &str, theme: &Theme) -> Div {
         div()
             .flex_1()
             .min_w(px(180.0))
@@ -243,7 +243,7 @@ impl StatsSection {
             )
     }
 
-    fn stat_grid(stats: &ListenStats, theme: Theme) -> Div {
+    fn stat_grid(stats: &ListenStats, theme: &Theme) -> Div {
         div()
             .w_full()
             .flex()
@@ -267,8 +267,7 @@ impl StatsSection {
                 theme,
             ))
             .child(Self::stat_card(
-                stats
-                    .first_listen.map_or_else(|| "—".to_string(), fmt_date),
+                stats.first_listen.map_or_else(|| "—".to_string(), fmt_date),
                 "First listen",
                 theme,
             ))
@@ -279,7 +278,7 @@ impl StatsSection {
         id: TrackId,
         metrics: &TrackListenMetrics,
         controller: &Controller,
-        theme: Theme,
+        theme: &Theme,
         cx: &mut App,
     ) -> Div {
         let (track, artists) = {
@@ -409,7 +408,7 @@ impl StatsSection {
             .iter()
             .enumerate()
             .map(|(index, (id, metrics))| {
-                Self::render_track_row(index, *id, metrics, &controller, theme, cx)
+                Self::render_track_row(index, *id, metrics, &controller, &theme, cx)
             })
             .collect::<Vec<_>>();
 
@@ -606,7 +605,7 @@ impl StatsSection {
             .child(Self::responsive_grid(rows))
     }
 
-    fn empty_state(theme: Theme) -> Div {
+    fn empty_state(theme: &Theme) -> Div {
         div()
             .flex_1()
             .w_full()
@@ -631,17 +630,17 @@ impl Render for StatsSection {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
 
-        let stats = controller.listen_stats(cx);
-        let has_data = stats.total_plays > 0;
+        let listen_stats = controller.listen_stats(cx);
+        let has_data = listen_stats.total_plays > 0;
 
         let (top_track, top_artist) = if has_data {
-            let state = controller.state.read(cx);
+            let library_state = controller.state.read(cx);
 
-            let top_track = stats.top_tracks.first().and_then(|(id, m)| {
-                let track = state.library.tracks.get(id)?;
+            let top_track = listen_stats.top_tracks.first().and_then(|(id, m)| {
+                let track = library_state.library.tracks.get(id)?;
 
                 let artist = track
-                    .artists(&state.library)
+                    .artists(&library_state.library)
                     .map(|artist| artist.name.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -649,8 +648,8 @@ impl Render for StatsSection {
                 Some((track.title.to_string(), artist, m.play_count))
             });
 
-            let top_artist = stats.top_artists.first().and_then(|(id, plays)| {
-                let artist = state.library.artists.get(id)?;
+            let top_artist = listen_stats.top_artists.first().and_then(|(id, plays)| {
+                let artist = library_state.library.artists.get(id)?;
 
                 Some((artist.name.to_string(), *plays))
             });
@@ -660,17 +659,17 @@ impl Render for StatsSection {
             (None, None)
         };
 
-        let top_track_ids = stats
+        let top_track_ids = listen_stats
             .top_tracks
             .iter()
             .map(|(id, _)| *id)
             .collect::<Vec<_>>();
-        let top_artist_ids = stats
+        let top_artist_ids = listen_stats
             .top_artists
             .iter()
             .map(|(id, _)| *id)
             .collect::<Vec<_>>();
-        let top_album_ids = stats
+        let top_album_ids = listen_stats
             .top_albums
             .iter()
             .map(|(id, _)| *id)
@@ -683,19 +682,19 @@ impl Render for StatsSection {
         let mut rows: Vec<Div> = Vec::new();
 
         if has_data {
-            rows.push(Self::banner(&stats, top_track, top_artist, theme));
-            rows.push(Self::stat_grid(&stats, theme));
+            rows.push(Self::banner(&listen_stats, top_track, top_artist, &theme));
+            rows.push(Self::stat_grid(&listen_stats, &theme));
 
-            if !stats.top_tracks.is_empty() {
-                rows.push(Self::top_tracks_section(&stats, cx));
+            if !listen_stats.top_tracks.is_empty() {
+                rows.push(Self::top_tracks_section(&listen_stats, cx));
             }
 
-            if !stats.top_artists.is_empty() {
-                rows.push(Self::top_artists_section(&stats, cx));
+            if !listen_stats.top_artists.is_empty() {
+                rows.push(Self::top_artists_section(&listen_stats, cx));
             }
 
-            if !stats.top_albums.is_empty() {
-                rows.push(Self::top_albums_section(&stats, cx));
+            if !listen_stats.top_albums.is_empty() {
+                rows.push(Self::top_albums_section(&listen_stats, cx));
             }
         }
 
@@ -753,7 +752,7 @@ impl Render for StatsSection {
                         .children(if has_data {
                             rows
                         } else {
-                            vec![Self::empty_state(theme)]
+                            vec![Self::empty_state(&theme)]
                         }),
                 ),
             )

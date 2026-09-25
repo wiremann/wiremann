@@ -44,7 +44,8 @@ impl FavoritesSection {
                 .join(", ");
 
             let album = track
-                .album(&state.library).map_or_else(|| "Unknown".to_string(), |album| album.name.to_string());
+                .album(&state.library)
+                .map_or_else(|| "Unknown".to_string(), |album| album.name.to_string());
 
             (track.clone(), artists, album)
         };

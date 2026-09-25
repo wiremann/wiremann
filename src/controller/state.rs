@@ -379,7 +379,7 @@ impl LibraryState {
             }
 
             if existing.artists.is_empty() {
-                existing.artists = artist_ids.clone();
+                existing.artists.clone_from(&artist_ids);
             }
 
             if existing.album == AlbumId::default() {

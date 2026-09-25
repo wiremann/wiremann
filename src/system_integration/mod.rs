@@ -17,6 +17,7 @@ use souvlaki::{
 pub struct SystemIntegration {
     pub tx: Sender<SystemIntegrationEvent>,
     pub rx: Receiver<SystemIntegrationCommand>,
+    #[allow(dead_code)]
     app_paths: AppPaths,
 
     media_controls: Option<MediaControls>,

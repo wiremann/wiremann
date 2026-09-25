@@ -247,7 +247,11 @@ impl Scanner {
                 processed,
                 metadata_reads = reads,
                 metadata_total_ms = meta_us / 1000,
-                metadata_avg_ms = if reads > 0 { meta_us / reads / 1000 } else { 0 },
+                metadata_avg_ms = if reads > 0 {
+                    meta_us.checked_div(reads).unwrap_or(0) / 1000
+                } else {
+                    0
+                },
                 scan_elapsed_ms = started.map_or(0, |t| t.elapsed().as_millis()),
                 "scan complete"
             );

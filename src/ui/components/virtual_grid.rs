@@ -56,6 +56,7 @@ pub struct VirtualGrid {
     overscan: usize,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn vgrid<R, V>(
     view: Entity<V>,
     id: impl Into<ElementId>,

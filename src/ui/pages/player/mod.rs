@@ -19,13 +19,13 @@ use controlbar::ControlBar;
 use lyrics::LyricsView;
 use queue::Queue;
 
+use gpui::prelude::FluentBuilder;
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
     StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative,
     rgba,
 };
-use gpui::prelude::FluentBuilder;
 
 #[derive(Clone)]
 pub struct PlayerPage {
@@ -288,8 +288,7 @@ impl Render for PlayerPage {
                                             .text_color(theme.player_icons_text_hover)
                                     })
                                     .when(
-                                        current_id
-                                            .is_some_and(|id| controller.is_favorite(id, cx)),
+                                        current_id.is_some_and(|id| controller.is_favorite(id, cx)),
                                         |this| {
                                             this.text_color(theme.player_icons_text_active)
                                                 .bg(theme.player_icons_bg_active)

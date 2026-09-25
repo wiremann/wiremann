@@ -30,7 +30,7 @@ impl Global for SidebarIndicator {}
 impl Global for SidebarBounds {}
 
 impl Sidebar {
-    fn section_header(text: &'static str, theme: Theme) -> impl IntoElement {
+    fn section_header(text: &'static str, theme: &Theme) -> impl IntoElement {
         div()
             .px_6()
             .pt_8()
@@ -47,7 +47,7 @@ impl Sidebar {
         text: &'static str,
         section: LibraryRoutes,
         current: LibraryRoutes,
-        theme: Theme,
+        theme: &Theme,
     ) -> impl IntoElement {
         let active = current == section;
 
@@ -184,71 +184,71 @@ impl Render for Sidebar {
                             .into_any_element()
                     }
                 })
-                .child(Self::section_header("DISCOVERY", theme))
+                .child(Self::section_header("DISCOVERY", &theme))
                 .child(Self::item(
                     Icons::Home,
                     "Home",
                     LibraryRoutes::Home,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::Heart,
                     "Favorites",
                     LibraryRoutes::Favorites,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::Chart,
                     "Stats",
                     LibraryRoutes::Stats,
                     current,
-                    theme,
+                    &theme,
                 ))
-                .child(Self::section_header("COLLECTION", theme))
+                .child(Self::section_header("COLLECTION", &theme))
                 .child(Self::item(
                     Icons::Music,
                     "Tracks",
                     LibraryRoutes::Tracks,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::Disc,
                     "Albums",
                     LibraryRoutes::Albums,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::User,
                     "Artists",
                     LibraryRoutes::Artists,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::Playlist,
                     "Playlists",
                     LibraryRoutes::Playlists,
                     current,
-                    theme,
+                    &theme,
                 ))
-                .child(Self::section_header("SYSTEM", theme))
+                .child(Self::section_header("SYSTEM", &theme))
                 .child(Self::item(
                     Icons::Plugins,
                     "Plugins",
                     LibraryRoutes::Plugins,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(Self::item(
                     Icons::Settings,
                     "Settings",
                     LibraryRoutes::Settings,
                     current,
-                    theme,
+                    &theme,
                 ))
                 .child(div().flex_grow()),
             |bounds, _, cx| {
