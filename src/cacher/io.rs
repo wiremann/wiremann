@@ -25,8 +25,8 @@ pub enum CacheJob {
         image: Vec<u8>,
     },
     LoadAppState,
-    /// Internal ack sent from controller back to `app_state_worker` indicating
-    /// the loaded `AppState` has been applied and the worker may process
+    /// Internal ack sent from controller back to app_state_worker indicating
+    /// the loaded AppState has been applied and the worker may process
     /// pre-load queued jobs.
     AckAppState,
     LoadThumbnails(HashSet<ImageId>, ImageKind),
@@ -36,7 +36,7 @@ pub enum CacheJob {
 
 /// Writes the small playback session (current track, position, volume, ...) to
 /// a RON file. The sizeable, growing state (library, queue, favorites,
-/// metrics) lives in the `SQLite` database instead.
+/// metrics) lives in the SQLite database instead.
 pub fn write_playback_state_to_disk(
     cache_dir: &Path,
     state: &PlaybackState,

@@ -205,8 +205,9 @@ impl Cacher {
             let mut backlog: Vec<CacheJob> = Vec::new();
             loop {
                 match rx.recv() {
-                    Ok(CacheJob::AckAppState) | Err(_) => break,
+                    Ok(CacheJob::AckAppState) => break,
                     Ok(job) => backlog.push(job),
+                    Err(_) => break,
                 }
             }
 
@@ -223,7 +224,7 @@ impl Cacher {
                         while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
                             state = later;
                         }
-                        rt.block_on(db.write_library(&state))
+                        rt.block_on(db.write_library(&state)).map_err(Into::into)
                     }
                     CacheJob::WriteQueueState(state) => {
                         info!(
@@ -231,7 +232,7 @@ impl Cacher {
                             queue_len = state.tracks.len(),
                             "processing WriteQueueState"
                         );
-                        rt.block_on(db.write_queue(&state))
+                        rt.block_on(db.write_queue(&state)).map_err(Into::into)
                     }
                     CacheJob::WriteFavorites(ids) => {
                         info!(
@@ -239,7 +240,7 @@ impl Cacher {
                             count = ids.len(),
                             "processing WriteFavorites"
                         );
-                        rt.block_on(db.write_favorites(&ids))
+                        rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
                     }
                     CacheJob::WriteMetrics(metrics) => {
                         info!(
@@ -247,7 +248,7 @@ impl Cacher {
                             metrics = metrics.tracks.len(),
                             "processing WriteMetrics"
                         );
-                        rt.block_on(db.write_metrics(&metrics))
+                        rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
                     }
                     CacheJob::WritePlaybackState(state) => {
                         info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
