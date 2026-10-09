@@ -18,7 +18,11 @@ impl Controller {
                 tracing::info!(action = "CacherEvent::AppState", queue_len = state.queue.tracks.len(), current = ?state.playback.current, "applying loaded AppState");
                 self.state.update(cx, |this, _| {
                     *this = *state.clone();
+                    this.startup_complete = true;
+                    this.pending_queue_write = None;
+                    this.pending_playback_write = None;
                 });
+                self.flush_pending_initial_state(cx);
 
                 // Acknowledge to cacher that the AppState has been applied so
                 // the app-state worker can safely process any queued writes.

@@ -110,6 +110,67 @@ impl Controller {
         }
     }
 
+    fn persist_queue_state(&self, cx: &mut App, state: crate::controller::state::QueueState) {
+        if self.state.read(cx).startup_complete {
+            let _ = self
+                .cacher_tx
+                .send(CacherCommand::WriteQueueState(state));
+            return;
+        }
+
+        let queued = state.clone();
+        self.state.update(cx, |this, _| {
+            this.pending_queue_write = Some(queued);
+            tracing::info!(
+                action = "startup_buffered_queue_write",
+                queue_len = this.pending_queue_write.as_ref().map_or(0, |q| q.tracks.len()),
+                "startup not complete; buffering queue write"
+            );
+        });
+    }
+
+    fn persist_playback_state(&self, cx: &mut App, state: crate::controller::state::PlaybackState) {
+        if self.state.read(cx).startup_complete {
+            let _ = self
+                .cacher_tx
+                .send(CacherCommand::WritePlaybackState(state));
+            return;
+        }
+
+        let queued = state.clone();
+        self.state.update(cx, |this, _| {
+            this.pending_playback_write = Some(queued);
+            tracing::info!(
+                action = "startup_buffered_playback_write",
+                current = ?this.pending_playback_write.as_ref().and_then(|s| s.current),
+                index = this.pending_playback_write.as_ref().map_or(0, |s| s.current_index),
+                "startup not complete; buffering playback write"
+            );
+        });
+    }
+
+    fn flush_pending_initial_state(&self, cx: &mut App) {
+        let (pending_queue, pending_playback) = {
+            let mut pending_queue = None;
+            let mut pending_playback = None;
+            self.state.update(cx, |this, _| {
+                this.startup_complete = true;
+                pending_queue = this.pending_queue_write.take();
+                pending_playback = this.pending_playback_write.take();
+            });
+            (pending_queue, pending_playback)
+        };
+
+        if let Some(queue) = pending_queue {
+            let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
+        }
+        if let Some(playback) = pending_playback {
+            let _ = self
+                .cacher_tx
+                .send(CacherCommand::WritePlaybackState(playback));
+        }
+    }
+
     pub fn load_audio(&self, id: &TrackId, cx: &App) {
         let state = self.state.read(cx);
         if let Some(track) = state.library.tracks.get(id)
@@ -192,16 +253,14 @@ impl Controller {
             .send(CacherCommand::WriteLibraryState(library));
         let playback = self.state.read(cx).playback.clone();
         tracing::info!(action = "WritePlaybackState", current = ?playback.current, index = playback.current_index, "enqueuing WritePlaybackState");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(playback));
+        self.persist_playback_state(cx, playback);
         let queue = self.state.read(cx).queue.clone();
         tracing::info!(
             action = "WriteQueueState",
             queue_len = queue.tracks.len(),
             "enqueuing WriteQueueState"
         );
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(queue));
+        self.persist_queue_state(cx, queue);
     }
 
     pub fn rescan_playlist(&self, id: PlaylistId, cx: &mut App) {
@@ -241,7 +300,7 @@ impl Controller {
             queue_len = state.tracks.len(),
             "enqueuing WriteQueueState (load_playlist)"
         );
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx, state);
     }
 
     pub fn load_album(&self, id: AlbumId, cx: &mut App) {
@@ -265,7 +324,7 @@ impl Controller {
             queue_len = state.tracks.len(),
             "enqueuing WriteQueueState (load_album)"
         );
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx, state);
     }
 
     pub fn load_artist(&self, id: ArtistId, cx: &mut App) {
@@ -289,7 +348,7 @@ impl Controller {
             queue_len = state.tracks.len(),
             "enqueuing WriteQueueState (load_artist)"
         );
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx, state);
     }
 
     pub fn load_track(&self, track_id: TrackId, cx: &mut App) {
@@ -326,7 +385,7 @@ impl Controller {
             queue_len = state.tracks.len(),
             "enqueuing WriteQueueState (load_track)"
         );
-        let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
+        self.persist_queue_state(cx, state);
     }
 
     pub fn scan_track(&self, path: PathBuf) {
@@ -351,9 +410,7 @@ impl Controller {
         });
         let state = self.state.read(cx).playback.clone();
         tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_repeat)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx, state);
     }
 
     pub fn set_mute(&self, cx: &mut App) {
@@ -370,9 +427,7 @@ impl Controller {
         });
         let state = self.state.read(cx).playback.clone();
         tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, "enqueuing WritePlaybackState (set_mute)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx, state);
     }
 
     pub fn set_volume(&self, vol: f32, cx: &mut App) {
@@ -388,9 +443,7 @@ impl Controller {
 
         let state = self.state.read(cx).playback.clone();
         tracing::info!(action = "WritePlaybackState", current = ?state.current, index = state.current_index, volume = state.volume, mute = state.mute, "enqueuing WritePlaybackState (set_volume)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state));
+        self.persist_playback_state(cx, state);
     }
 
     pub fn set_shuffle(&self, cx: &mut App) {
@@ -427,13 +480,9 @@ impl Controller {
             queue_len = state.queue.tracks.len(),
             "enqueuing WriteQueueState (set_shuffle)"
         );
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
+        self.persist_queue_state(cx, state.queue.clone());
         tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (set_shuffle)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_playback_state(cx, state.playback.clone());
     }
 
     pub fn next(&self, cx: &mut App) {
@@ -450,13 +499,9 @@ impl Controller {
             queue_len = state.queue.tracks.len(),
             "enqueuing WriteQueueState (next)"
         );
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
+        self.persist_queue_state(cx, state.queue.clone());
         tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (next)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_playback_state(cx, state.playback.clone());
     }
     pub fn prev(&self, cx: &mut App) {
         self.state.update(cx, |this, _| {
@@ -471,13 +516,9 @@ impl Controller {
             queue_len = state.queue.tracks.len(),
             "enqueuing WriteQueueState (prev)"
         );
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WriteQueueState(state.queue));
+        self.persist_queue_state(cx, state.queue.clone());
         tracing::info!(action = "WritePlaybackState", current = ?state.playback.current, index = state.playback.current_index, "enqueuing WritePlaybackState (prev)");
-        let _ = self
-            .cacher_tx
-            .send(CacherCommand::WritePlaybackState(state.playback));
+        self.persist_playback_state(cx, state.playback.clone());
     }
 
     pub fn seek(&self, pos: Duration) {

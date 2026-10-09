@@ -761,6 +761,9 @@ impl Db {
             favorites,
             metrics,
             metrics_session: None,
+            startup_complete: false,
+            pending_queue_write: None,
+            pending_playback_write: None,
             last_playback_write: None,
         })
     }
