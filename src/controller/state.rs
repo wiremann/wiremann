@@ -14,7 +14,7 @@ const IMAGE_HASH_SEED: u64 = 0x2718_2818_2845_9045;
 const ALBUM_HASH_SEED: u64 = 0x1618_0339_8874_9894;
 const ARTIST_HASH_SEED: u64 = 0x1414_2135_6237_3095;
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AppState {
     pub playback: PlaybackState,
     pub library: LibraryState,
@@ -22,6 +22,14 @@ pub struct AppState {
     pub favorites: Vec<TrackId>,
     pub metrics: ListenMetrics,
     pub metrics_session: Option<MetricsSession>,
+    /// Set to true only after the persisted AppState has been loaded and applied
+    /// to the in-memory state. This prevents stale startup writes from
+    /// overwriting a valid persisted queue.
+    pub startup_complete: bool,
+    /// Temporary buffers for any queue/playback snapshots produced before the
+    /// persisted AppState is ready.
+    pub pending_queue_write: Option<QueueState>,
+    pub pending_playback_write: Option<PlaybackState>,
     /// Last time `session.ron` was written while the position ticked, used to
     /// throttle position-driven writes to disk.
     pub last_playback_write: Option<Instant>,
@@ -259,6 +267,23 @@ impl Default for PlaybackState {
             mute: false,
             shuffling: false,
             repeat: false,
+        }
+    }
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            playback: PlaybackState::default(),
+            library: LibraryState::default(),
+            queue: QueueState::default(),
+            favorites: Vec::new(),
+            metrics: ListenMetrics::default(),
+            metrics_session: None,
+            startup_complete: false,
+            pending_queue_write: None,
+            pending_playback_write: None,
+            last_playback_write: None,
         }
     }
 }

@@ -201,12 +201,24 @@ impl Cacher {
             }
 
             // Collect any jobs that arrived before controller acknowledged
-            // applying the AppState. They will be processed after the ack.
+            // applying the AppState. Keep only the newest write for each category
+            // so a stale empty startup queue cannot overwrite a valid restored queue.
             let mut backlog: Vec<CacheJob> = Vec::new();
+            let mut latest_queue: Option<crate::controller::state::QueueState> = None;
+            let mut latest_playback: Option<crate::controller::state::PlaybackState> = None;
+            let mut latest_library: Option<crate::controller::state::LibraryState> = None;
+            let mut latest_favorites: Option<Vec<crate::controller::state::TrackId>> = None;
+            let mut latest_metrics: Option<crate::controller::state::ListenMetrics> = None;
             loop {
                 match rx.recv() {
-                    Ok(CacheJob::AckAppState) | Err(_) => break,
+                    Ok(CacheJob::AckAppState) => break,
+                    Ok(CacheJob::WriteQueueState(state)) => latest_queue = Some(state),
+                    Ok(CacheJob::WritePlaybackState(state)) => latest_playback = Some(state),
+                    Ok(CacheJob::WriteLibraryState(state)) => latest_library = Some(state),
+                    Ok(CacheJob::WriteFavorites(ids)) => latest_favorites = Some(ids),
+                    Ok(CacheJob::WriteMetrics(metrics)) => latest_metrics = Some(metrics),
                     Ok(job) => backlog.push(job),
+                    Err(_) => break,
                 }
             }
 
@@ -223,7 +235,7 @@ impl Cacher {
                         while let Ok(CacheJob::WriteLibraryState(later)) = rx.try_recv() {
                             state = later;
                         }
-                        rt.block_on(db.write_library(&state))
+                        rt.block_on(db.write_library(&state)).map_err(Into::into)
                     }
                     CacheJob::WriteQueueState(state) => {
                         info!(
@@ -231,7 +243,7 @@ impl Cacher {
                             queue_len = state.tracks.len(),
                             "processing WriteQueueState"
                         );
-                        rt.block_on(db.write_queue(&state))
+                        rt.block_on(db.write_queue(&state)).map_err(Into::into)
                     }
                     CacheJob::WriteFavorites(ids) => {
                         info!(
@@ -239,7 +251,7 @@ impl Cacher {
                             count = ids.len(),
                             "processing WriteFavorites"
                         );
-                        rt.block_on(db.write_favorites(&ids))
+                        rt.block_on(db.write_favorites(&ids)).map_err(Into::into)
                     }
                     CacheJob::WriteMetrics(metrics) => {
                         info!(
@@ -247,7 +259,7 @@ impl Cacher {
                             metrics = metrics.tracks.len(),
                             "processing WriteMetrics"
                         );
-                        rt.block_on(db.write_metrics(&metrics))
+                        rt.block_on(db.write_metrics(&metrics)).map_err(Into::into)
                     }
                     CacheJob::WritePlaybackState(state) => {
                         info!(action = "app_state_worker::WritePlaybackState", current = ?state.current, index = state.current_index, "processing WritePlaybackState");
@@ -275,7 +287,23 @@ impl Cacher {
                 }
             };
 
-            // Process backlog now that controller should have applied AppState
+            // Process the latest valid startup backlog now that the controller
+            // has applied the restored state.
+            if let Some(state) = latest_queue {
+                process_job(CacheJob::WriteQueueState(state));
+            }
+            if let Some(state) = latest_playback {
+                process_job(CacheJob::WritePlaybackState(state));
+            }
+            if let Some(state) = latest_library {
+                process_job(CacheJob::WriteLibraryState(state));
+            }
+            if let Some(ids) = latest_favorites {
+                process_job(CacheJob::WriteFavorites(ids));
+            }
+            if let Some(metrics) = latest_metrics {
+                process_job(CacheJob::WriteMetrics(metrics));
+            }
             for job in backlog {
                 process_job(job);
             }

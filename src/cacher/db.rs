@@ -4,13 +4,13 @@ use crate::controller::state::{
 };
 use crate::errors::CacherError;
 use sqlx::{Row, Sqlite, SqlitePool, Transaction};
+use tracing::info;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
 
-/// Operations against the on-disk `SQLite` database that backs all data which
+/// Operations against the on-disk SQLite database that backs all data which
 /// grows with use: the library, queue, favorites and listen metrics.
 ///
 /// The playback session (`session.ron`) and image/lyrics blob caches are kept
@@ -272,7 +272,7 @@ impl Db {
                     "INSERT INTO album_artists (album_id, position, artist_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(album_hex(album.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(artist_hex(*artist))
                 .execute(&mut *tx)
                 .await?;
@@ -283,7 +283,7 @@ impl Db {
                     "INSERT INTO album_tracks (album_id, position, track_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(album_hex(album.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(track_hex(*track))
                 .execute(&mut *tx)
                 .await?;
@@ -310,10 +310,10 @@ impl Db {
                     "INSERT INTO track_sources (track_id, position, path, size, modified) VALUES (?1, ?2, ?3, ?4, ?5)",
                 )
                 .bind(track_hex(track.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(source.path.to_string_lossy().to_string())
-                .bind(i64::try_from(source.size).unwrap_or(i64::MAX))
-                .bind(i64::try_from(source.modified).unwrap_or(i64::MAX))
+                .bind(source.size as i64)
+                .bind(source.modified as i64)
                 .execute(&mut *tx)
                 .await?;
             }
@@ -323,7 +323,7 @@ impl Db {
                     "INSERT INTO track_artists (track_id, position, artist_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(track_hex(track.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(artist_hex(*artist))
                 .execute(&mut *tx)
                 .await?;
@@ -339,7 +339,7 @@ impl Db {
                     "INSERT INTO artist_tracks (artist_id, position, track_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(artist_hex(artist.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(track_hex(*track))
                 .execute(&mut *tx)
                 .await?;
@@ -350,7 +350,7 @@ impl Db {
                     "INSERT INTO artist_albums (artist_id, position, album_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(artist_hex(artist.id))
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(album_hex(*album))
                 .execute(&mut *tx)
                 .await?;
@@ -368,7 +368,7 @@ impl Db {
             .bind(playlist.name.to_string())
             .bind(source_str(&playlist.source))
             .bind(playlist.folder_path.as_ref().map(|p| p.to_string_lossy().to_string()))
-            .bind(i64::try_from(playlist.duration.as_secs()).unwrap_or(i64::MAX))
+            .bind(playlist.duration.as_secs() as i64)
             .bind(playlist.image_id.map(image_hex))
             .execute(&mut *tx)
             .await?;
@@ -378,7 +378,7 @@ impl Db {
                     "INSERT INTO playlist_tracks (playlist_id, position, track_id) VALUES (?1, ?2, ?3)",
                 )
                 .bind(playlist.id.0.to_string())
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(track_hex(*track))
                 .execute(&mut *tx)
                 .await?;
@@ -620,7 +620,7 @@ impl Db {
 
         for (pos, track) in state.tracks.iter().enumerate() {
             sqlx::query("INSERT INTO queue_tracks (position, track_id) VALUES (?1, ?2)")
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(track_hex(*track))
                 .execute(&mut *tx)
                 .await?;
@@ -628,8 +628,8 @@ impl Db {
 
         for (pos, index) in state.order.iter().enumerate() {
             sqlx::query("INSERT INTO queue_order (position, order_index) VALUES (?1, ?2)")
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
-                .bind(i64::try_from(*index).unwrap_or(i64::MAX))
+                .bind(pos as i64)
+                .bind(*index as i64)
                 .execute(&mut *tx)
                 .await?;
         }
@@ -669,7 +669,7 @@ impl Db {
 
         for (pos, id) in ids.iter().enumerate() {
             sqlx::query("INSERT INTO favorites (position, track_id) VALUES (?1, ?2)")
-                .bind(i64::try_from(pos).unwrap_or(i64::MAX))
+                .bind(pos as i64)
                 .bind(track_hex(*id))
                 .execute(&mut *tx)
                 .await?;
@@ -704,11 +704,11 @@ impl Db {
                 "INSERT INTO track_metrics (track_id, play_count, play_time_secs, first_played, last_played, skip_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )
             .bind(track_hex(*id))
-            .bind(i64::from(m.play_count))
-            .bind(i64::try_from(m.play_time.as_secs()).unwrap_or(i64::MAX))
-            .bind(m.first_played.map(i64::try_from).and_then(Result::ok))
-            .bind(m.last_played.map(i64::try_from).and_then(Result::ok))
-            .bind(i64::from(m.skip_count))
+            .bind(m.play_count as i64)
+            .bind(m.play_time.as_secs() as i64)
+            .bind(m.first_played.map(|v| v as i64))
+            .bind(m.last_played.map(|v| v as i64))
+            .bind(m.skip_count as i64)
             .execute(&mut *tx)
             .await?;
         }
@@ -743,7 +743,7 @@ impl Db {
     }
 
     /// Loads the full [`crate::controller::state::AppState`]: structured data
-    /// from `SQLite` plus the playback session from its RON file.
+    /// from SQLite plus the playback session from its RON file.
     pub async fn load_app_state(
         &self,
         cache_dir: &Path,
@@ -761,6 +761,9 @@ impl Db {
             favorites,
             metrics,
             metrics_session: None,
+            startup_complete: false,
+            pending_queue_write: None,
+            pending_playback_write: None,
             last_playback_write: None,
         })
     }
