@@ -1,6 +1,6 @@
 use crate::ui::components::icons::{Icons, icon};
 use crate::ui::theme::Theme;
-use gpui::{
+use wgpui{
     App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     Styled, Window, div, px, relative,
 };
@@ -80,7 +80,7 @@ impl Render for ScanningStatusToast {
                     .child(
                         div()
                             .text_color(theme.toast_text)
-                            .font_weight(gpui::FontWeight::MEDIUM)
+                            .font_weight(wgpuiFontWeight::MEDIUM)
                             .child(message),
                     )
                     .child(
@@ -129,4 +129,4 @@ impl ScanningStatus {
     }
 }
 
-impl gpui::Global for ScanningStatus {}
+impl wgpuiGlobal for ScanningStatus {}

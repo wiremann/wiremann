@@ -6,8 +6,8 @@ use crate::ui::components::icons::{Icons, icon};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
-use gpui::prelude::FluentBuilder;
-use gpui::{
+use wgpuiprelude::FluentBuilder;
+use wgpui{
     Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
     IntoElement, MouseButton, ParentElement, Render, StatefulInteractiveElement, Styled,
     StyledImage, Window, div, img, px, white,
@@ -156,7 +156,7 @@ impl Render for Titlebar {
                                 .child(
                                     div()
                                         .text_xs()
-                                        .font_weight(gpui::FontWeight::BOLD)
+                                        .font_weight(wgpuiFontWeight::BOLD)
                                         .child("?"),
                                 ),
                         )
@@ -235,7 +235,7 @@ impl Render for Titlebar {
 fn mini_player(
     theme: &Theme,
     track: &crate::controller::state::Track,
-    current_image: Option<&std::sync::Arc<gpui::RenderImage>>,
+    current_image: Option<&std::sync::Arc<wgpuiRenderImage>>,
     is_playing: bool,
     controller: &Controller,
     artist: &str,
@@ -262,7 +262,7 @@ fn mini_player(
                 .overflow_hidden()
                 .child(if let Some(img_src) = current_image {
                     img(img_src.clone())
-                        .object_fit(gpui::ObjectFit::Contain)
+                        .object_fit(wgpuiObjectFit::Contain)
                         .size_full()
                         .into_any_element()
                 } else {
@@ -294,7 +294,7 @@ fn mini_player(
                                     .flex_row()
                                     .text_color(white())
                                     .text_sm()
-                                    .font_weight(gpui::FontWeight::MEDIUM)
+                                    .font_weight(wgpuiFontWeight::MEDIUM)
                                     .whitespace_nowrap()
                                     .child(title.clone())
                                     .child(title)
@@ -314,7 +314,7 @@ fn mini_player(
                                 div()
                                     .text_color(white())
                                     .text_sm()
-                                    .font_weight(gpui::FontWeight::MEDIUM)
+                                    .font_weight(wgpuiFontWeight::MEDIUM)
                                     .whitespace_nowrap()
                                     .text_ellipsis()
                                     .child(title),

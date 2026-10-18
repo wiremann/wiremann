@@ -4,7 +4,7 @@ use crate::controller::state::{ImageId, TrackId, TrackSource};
 use crate::controller::state::{Playlist, PlaylistId};
 use crate::lyrics_manager::Lyrics;
 use crate::scanner::metadata::ScannedTrack;
-use gpui::RenderImage;
+use wgpuiRenderImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;

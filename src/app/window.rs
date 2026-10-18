@@ -1,4 +1,4 @@
-use gpui::{
+use wgpui{
     App, Bounds, Size, WindowBackgroundAppearance, WindowBounds, WindowDecorations, WindowIcon,
     WindowKind, WindowOptions, px, size,
 };

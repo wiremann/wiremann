@@ -2,7 +2,7 @@ use crate::cacher::ImageKind;
 use crate::controller::commands::CacherCommand;
 use crate::controller::state::ImageId;
 use crossbeam_channel::Sender;
-use gpui::RenderImage;
+use wgpuiRenderImage;
 use lru::LruCache;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
@@ -66,4 +66,4 @@ impl ImageCache {
     }
 }
 
-impl gpui::Global for ImageCache {}
+impl wgpuiGlobal for ImageCache {}

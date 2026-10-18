@@ -1,8 +1,8 @@
 use super::Page;
 use crate::ui::theme::Theme;
 
-use gpui::prelude::FluentBuilder;
-use gpui::{
+use wgpuiprelude::FluentBuilder;
+use wgpui{
     Animation, AnimationExt as _, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
     ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, px,
 };
@@ -72,7 +72,7 @@ impl Render for NavBar {
 
                             this.with_animation(
                                 ElementId::NamedInteger("pill_move".into(), page as u64),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                Animation::new(duration).with_easing(wgpuiease_out_quint()),
                                 move |this, delta| {
                                     let x = prev_offset
                                         + (active_highlight_offset - prev_offset) * delta;

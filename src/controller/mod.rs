@@ -24,7 +24,7 @@ use crate::{
 use commands::{AudioCommand, ScannerCommand};
 use crossbeam_channel::{Receiver, Sender};
 use events::{AudioEvent, ScannerEvent};
-use gpui::{App, Entity, Global, Rgba, rgb};
+use wgpui{App, Entity, Global, Rgba, rgb};
 use okmain::rgb::Rgb;
 use rand::rng;
 use rand::seq::{IteratorRandom, SliceRandom};

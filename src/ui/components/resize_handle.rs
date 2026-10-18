@@ -1,5 +1,5 @@
 use crate::ui::{components::element_ext::ElementExt, theme::Theme};
-use gpui::{
+use wgpui{
     App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, InteractiveElement,
     IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement,
     Styled, Window, div, px,
@@ -16,7 +16,7 @@ struct ResizeDrag(EntityId);
 
 impl Render for ResizeDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        gpui::Empty
+        wgpuiEmpty
     }
 }
 

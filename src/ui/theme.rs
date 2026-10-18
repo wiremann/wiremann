@@ -1,4 +1,4 @@
-use gpui::{Rgba, rgb, rgba};
+use wgpui{Rgba, rgb, rgba};
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
@@ -492,5 +492,5 @@ impl Default for DominantColors {
     }
 }
 
-impl gpui::Global for Theme {}
-impl gpui::Global for DominantColors {}
+impl wgpuiGlobal for Theme {}
+impl wgpuiGlobal for DominantColors {}

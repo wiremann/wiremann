@@ -10,7 +10,7 @@ use crate::{
         wiremann::Wiremann,
     },
 };
-use gpui::{
+use wgpui{
     App, Context, Entity, FontWeight, Global, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, Size, StatefulInteractiveElement, Styled, StyledImage, Window,
     div, img, px, size,

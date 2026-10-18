@@ -1,4 +1,4 @@
-use gpui::{
+use wgpui{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
     div, img, px, rems,

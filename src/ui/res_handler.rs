@@ -1,7 +1,7 @@
 use crate::controller::events::{
     AudioEvent, CacherEvent, ImageProcessorEvent, LyricsEvent, ScannerEvent, SystemIntegrationEvent,
 };
-use gpui::{Context, EventEmitter};
+use wgpui{Context, EventEmitter};
 
 pub enum Event {
     Audio(AudioEvent),

@@ -1,4 +1,4 @@
-use gpui::{
+use wgpui{
     Animation, AnimationExt, Context, ElementId, FontWeight, Global, InteractiveElement,
     IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
     gradient_color_stop, linear_gradient, px, transparent_black,
@@ -171,7 +171,7 @@ impl Render for Sidebar {
                         indicator
                             .with_animation(
                                 ElementId::Name(format!("sidebar_indicator_{current:?}").into()),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
+                                Animation::new(duration).with_easing(wgpuiease_out_quint()),
                                 move |this, delta| {
                                     let y = prev_top + (indicator_data.top - prev_top) * delta;
 

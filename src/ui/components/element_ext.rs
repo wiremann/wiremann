@@ -1,5 +1,5 @@
 // Ref: https://github.com/longbridge/gpui-component/blob/main/crates/ui/src/element_ext.rs
-use gpui::{App, Bounds, ParentElement, Pixels, Styled, Window, canvas};
+use wgpui{App, Bounds, ParentElement, Pixels, Styled, Window, canvas};
 
 pub trait ElementExt: ParentElement + Sized {
     /// Add a prepaint callback to the element.
@@ -8,7 +8,7 @@ pub trait ElementExt: ParentElement + Sized {
     ///
     /// The first argument is the bounds of the element in pixels.
     ///
-    /// See also [`gpui::canvas`].
+    /// See also [`wgpuicanvas`].
     fn on_prepaint<F>(self, f: F) -> Self
     where
         F: FnOnce(Bounds<Pixels>, &mut Window, &mut App) + 'static,

@@ -1,4 +1,4 @@
-use gpui::{
+use wgpui{
     AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement,
     LayoutId, Pixels, Window,
 };

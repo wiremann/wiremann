@@ -1,4 +1,4 @@
-use gpui::{
+use wgpui{
     AnyElement, App, AvailableSpace, Bounds, ContentMask, Context, Div, Element, ElementId, Entity,
     GlobalElementId, Hitbox, InteractiveElement, IntoElement, Pixels, Render, ScrollHandle, Size,
     SmoothScrollState, Stateful, StatefulInteractiveElement, Styled, Window, div, point, px, size,
@@ -78,7 +78,7 @@ where
         view.update(cx, |this, cx| {
             f(this, range, cols, window, cx)
                 .into_iter()
-                .map(gpui::IntoElement::into_any_element)
+                .map(wgpuiIntoElement::into_any_element)
                 .collect()
         })
     };
@@ -130,10 +130,10 @@ impl Element for VirtualGrid {
     fn request_layout(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
+        inspector_id: Option<&wgpuiInspectorElementId>,
         window: &mut Window,
         cx: &mut App,
-    ) -> (gpui::LayoutId, Self::RequestLayoutState) {
+    ) -> (wgpuiLayoutId, Self::RequestLayoutState) {
         let layout_id = self.base.interactivity().request_layout(
             global_id,
             inspector_id,
@@ -153,7 +153,7 @@ impl Element for VirtualGrid {
     fn prepaint(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
+        inspector_id: Option<&wgpuiInspectorElementId>,
         bounds: Bounds<Pixels>,
         layout: &mut Self::RequestLayoutState,
         window: &mut Window,
@@ -271,7 +271,7 @@ impl Element for VirtualGrid {
     fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
+        inspector_id: Option<&wgpuiInspectorElementId>,
         bounds: Bounds<Pixels>,
         layout: &mut Self::RequestLayoutState,
         hitbox: &mut Self::PrepaintState,

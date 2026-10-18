@@ -1,5 +1,5 @@
 use crate::ui::components::bounds_observer::observe_bounds;
-use gpui::{
+use wgpui{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
     Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,
@@ -476,7 +476,7 @@ impl HomeSection {
                 let mut iter = children.into_iter();
 
                 loop {
-                    let mut row_children: Vec<gpui::AnyElement> = Vec::new();
+                    let mut row_children: Vec<wgpuiAnyElement> = Vec::new();
                     for _ in 0..cols {
                         if let Some(child) = iter.next() {
                             row_children.push(child.w(cell_w).flex_shrink_0().into_any_element());

@@ -1,5 +1,5 @@
-use gpui::prelude::FluentBuilder;
-use gpui::{
+use wgpuiprelude::FluentBuilder;
+use wgpui{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
