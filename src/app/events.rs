@@ -5,7 +5,7 @@ use crate::{
         wiremann::Wiremann,
     },
 };
-use wgpui{App, Entity};
+use gpui::{App, Entity};
 use std::{
     sync::Arc,
     time::{Duration, Instant},

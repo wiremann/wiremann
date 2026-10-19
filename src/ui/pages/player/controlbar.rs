@@ -4,7 +4,7 @@ use crate::ui::{
     components::slider::{Slider, SliderState},
     theme::Theme,
 };
-use wgpui{
+use gpui::{
     Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, div,
 };

@@ -17,4 +17,4 @@ pub enum Page {
     Player,
 }
 
-impl wgpuiGlobal for Page {}
+impl gpui::Global for Page {}

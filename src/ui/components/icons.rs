@@ -1,4 +1,4 @@
-use wgpui{
+use gpui::{
     AnyElement, App, AppContext, Context, Entity, Hsla, IntoElement, Radians, Render, RenderOnce,
     SharedString, StyleRefinement, Styled, TextColor, Transformation, Window,
     prelude::FluentBuilder as _, svg, white,

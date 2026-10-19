@@ -7,7 +7,7 @@ use crate::ui::{
     },
     theme::Theme,
 };
-use wgpui{
+use gpui::{
     Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
     IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
@@ -133,7 +133,7 @@ impl Render for ToastManager {
                                     div()
                                         .flex_1()
                                         .text_color(theme.toast_text)
-                                        .font_weight(wgpuiFontWeight::MEDIUM)
+                                        .font_weight(gpui::FontWeight::MEDIUM)
                                         .child(msg.clone()),
                                 )
                                 .on_click(move |_, _, cx| {
@@ -181,7 +181,7 @@ impl Render for ToastManager {
 
                             this.with_animation(
                                 ElementId::NamedInteger("toast_anim".into(), id),
-                                Animation::new(duration).with_easing(wgpuiease_out_quint()),
+                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
                                 move |this, delta| match (prev_phase, phase) {
                                     (ToastPhase::Entering, ToastPhase::Idle) => {
                                         let x = 80.0 * (1.0 - delta);

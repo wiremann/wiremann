@@ -5,8 +5,8 @@
 // use crate::ui::components::Page;
 // use crate::ui::components::image_cache::ImageCache;
 // use crate::ui::theme::Theme;
-// use wgpuiprelude::FluentBuilder;
-// use wgpui{
+// use gpui::prelude::FluentBuilder;
+// use gpui::{
 //     App, Div, FontWeight, ImageSource, InteractiveElement, ObjectFit, ParentElement, Pixels,
 //     StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 // };

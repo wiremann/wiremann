@@ -20,8 +20,8 @@ use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
 use crate::ui::theme::Theme;
-use wgpuiprelude::FluentBuilder;
-use wgpui{
+use gpui::prelude::FluentBuilder;
+use gpui::{
     Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
     InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
     UniformListScrollHandle, Window, div, px,

@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use wgpui{
+use gpui::{
     AbsoluteLength, App, Background, BorderStyle, Bounds, Corners, CursorStyle, DispatchPhase,
     Edges, Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId,
     InteractiveElement, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
@@ -36,7 +36,7 @@ impl ScrollableHandle {
 
     /// negative offset
     #[must_use]
-    pub fn offset(&self) -> wgpuiPoint<Pixels> {
+    pub fn offset(&self) -> gpui::Point<Pixels> {
         match self {
             ScrollableHandle::Regular(h) => h.offset(),
             ScrollableHandle::UniformList { handle, .. } => handle.0.borrow().base_handle.offset(),
@@ -45,7 +45,7 @@ impl ScrollableHandle {
 
     /// max offset, this is positive
     #[must_use]
-    pub fn max_offset(&self) -> wgpuiSize<Pixels> {
+    pub fn max_offset(&self) -> gpui::Size<Pixels> {
         match self {
             ScrollableHandle::Regular(h) => h.max_offset(),
             ScrollableHandle::UniformList { handle, .. } => {
@@ -55,7 +55,7 @@ impl ScrollableHandle {
     }
 
     /// scroll offset is NEGATIVE (0 = top, -max = bottom).
-    pub fn set_offset(&self, offset: wgpuiPoint<Pixels>) {
+    pub fn set_offset(&self, offset: gpui::Point<Pixels>) {
         match self {
             ScrollableHandle::Regular(h) => h.set_offset(offset),
             ScrollableHandle::UniformList { handle, .. } => {
@@ -255,11 +255,11 @@ impl Element for Scrollbar {
         let thumb_y = inner_bounds.origin.y + available_track * scroll_ratio;
 
         let thumb_bounds = Bounds {
-            origin: wgpuiPoint {
+            origin: gpui::Point {
                 x: inner_bounds.origin.x,
                 y: thumb_y,
             },
-            size: wgpuiSize {
+            size: gpui::Size {
                 width: inner_bounds.size.width,
                 height: thumb_height,
             },
@@ -427,11 +427,11 @@ impl Element for Scrollbar {
                     state.last_interaction_time = Some(Instant::now());
 
                     let expanded_thumb_bounds = Bounds {
-                        origin: wgpuiPoint {
+                        origin: gpui::Point {
                             x: thumb_bounds_down.origin.x - px(4.0),
                             y: thumb_bounds_down.origin.y,
                         },
-                        size: wgpuiSize {
+                        size: gpui::Size {
                             width: thumb_bounds_down.size.width + px(12.0),
                             height: thumb_bounds_down.size.height,
                         },
@@ -451,7 +451,7 @@ impl Element for Scrollbar {
                             let scroll_ratio = (target_thumb_top / available_track).clamp(0.0, 1.0);
                             let positive_scroll_position = max_offset_down * scroll_ratio;
 
-                            scroll_handle_down.set_offset(wgpuiPoint {
+                            scroll_handle_down.set_offset(gpui::Point {
                                 x: px(0.0),
                                 y: -positive_scroll_position,
                             });
@@ -487,7 +487,7 @@ impl Element for Scrollbar {
                             + delta_y * scroll_per_pixel)
                             .clamp(px(0.0), max_offset_move);
 
-                        scroll_handle_move.set_offset(wgpuiPoint {
+                        scroll_handle_move.set_offset(gpui::Point {
                             x: px(0.0),
                             y: -new_positive_scroll,
                         });
@@ -559,7 +559,7 @@ impl RenderOnce for FloatingScrollbar {
                     .scroll_handle(self.handle)
                     .w(px(8.0))
                     .h_full()
-                    .bg(wgpuitransparent_black())
+                    .bg(gpui::transparent_black())
                     .text_color(theme.scrollbar_thumb)
                     .rounded(px(0.0)),
             )

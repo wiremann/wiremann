@@ -9,7 +9,7 @@ use crate::{
 };
 use crossbeam_channel::{Receiver, Sender, select, tick};
 use dashmap::DashSet;
-use wgpuiRenderImage;
+use gpui::RenderImage;
 use image::{DynamicImage, EncodableLayout, Frame, imageops};
 use smallvec::smallvec;
 use std::collections::{HashMap, HashSet};

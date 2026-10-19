@@ -15,9 +15,9 @@ use crate::{
         theme::Theme,
     },
 };
-use wgpuiEntity;
-use wgpuiprelude::FluentBuilder;
-use wgpui{
+use gpui::Entity;
+use gpui::prelude::FluentBuilder;
+use gpui::{
     App, Bounds, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,

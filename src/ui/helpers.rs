@@ -2,7 +2,7 @@ use crate::controller::state::PlaylistId;
 use crate::controller::state::TrackId;
 use std::sync::Arc;
 use std::time::Duration;
-use wgpuiRenderImage;
+use gpui::RenderImage;
 
 #[must_use]
 #[allow(
@@ -30,7 +30,7 @@ pub fn duration_to_slider(pos: Duration, duration: Duration) -> f32 {
     }
 }
 
-pub fn drop_image_from_app(cx: &mut wgpuiApp, image: Arc<RenderImage>) {
+pub fn drop_image_from_app(cx: &mut gpui::App, image: Arc<RenderImage>) {
     cx.defer(move |cx| {
         for window in cx.windows() {
             let image = image.clone();

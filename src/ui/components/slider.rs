@@ -1,5 +1,5 @@
 use crate::ui::components::element_ext::ElementExt;
-use wgpui{
+use gpui::{
     App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter,
     InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels,
     Point, Refineable, Render, RenderOnce, SharedString, StatefulInteractiveElement,
@@ -24,7 +24,7 @@ struct DragSlider(EntityId);
 
 impl Render for DragSlider {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        wgpuiEmpty
+        gpui::Empty
     }
 }
 

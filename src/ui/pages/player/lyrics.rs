@@ -5,11 +5,11 @@ use crate::ui::components::bounds_observer::observe_bounds;
 use crate::ui::components::icons::{Icons, icon};
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
-use wgpuiprelude::FluentBuilder;
+use gpui::prelude::FluentBuilder;
 use std::cell::RefCell;
 
 use crate::ui::components::virtual_list::{VirtualListScrollController, vlist};
-use wgpui{
+use gpui::{
     Animation, AnimationExt, App, AppContext, Bounds, Context, Entity, FontWeight, Global,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, ScrollHandle, Styled, Window,
     div, gradient_color_stop, linear, linear_gradient, percentage, px, relative, rgba,
@@ -214,7 +214,7 @@ impl Render for LyricLineView {
                                                             .get(&(self.idx, word_idx))
                                                             .map(|b| b.size.width * progress)
                                                     },
-                                                    wgpuiStyled::w,
+                                                    gpui::Styled::w,
                                                 )
                                                 .child(
                                                     div()

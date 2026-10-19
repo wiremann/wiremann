@@ -1,5 +1,5 @@
 use crate::ui::components::bounds_observer::observe_bounds;
-use wgpui{
+use gpui::{
     App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage,
     Window, div, gradient_color_stop, img, linear_gradient, prelude::FluentBuilder, px, rems,

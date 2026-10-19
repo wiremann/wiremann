@@ -8,7 +8,7 @@ use std::{
 };
 
 use crossbeam_channel::{Receiver, select, tick};
-use wgpuiRenderImage;
+use gpui::RenderImage;
 use image::Frame;
 use smallvec::smallvec;
 use tracing::{error, info, trace};

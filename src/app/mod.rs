@@ -16,7 +16,7 @@ use crate::{
 };
 pub use paths::*;
 
-use wgpui{AppContext, Application, Result};
+use gpui::{AppContext, Application, Result};
 use raw_window_handle::HasWindowHandle;
 use std::sync::Arc;
 use tracing::info;
@@ -44,7 +44,7 @@ pub fn run(app_paths: AppPaths) -> Result<(), AppError> {
             println!(
                 "Worker configuration: \nMetadata: {metadata_workers:?}\nThumbnail: {thumbnail_workers:?}\nCacher: {cacher_workers:?}"
             );
-            let app_icon = wgpuiWindowIcon::from_png_bytes(ICON_PNG).ok();
+            let app_icon = gpui::WindowIcon::from_png_bytes(ICON_PNG).ok();
             let window_options = build_window_options(app_icon, cx);
 
             info!("Spawning application window...");

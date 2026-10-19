@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use wgpui{App, KeyBinding, actions};
+use gpui::{App, KeyBinding, actions};
 
 use crate::{
     controller::{Controller, state::PlaybackStatus},

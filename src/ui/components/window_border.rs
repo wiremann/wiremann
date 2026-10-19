@@ -1,5 +1,5 @@
 use crate::ui::theme::Theme;
-use wgpui{
+use gpui::{
     AnyElement, App, Bounds, CursorStyle, Decorations, Edges, HitboxBehavior, Hsla,
     InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce,
     ResizeEdge, Size, Styled, Window, canvas, div, point, prelude::FluentBuilder, px,
@@ -160,7 +160,7 @@ impl RenderOnce for WindowBorder {
                             .when(!tiling.left, |div| div.border_l(BORDER_SIZE))
                             .when(!tiling.right, |div| div.border_r(BORDER_SIZE))
                             .when(!tiling.is_tiled(), |div| {
-                                div.shadow(vec![wgpuiBoxShadow {
+                                div.shadow(vec![gpui::BoxShadow {
                                     color: Hsla {
                                         h: 0.,
                                         s: 0.,

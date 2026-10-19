@@ -3,8 +3,8 @@ use crate::controller::{Controller, state::Track};
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
-use wgpuiprelude::FluentBuilder;
-use wgpui{
+use gpui::prelude::FluentBuilder;
+use gpui::{
     App, AppContext, Context, Entity, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, px, uniform_list,

@@ -13,8 +13,8 @@ use crate::{
         theme::Theme,
     },
 };
-use wgpuiEntity;
-use wgpui{
+use gpui::Entity;
+use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
     UniformListScrollHandle, Window, div, img, rems, uniform_list,

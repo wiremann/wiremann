@@ -1,4 +1,4 @@
-use wgpui{
+use gpui::{
     Context, FontWeight, IntoElement, ParentElement, Render, Styled, Window, div, px, rems,
 };
 

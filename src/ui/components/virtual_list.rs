@@ -1,4 +1,4 @@
-use wgpui{
+use gpui::{
     AnyElement, App, Bounds, ContentMask, Context, Div, Element, ElementId, Entity,
     GlobalElementId, Hitbox, InteractiveElement, IntoElement, Pixels, Render, ScrollHandle, Size,
     SmoothScrollState, Stateful, StatefulInteractiveElement, Styled, Window, div, point, px, size,
@@ -93,7 +93,7 @@ where
         view.update(cx, |this, cx| {
             f(this, range, window, cx)
                 .into_iter()
-                .map(wgpuiIntoElement::into_any_element)
+                .map(gpui::IntoElement::into_any_element)
                 .collect()
         })
     };
@@ -165,10 +165,10 @@ impl Element for VirtualList {
     fn request_layout(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&wgpuiInspectorElementId>,
+        inspector_id: Option<&gpui::InspectorElementId>,
         window: &mut Window,
         cx: &mut App,
-    ) -> (wgpuiLayoutId, Self::RequestLayoutState) {
+    ) -> (gpui::LayoutId, Self::RequestLayoutState) {
         let layout_id = self.base.interactivity().request_layout(
             global_id,
             inspector_id,
@@ -188,7 +188,7 @@ impl Element for VirtualList {
     fn prepaint(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&wgpuiInspectorElementId>,
+        inspector_id: Option<&gpui::InspectorElementId>,
         bounds: Bounds<Pixels>,
         layout: &mut Self::RequestLayoutState,
         window: &mut Window,
@@ -260,8 +260,8 @@ impl Element for VirtualList {
                 let origin = bounds.origin + point(px(0.0), y);
 
                 let available = size(
-                    wgpuiAvailableSpace::Definite(bounds.size.width),
-                    wgpuiAvailableSpace::Definite(self.heights[ix]),
+                    gpui::AvailableSpace::Definite(bounds.size.width),
+                    gpui::AvailableSpace::Definite(self.heights[ix]),
                 );
 
                 item.layout_as_root(available, window, cx);
@@ -289,7 +289,7 @@ impl Element for VirtualList {
     fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&wgpuiInspectorElementId>,
+        inspector_id: Option<&gpui::InspectorElementId>,
         bounds: Bounds<Pixels>,
         layout: &mut Self::RequestLayoutState,
         hitbox: &mut Self::PrepaintState,

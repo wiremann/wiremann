@@ -19,8 +19,8 @@ use controlbar::ControlBar;
 use lyrics::LyricsView;
 use queue::Queue;
 
-use wgpuiprelude::FluentBuilder;
-use wgpui{
+use gpui::prelude::FluentBuilder;
+use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
     StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative,
@@ -123,7 +123,7 @@ impl Render for PlayerPage {
             .flex()
             .items_center()
             .justify_center()
-            .child(div().absolute().size_full().bg(wgpuiradial_gradient(
+            .child(div().absolute().size_full().bg(gpui::radial_gradient(
                 gx,
                 gy - 0.03,
                 0.72,
@@ -131,7 +131,7 @@ impl Render for PlayerPage {
                 gradient_color_stop(dominant_colors.color1, 0.0),
                 gradient_color_stop(rgba(0x00000000), 1.0),
             )))
-            .child(div().absolute().size_full().bg(wgpuiradial_gradient(
+            .child(div().absolute().size_full().bg(gpui::radial_gradient(
                 gx,
                 gy - 0.03,
                 1.9,
@@ -139,7 +139,7 @@ impl Render for PlayerPage {
                 gradient_color_stop(dominant_colors.color1.blend(dominant_colors.color2), 0.0),
                 gradient_color_stop(rgba(0x00000000), 1.0),
             )))
-            .when(is_portrait, wgpuiStyled::flex_col)
+            .when(is_portrait, gpui::Styled::flex_col)
             .child(
                 // Main content: album art + title + controls + controlbar
                 div()
