@@ -3,14 +3,14 @@ pub mod lyrics;
 pub mod queue;
 
 use crate::{
-    controller::{Controller, state::PlaybackStatus},
+    controller::{state::PlaybackStatus, Controller},
     ui::{
         components::{
             bounds_observer::observe_bounds,
-            icons::{Icons, icon},
+            icons::{icon, Icons},
             image_cache::ImageCache,
             resize_handle::{ResizeHandle, ResizeSide, ResizeState},
-            scrollbar::{RightPad, floating_scrollbar},
+            scrollbar::{floating_scrollbar, RightPad},
         },
         theme::{DominantColors, Theme},
     },
@@ -20,10 +20,16 @@ use lyrics::LyricsView;
 use queue::Queue;
 
 use gpui::{
+<<<<<<< HEAD
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
     StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img,
     prelude::FluentBuilder, px, relative, rgba,
+=======
+    div, gradient_color_stop, img, px, relative, rgba, App, AppContext, Bounds, Context, Entity,
+    FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
+    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window,
+>>>>>>> anantnrg-fix-resize-handle-gap
 };
 
 #[derive(Clone)]
@@ -466,7 +472,13 @@ impl Render for PlayerPage {
                     .child(self.controlbar.clone()),
             )
             .when(!is_portrait && *show_panel.read(cx), |this| {
-                this.child(ResizeHandle::new(&self.panel_width))
+                this.child(
+                    div()
+                        .h_full()
+                        .flex_shrink_0()
+                        .bg(theme.player_panel_bg)
+                        .child(ResizeHandle::new(&self.panel_width)),
+                )
             })
             .when(*show_panel.read(cx), |this| {
                 this.child(

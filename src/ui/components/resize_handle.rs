@@ -84,14 +84,17 @@ impl RenderOnce for ResizeHandle {
 
         div()
             .id(("resize_handle", entity_id))
-            .w(px(2.0))
+            .w(px(6.0))
             .h_full()
             .flex_shrink_0()
             .cursor_col_resize()
+            .flex()
+            .justify_center()
+            .items_center()
             .child(
                 div()
                     .id("resize_handle_inner")
-                    .w_full()
+                    .w(px(1.0))
                     .h_full()
                     .bg(theme.resize_handle),
             )
