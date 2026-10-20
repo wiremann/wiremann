@@ -19,12 +19,11 @@ use controlbar::ControlBar;
 use lyrics::LyricsView;
 use queue::Queue;
 
-use gpui::prelude::FluentBuilder;
 use gpui::{
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
-    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img, px, relative,
-    rgba,
+    StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img,
+    prelude::FluentBuilder, px, relative, rgba,
 };
 
 #[derive(Clone)]
@@ -469,146 +468,165 @@ impl Render for PlayerPage {
             .when(!is_portrait && *show_panel.read(cx), |this| {
                 this.child(ResizeHandle::new(&self.panel_width))
             })
-            .child(if *show_panel.read(cx) {
-                div()
-                    .h_full()
-                    .when(is_portrait, |this| this.w_full().flex_1())
-                    .when(!is_portrait, |this| this.w(px(panel_width)).h_full())
-                    .flex_shrink_0()
-                    .flex()
-                    .flex_col()
-                    .bg(theme.player_panel_bg)
-                    .child({
-                        let current_panel = self.current_panel.clone();
+            .when(*show_panel.read(cx), |this| {
+                this.child(
+                    div()
+                        .h_full()
+                        .when(is_portrait, |this| this.w_full().flex_1())
+                        .when(!is_portrait, |this| this.w(px(panel_width)).h_full())
+                        .flex_shrink_0()
+                        .flex()
+                        .flex_col()
+                        .bg(theme.player_panel_bg)
+                        .child({
+                            let current_panel = self.current_panel.clone();
 
-                        let active_left = if *current_panel.read(cx) == Panel::Queue {
-                            px(0.0)
-                        } else {
-                            px(72.0)
-                        };
+                            div()
+                                .w_full()
+                                .relative()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .py_4()
+                                .child(
+                                    div()
+                                        .relative()
+                                        .h_full()
+                                        .flex()
+                                        .items_center()
+                                        .child({
+                                            let current_panel = current_panel.clone();
 
-                        div()
-                            .w_full()
-                            .h_10()
-                            .relative()
-                            .flex()
-                            .items_center()
-                            .justify_start()
-                            .px_4()
-                            .child(
-                                div()
-                                    .relative()
-                                    .h_full()
-                                    .flex()
-                                    .items_center()
-                                    .gap_x_6()
-                                    .child(
-                                        div()
-                                            .absolute()
-                                            .bottom_1()
-                                            .left(active_left)
-                                            .w(px(48.0))
-                                            .h(px(2.0))
-                                            .rounded_full()
-                                            .bg(theme.switcher_active),
-                                    )
-                                    .child({
-                                        let current_panel = current_panel.clone();
+                                            div()
+                                                .id("panel_switcher_queue")
+                                                .py_1()
+                                                .px_5()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .cursor_pointer()
+                                                .relative()
+                                                .on_click({
+                                                    let current_panel = current_panel.clone();
+                                                    move |_, _, cx| {
+                                                        current_panel.update(cx, |p, _| {
+                                                            *p = Panel::Queue;
+                                                        });
+                                                    }
+                                                })
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(rgba(0xffffff33))
+                                                        .rounded_md()
+                                                        .opacity(0.0)
+                                                        .absolute()
+                                                        .when(
+                                                            current_panel.read(cx) == &Panel::Queue,
+                                                            |this| this.opacity(1.0),
+                                                        ),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .font_weight(FontWeight(400.0))
+                                                        .tracking_widest()
+                                                        .text_color(
+                                                            if *current_panel.read(cx)
+                                                                == Panel::Queue
+                                                            {
+                                                                theme.player_panel_tab_text_active
+                                                            } else {
+                                                                theme.player_panel_tab_text
+                                                            },
+                                                        )
+                                                        .child("QUEUE"),
+                                                )
+                                        })
+                                        .child({
+                                            let current_panel = current_panel.clone();
 
-                                        div()
-                                            .id("panel_switcher_queue")
-                                            .w(px(48.0))
-                                            .flex()
-                                            .justify_center()
-                                            .cursor_pointer()
-                                            .on_click({
-                                                let current_panel = current_panel.clone();
-                                                move |_, _, cx| {
-                                                    current_panel.update(cx, |p, _| {
-                                                        *p = Panel::Queue;
-                                                    });
-                                                }
-                                            })
-                                            .child(
-                                                div()
-                                                    .text_sm()
-                                                    .font_weight(FontWeight(500.0))
-                                                    .text_color(
-                                                        if *current_panel.read(cx) == Panel::Queue {
-                                                            theme.player_panel_tab_text_active
-                                                        } else {
-                                                            theme.player_panel_tab_text
-                                                        },
-                                                    )
-                                                    .child("Queue"),
-                                            )
-                                    })
-                                    .child({
-                                        let current_panel = current_panel.clone();
-
-                                        div()
-                                            .id("panel_switcher_lyrics")
-                                            .w(px(48.0))
-                                            .flex()
-                                            .justify_center()
-                                            .cursor_pointer()
-                                            .on_click({
-                                                let current_panel = current_panel.clone();
-                                                move |_, _, cx| {
-                                                    current_panel.update(cx, |p, _| {
-                                                        *p = Panel::Lyrics;
-                                                    });
-                                                }
-                                            })
-                                            .child(
-                                                div()
-                                                    .text_sm()
-                                                    .font_weight(FontWeight(500.0))
-                                                    .text_color(
-                                                        if *current_panel.read(cx) == Panel::Lyrics
-                                                        {
-                                                            theme.player_panel_tab_text_active
-                                                        } else {
-                                                            theme.player_panel_tab_text
-                                                        },
-                                                    )
-                                                    .child("Lyrics"),
-                                            )
-                                    }),
-                            )
-                    })
-                    .child({
-                        let current_panel = self.current_panel.clone();
-
-                        div().w_full().h_full().px_4().flex().relative().child({
-                            if *current_panel.read(cx) == Panel::Queue {
-                                div()
-                                    .id("queue_container")
-                                    .w_full()
-                                    .h_full()
-                                    .child(self.queue.clone())
-                                    .child(floating_scrollbar(
-                                        "queue_scrollbar",
-                                        queue_scroll_handle,
-                                        RightPad::Pad,
-                                    ))
-                            } else {
-                                div()
-                                    .id("lyrics_container")
-                                    .w_full()
-                                    .h_full()
-                                    .px_8()
-                                    .child(self.lyrics.clone())
-                                    .child(floating_scrollbar(
-                                        "lyrics_scrollbar",
-                                        lyrics_scroll_handle,
-                                        RightPad::Pad,
-                                    ))
-                            }
+                                            div()
+                                                .id("panel_switcher_lyrics")
+                                                .py_1()
+                                                .px_5()
+                                                .flex()
+                                                .justify_center()
+                                                .items_center()
+                                                .cursor_pointer()
+                                                .on_click({
+                                                    let current_panel = current_panel.clone();
+                                                    move |_, _, cx| {
+                                                        current_panel.update(cx, |p, _| {
+                                                            *p = Panel::Lyrics;
+                                                        });
+                                                    }
+                                                })
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(rgba(0xffffff33))
+                                                        .rounded_md()
+                                                        .opacity(0.0)
+                                                        .absolute()
+                                                        .when(
+                                                            current_panel.read(cx)
+                                                                == &Panel::Lyrics,
+                                                            |this| this.opacity(1.0),
+                                                        ),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .font_weight(FontWeight(400.0))
+                                                        .tracking_widest()
+                                                        .text_color(
+                                                            if *current_panel.read(cx)
+                                                                == Panel::Lyrics
+                                                            {
+                                                                theme.player_panel_tab_text_active
+                                                            } else {
+                                                                theme.player_panel_tab_text
+                                                            },
+                                                        )
+                                                        .child("LYRICS"),
+                                                )
+                                        }),
+                                )
                         })
-                    })
-            } else {
-                div()
+                        .child({
+                            let current_panel = self.current_panel.clone();
+
+                            div().w_full().h_full().px_4().flex().relative().child({
+                                if *current_panel.read(cx) == Panel::Queue {
+                                    div()
+                                        .id("queue_container")
+                                        .w_full()
+                                        .h_full()
+                                        .child(self.queue.clone())
+                                        .child(floating_scrollbar(
+                                            "queue_scrollbar",
+                                            queue_scroll_handle,
+                                            RightPad::Pad,
+                                        ))
+                                } else {
+                                    div()
+                                        .id("lyrics_container")
+                                        .w_full()
+                                        .h_full()
+                                        .px_8()
+                                        .child(self.lyrics.clone())
+                                        .child(floating_scrollbar(
+                                            "lyrics_scrollbar",
+                                            lyrics_scroll_handle,
+                                            RightPad::Pad,
+                                        ))
+                                }
+                            })
+                        }),
+                )
             })
             .child(
                 div()
