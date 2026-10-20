@@ -276,15 +276,15 @@ impl Default for Theme {
             player_panel_bg: rgba(0x050505A0),
             player_panel_tab_bg: rgba(0xFFFFFF00),
             player_panel_tab_bg_hover: rgba(0xFFFFFF0A),
-            player_panel_tab_bg_active: rgba(0xFFFFFF14),
+            player_panel_tab_bg_active: rgba(0xFFFFFF24),
 
             player_panel_tab_text: rgb(0x71717A),
             player_panel_tab_text_hover: rgb(0xD4D4D8),
             player_panel_tab_text_active: rgb(0xFAFAFA),
 
-            player_panel_show_hide_text: rgb(0x71717A),
+            player_panel_show_hide_text: rgba(0xFFFFFFCC),
             player_panel_show_hide_text_hover: rgb(0xFFFFFF),
-            player_panel_show_hide_bg_hover: rgba(0xFFFFFF0A),
+            player_panel_show_hide_bg_hover: rgba(0xFFFFFF24),
 
             queue_item_title: rgb(0xFAFAFA),
             queue_item_title_current: rgb(0xFFFFFF),

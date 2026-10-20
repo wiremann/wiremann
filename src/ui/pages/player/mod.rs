@@ -487,7 +487,7 @@ impl Render for PlayerPage {
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .py_4()
+                                .py_3()
                                 .child(
                                     div()
                                         .relative()
@@ -518,7 +518,7 @@ impl Render for PlayerPage {
                                                     div()
                                                         .w_full()
                                                         .h_full()
-                                                        .bg(rgba(0xffffff33))
+                                                        .bg(theme.player_panel_tab_bg_active)
                                                         .rounded_md()
                                                         .opacity(0.0)
                                                         .absolute()
@@ -567,7 +567,7 @@ impl Render for PlayerPage {
                                                     div()
                                                         .w_full()
                                                         .h_full()
-                                                        .bg(rgba(0xffffff33))
+                                                        .bg(theme.player_panel_tab_bg_active)
                                                         .rounded_md()
                                                         .opacity(0.0)
                                                         .absolute()
@@ -631,11 +631,11 @@ impl Render for PlayerPage {
             .child(
                 div()
                     .id("show_hide_queue")
-                    .px_3()
-                    .py_1()
+                    .px_2()
+                    .py_2()
                     .absolute()
-                    .top_1()
-                    .right_1()
+                    .top_2()
+                    .right_2()
                     .text_center()
                     .rounded_md()
                     .text_sm()
@@ -647,7 +647,7 @@ impl Render for PlayerPage {
                             .text_color(theme.player_panel_show_hide_text_hover)
                     })
                     .on_click(move |_, _, cx| show_panel.update(cx, |this, _| *this = !*this))
-                    .child(icon(Icons::PanelRight).size_5()),
+                    .child(icon(Icons::PanelRight).size_4()),
             )
     }
 }
