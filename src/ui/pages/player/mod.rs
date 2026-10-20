@@ -3,14 +3,14 @@ pub mod lyrics;
 pub mod queue;
 
 use crate::{
-    controller::{state::PlaybackStatus, Controller},
+    controller::{Controller, state::PlaybackStatus},
     ui::{
         components::{
             bounds_observer::observe_bounds,
-            icons::{icon, Icons},
+            icons::{Icons, icon},
             image_cache::ImageCache,
             resize_handle::{ResizeHandle, ResizeSide, ResizeState},
-            scrollbar::{floating_scrollbar, RightPad},
+            scrollbar::{RightPad, floating_scrollbar},
         },
         theme::{DominantColors, Theme},
     },
@@ -20,16 +20,10 @@ use lyrics::LyricsView;
 use queue::Queue;
 
 use gpui::{
-<<<<<<< HEAD
     App, AppContext, Bounds, Context, Entity, FontWeight, InteractiveElement, IntoElement,
     ObjectFit, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement, Styled,
     StyledImage, UniformListScrollHandle, Window, div, gradient_color_stop, img,
     prelude::FluentBuilder, px, relative, rgba,
-=======
-    div, gradient_color_stop, img, px, relative, rgba, App, AppContext, Bounds, Context, Entity,
-    FontWeight, InteractiveElement, IntoElement, ObjectFit, ParentElement, Pixels, Render,
-    ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, UniformListScrollHandle, Window,
->>>>>>> anantnrg-fix-resize-handle-gap
 };
 
 #[derive(Clone)]
