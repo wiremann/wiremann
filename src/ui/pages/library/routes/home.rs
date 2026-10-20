@@ -732,8 +732,6 @@ impl Render for HomeSection {
                         avail_width.update(cx, |v, _| {
                             *v = width;
                         });
-
-                        println!("HOME WIDTH: {}", bounds.size.width);
                     }
                 },
             ))

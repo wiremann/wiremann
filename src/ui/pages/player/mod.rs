@@ -536,7 +536,7 @@ impl Render for PlayerPage {
                                                 .child(
                                                     div()
                                                         .text_xs()
-                                                        .font_weight(FontWeight(400.0))
+                                                        .font_weight(FontWeight(500.0))
                                                         .tracking_widest()
                                                         .text_color(
                                                             if *current_panel.read(cx)
@@ -586,7 +586,7 @@ impl Render for PlayerPage {
                                                 .child(
                                                     div()
                                                         .text_xs()
-                                                        .font_weight(FontWeight(400.0))
+                                                        .font_weight(FontWeight(500.0))
                                                         .tracking_widest()
                                                         .text_color(
                                                             if *current_panel.read(cx)
