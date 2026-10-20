@@ -1,8 +1,8 @@
 use crate::ui::{components::element_ext::ElementExt, theme::Theme};
 use gpui::{
-    App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, InteractiveElement,
+    div, px, App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, InteractiveElement,
     IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement,
-    Styled, Window, div, px,
+    Styled, Window,
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -84,17 +84,14 @@ impl RenderOnce for ResizeHandle {
 
         div()
             .id(("resize_handle", entity_id))
-            .w(px(6.0))
+            .w(px(2.0))
             .h_full()
             .flex_shrink_0()
             .cursor_col_resize()
-            .flex()
-            .justify_center()
-            .items_center()
             .child(
                 div()
                     .id("resize_handle_inner")
-                    .w(px(2.0))
+                    .w_full()
                     .h_full()
                     .bg(theme.resize_handle),
             )
