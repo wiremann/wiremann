@@ -1,3 +1,7 @@
+use wgpui_motion::prelude::Spring;
+
+pub const PAGE_TRANSITION_SPRING: Spring = Spring::SNAPPY;
+
 pub fn ease_in_out_quart() -> impl Fn(f32) -> f32 {
     move |delta| {
         if delta < 0.5 {

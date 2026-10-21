@@ -2,6 +2,7 @@ mod navbar;
 mod titlebar;
 
 use crate::controller::Controller;
+use crate::ui::animations::PAGE_TRANSITION_SPRING;
 use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
@@ -24,7 +25,7 @@ use gpui::{
 };
 use std::time::Duration;
 use titlebar::Titlebar;
-use wgpui_motion::prelude::{MotionExt, Transition, expo_in_out};
+use wgpui_motion::prelude::{MotionExt, Transition};
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
@@ -175,10 +176,7 @@ impl Render for Wiremann {
                         this.child(
                             page_el
                                 .motion(ElementId::NamedInteger("page_slide".into(), page as u64))
-                                .transition(
-                                    Transition::new(Duration::from_millis(300))
-                                        .curve(expo_in_out()),
-                                )
+                                .transition(Transition::spring(PAGE_TRANSITION_SPRING))
                                 .enter(move |style| style.left(px(offset)).opacity(0.0))
                                 .base(|style| style.left(px(0.0)).opacity(1.0))
                                 .on_settle(move |_, _, cx| {

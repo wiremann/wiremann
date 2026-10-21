@@ -3,6 +3,7 @@ mod routes;
 mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
+use crate::ui::animations::PAGE_TRANSITION_SPRING;
 use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
@@ -24,7 +25,7 @@ use gpui::{
     App, AppContext, Context, ElementId, Entity, Global, InteractiveElement, IntoElement,
     ParentElement, Render, ScrollHandle, Styled, UniformListScrollHandle, Window, div, px,
 };
-use wgpui_motion::prelude::{MotionExt, Spring, Transition};
+use wgpui_motion::prelude::{MotionExt, Transition};
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -48,6 +49,14 @@ pub enum LibraryRoutes {
     // System
     Settings,
     Plugins,
+}
+
+#[derive(Clone, Copy)]
+struct LibraryTransitionState {
+    settled: LibraryRoutes,
+    from: LibraryRoutes,
+    target: LibraryRoutes,
+    generation: u64,
 }
 
 #[derive(Clone)]
@@ -204,10 +213,25 @@ impl Render for LibraryPage {
                 div().w_full().h_full().child(self.playlist.clone())
             }
         };
-        let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
-        let prev_page = *section_state.read(cx);
+        let transition_state =
+            window.use_keyed_state("library_transition", cx, |_, _| LibraryTransitionState {
+                settled: section,
+                from: section,
+                target: section,
+                generation: 0,
+            });
+        if transition_state.read(cx).target != section {
+            transition_state.update(cx, |state, _| {
+                state.from = state.target;
+                state.target = section;
+                state.generation = state.generation.wrapping_add(1);
+            });
+        }
+        let transition = *transition_state.read(cx);
 
-        let direction = (section.index() - prev_page.index()).signum() as f32;
+        let direction = (section.index() - transition.from.index()).signum() as f32;
+        let is_transitioning =
+            transition.target != transition.settled || transition.from != transition.target;
 
         div()
             .size_full()
@@ -230,18 +254,29 @@ impl Render for LibraryPage {
                     .w_full()
                     .h_full()
                     .map(move |this| {
-                        if prev_page == section {
+                        if !is_transitioning {
                             this.child(section_el).into_any_element()
                         } else {
-                            let section_state = section_state.clone();
+                            let transition_state = transition_state.clone();
+                            let generation = transition.generation;
 
                             this.child(section_el)
-                                .motion(ElementId::Name("library_section".into()))
-                                .transition(Transition::spring(Spring::snappy()))
+                                .motion(ElementId::NamedInteger(
+                                    "library_section".into(),
+                                    generation,
+                                ))
+                                .transition(Transition::spring(PAGE_TRANSITION_SPRING))
                                 .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
                                 .base(|style| style.top(px(0.0)).opacity(1.0))
                                 .on_settle(move |_, _, cx| {
-                                    section_state.update(cx, |state, _| *state = section);
+                                    transition_state.update(cx, |state, cx| {
+                                        if state.generation == generation && state.target == section
+                                        {
+                                            state.settled = section;
+                                            state.from = section;
+                                            cx.notify();
+                                        }
+                                    });
                                 })
                                 .into_any_element()
                         }
