@@ -2,7 +2,6 @@ mod navbar;
 mod titlebar;
 
 use crate::controller::Controller;
-use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
@@ -20,11 +19,12 @@ use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
+    AppContext, BorrowAppContext, Context, ElementId, Entity, InteractiveElement, IntoElement,
+    ParentElement, Render, Styled, Window, div, px,
 };
 use std::time::Duration;
 use titlebar::Titlebar;
+use wgpui_motion::prelude::{MotionExt, Transition, expo_in_out};
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
@@ -169,29 +169,23 @@ impl Render for Wiremann {
                     if prev_page == page {
                         this.child(page_el).into_any_element()
                     } else {
-                        let duration = std::time::Duration::from_millis(300);
+                        let page_state = page_state.clone();
+                        let offset = 360.0 * direction;
 
-                        cx.spawn({
-                            let page_state = page_state.clone();
-                            async move |_, cx| {
-                                cx.background_executor().timer(duration).await;
-                                let () = page_state.update(cx, |state, _| {
-                                    *state = page;
-                                });
-                            }
-                        })
-                        .detach();
-
-                        this.child(page_el)
-                            .with_animation(
-                                ElementId::NamedInteger("page_slide".into(), page as u64),
-                                Animation::new(duration).with_easing(ease_in_out_expo()),
-                                move |this, delta| {
-                                    let offset = 360.0 * direction * (1.0 - delta);
-                                    this.left(px(offset)).opacity(delta)
-                                },
-                            )
-                            .into_any_element()
+                        this.child(
+                            page_el
+                                .motion(ElementId::NamedInteger("page_slide".into(), page as u64))
+                                .transition(
+                                    Transition::new(Duration::from_millis(300))
+                                        .curve(expo_in_out()),
+                                )
+                                .enter(move |style| style.left(px(offset)).opacity(0.0))
+                                .base(|style| style.left(px(0.0)).opacity(1.0))
+                                .on_settle(move |_, _, cx| {
+                                    page_state.update(cx, |state, _| *state = page);
+                                }),
+                        )
+                        .into_any_element()
                     }
                 })
                 .into_any_element()

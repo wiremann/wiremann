@@ -8,7 +8,7 @@ authors = ["Anant Narayan"]
 [dependencies]
 anyhow = "1.0.102"
 crossbeam-channel = "0.5.15"
-gpui-ce = { git = "https://github.com/Far-Beyond-Pulsar/WGPUI" }
+gpui-ce = { git = "https://github.com/Far-Beyond-Pulsar/WGPUI", rev = "afcb6bf3c73ed5a33077dc8544d7b6db9cb90619" }
 wgpui-motion = { git = "https://github.com/Far-Beyond-Pulsar/WGPUI-Motion" }
 image = { version = "0.25.10", default-features = false, features = [
     "png",
