@@ -328,17 +328,6 @@ impl Render for PlayerPage {
                                     .justify_center()
                                     .cursor_pointer()
                                     .text_color(theme.player_icons_text)
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
-                                    .when(
-                                        current_id.is_some_and(|id| controller.is_favorite(id, cx)),
-                                        |this| {
-                                            this.text_color(theme.player_icons_text_active)
-                                                .bg(theme.player_icons_bg_active)
-                                        },
-                                    )
                                     .on_click({
                                         let controller = controller.clone();
                                         move |_, _, cx| {
@@ -353,6 +342,28 @@ impl Render for PlayerPage {
                                             }
                                         }
                                     })
+                                    .motion("player_favorite")
+                                    .transition(page_transition())
+                                    .variant_when(
+                                        current_id.is_some_and(|id| controller.is_favorite(id, cx)),
+                                        move |style| {
+                                            style
+                                                .text_color(theme.player_icons_text_active)
+                                                .bg(theme.player_icons_bg_active)
+                                        },
+                                    )
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
+                                    })
                                     .child(icon(Icons::Heart).size_4()),
                             )
                             .child(
@@ -364,22 +375,33 @@ impl Render for PlayerPage {
                                     .items_center()
                                     .justify_center()
                                     .text_color(theme.player_icons_text)
-                                    .when(
-                                        cx.global::<Controller>().state.read(cx).playback.shuffling,
-                                        |this| {
-                                            this.text_color(theme.player_icons_text_active)
-                                                .bg(theme.player_icons_bg_active)
-                                        },
-                                    )
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
                                     .on_click({
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_shuffle(cx)
                                     })
                                     .cursor_pointer()
+                                    .motion("player_shuffle")
+                                    .transition(page_transition())
+                                    .variant_when(
+                                        cx.global::<Controller>().state.read(cx).playback.shuffling,
+                                        move |style| {
+                                            style
+                                                .text_color(theme.player_icons_text_active)
+                                                .bg(theme.player_icons_bg_active)
+                                        },
+                                    )
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
+                                    })
                                     .child(icon(Icons::Shuffle).size_4()),
                             )
                             .child(
@@ -390,25 +412,34 @@ impl Render for PlayerPage {
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
                                     .text_color(theme.player_icons_text)
                                     .cursor_pointer()
+                                    .motion("player_previous")
+                                    .transition(page_transition())
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
+                                    })
                                     .child(icon(Icons::Prev).size_4()),
                             )
                             .child(
                                 div()
                                     .id("play_pause")
-                                    .p_5()
-                                    .rounded_full()
+                                    .w(px(60.0))
+                                    .h(px(60.0))
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .bg(theme.player_play_pause_bg)
-                                    .hover(|this| this.bg(theme.player_play_pause_hover))
+                                    .cursor_pointer()
                                     .on_click(|_, _, cx| {
                                         match cx
                                             .global::<Controller>()
@@ -425,16 +456,37 @@ impl Render for PlayerPage {
                                             }
                                         }
                                     })
-                                    .text_color(theme.player_play_pause_text)
-                                    .cursor_pointer()
                                     .child(
-                                        if cx.global::<Controller>().state.read(cx).playback.status
-                                            == PlaybackStatus::Playing
-                                        {
-                                            icon(Icons::Pause).size_5()
-                                        } else {
-                                            icon(Icons::Play).size_5()
-                                        },
+                                        div()
+                                            .size_full()
+                                            .rounded_full()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .bg(theme.player_play_pause_bg)
+                                            .text_color(theme.player_play_pause_text)
+                                            .motion("player_play_pause")
+                                            .transition(page_transition())
+                                            .while_hovered(move |style| {
+                                                style.bg(theme.player_play_pause_hover)
+                                            })
+                                            .while_pressed(|style| {
+                                                style.w(relative(0.92)).h(relative(0.92))
+                                            })
+                                            .child(
+                                                if cx
+                                                    .global::<Controller>()
+                                                    .state
+                                                    .read(cx)
+                                                    .playback
+                                                    .status
+                                                    == PlaybackStatus::Playing
+                                                {
+                                                    icon(Icons::Pause).size_5()
+                                                } else {
+                                                    icon(Icons::Play).size_5()
+                                                },
+                                            ),
                                     ),
                             )
                             .child(
@@ -445,13 +497,23 @@ impl Render for PlayerPage {
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
                                     .cursor_pointer()
                                     .text_color(theme.player_icons_text)
+                                    .motion("player_next")
+                                    .transition(page_transition())
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
+                                    })
                                     .child(icon(Icons::Next).size_4()),
                             )
                             .child(
@@ -463,21 +525,32 @@ impl Render for PlayerPage {
                                     .items_center()
                                     .justify_center()
                                     .cursor_pointer()
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
                                     .text_color(theme.player_icons_text)
-                                    .when(
-                                        cx.global::<Controller>().state.read(cx).playback.repeat,
-                                        |this| {
-                                            this.text_color(theme.player_icons_text_active)
-                                                .bg(theme.player_icons_bg_active)
-                                        },
-                                    )
                                     .on_click({
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_repeat(cx)
+                                    })
+                                    .motion("player_repeat")
+                                    .transition(page_transition())
+                                    .variant_when(
+                                        cx.global::<Controller>().state.read(cx).playback.repeat,
+                                        move |style| {
+                                            style
+                                                .text_color(theme.player_icons_text_active)
+                                                .bg(theme.player_icons_bg_active)
+                                        },
+                                    )
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
                                     })
                                     .child(icon(Icons::Repeat).size_4()),
                             )
@@ -491,10 +564,6 @@ impl Render for PlayerPage {
                                     .justify_center()
                                     .cursor_pointer()
                                     .text_color(theme.player_icons_text)
-                                    .hover(|this| {
-                                        this.bg(theme.player_icons_bg_hover)
-                                            .text_color(theme.player_icons_text_hover)
-                                    })
                                     .on_click(|_, _, cx| {
                                         if let Some(id) = cx
                                             .global::<Controller>()
@@ -505,6 +574,20 @@ impl Render for PlayerPage {
                                         {
                                             cx.global::<Controller>().reveal_in_folder(id, cx);
                                         }
+                                    })
+                                    .motion("player_reveal_in_folder")
+                                    .transition(page_transition())
+                                    .while_hovered(move |style| {
+                                        style
+                                            .opacity(0.9)
+                                            .bg(theme.player_icons_bg_hover)
+                                            .text_color(theme.player_icons_text_hover)
+                                    })
+                                    .while_pressed(move |style| {
+                                        style
+                                            .opacity(0.72)
+                                            .bg(theme.player_icons_bg_active)
+                                            .text_color(theme.player_icons_text_active)
                                     })
                                     .child(icon(Icons::FolderOpen).size_4()),
                             ),
@@ -792,18 +875,23 @@ impl Render for PlayerPage {
                     .rounded_md()
                     .text_sm()
                     .font_weight(FontWeight(400.0))
-                    .text_color(theme.player_panel_show_hide_text)
                     .cursor_pointer()
-                    .hover(|this| {
-                        this.bg(theme.player_panel_show_hide_bg_hover)
-                            .text_color(theme.player_panel_show_hide_text_hover)
-                    })
                     .on_click(move |_, _, cx| {
                         show_panel.update(cx, |this, cx| {
                             *this = !*this;
                             cx.notify();
                         });
                     })
+                    .bg(rgba(0x00000000))
+                    .text_color(theme.player_panel_show_hide_text)
+                    .motion("player_panel_toggle")
+                    .transition(page_transition())
+                    .while_hovered(move |style| {
+                        style
+                            .bg(theme.player_panel_show_hide_bg_hover)
+                            .text_color(theme.player_panel_show_hide_text_hover)
+                    })
+                    .while_pressed(|style| style.opacity(0.75))
                     .child(icon(Icons::PanelRight).size_4()),
             )
     }
