@@ -3,7 +3,7 @@ mod routes;
 mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
-use crate::ui::animations::PAGE_TRANSITION_SPRING;
+use crate::ui::animations::page_transition;
 use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
@@ -25,7 +25,7 @@ use gpui::{
     App, AppContext, Context, ElementId, Entity, Global, InteractiveElement, IntoElement,
     ParentElement, Render, ScrollHandle, Styled, UniformListScrollHandle, Window, div, px,
 };
-use wgpui_motion::prelude::{MotionExt, Transition};
+use wgpui_motion::prelude::MotionExt;
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -105,6 +105,7 @@ impl LibraryPage {
         cx.set_global(SidebarIndicator {
             top: 0.0,
             height: 32.0,
+            route: LibraryRoutes::Home,
         });
 
         cx.set_global(SidebarBounds { top: 0.0 });
@@ -265,7 +266,7 @@ impl Render for LibraryPage {
                                     "library_section".into(),
                                     generation,
                                 ))
-                                .transition(Transition::spring(PAGE_TRANSITION_SPRING))
+                                .transition(page_transition())
                                 .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
                                 .base(|style| style.top(px(0.0)).opacity(1.0))
                                 .on_settle(move |_, _, cx| {

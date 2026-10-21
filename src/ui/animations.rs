@@ -1,6 +1,10 @@
-use wgpui_motion::prelude::Spring;
+use std::time::Duration;
 
-pub const PAGE_TRANSITION_SPRING: Spring = Spring::SNAPPY;
+use wgpui_motion::prelude::{Transition, expo_in_out};
+
+pub fn page_transition() -> Transition {
+    Transition::new(Duration::from_millis(300)).curve(expo_in_out())
+}
 
 pub fn ease_in_out_quart() -> impl Fn(f32) -> f32 {
     move |delta| {
