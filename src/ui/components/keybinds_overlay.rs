@@ -1,15 +1,19 @@
 use gpui::{
-    App, AppContext, Context, Entity, FontWeight, Global, InteractiveElement, IntoElement,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Window, div, px, rgb,
-    rgba,
+    App, AppContext, Context, ElementId, Entity, FontWeight, Global, InteractiveElement,
+    IntoElement, ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Window,
+    div, px, rgb, rgba,
 };
 
-use crate::ui::theme::Theme;
+use crate::ui::{animations::page_transition, theme::Theme};
+use wgpui_motion::prelude::MotionExt;
 
 #[derive(Clone)]
 pub struct KeybindsOverlay {
     pub visible: Entity<bool>,
     scroll_handle: ScrollHandle,
+    mounted: bool,
+    generation: u64,
+    last_visible: bool,
 }
 
 #[derive(Clone)]
@@ -22,6 +26,9 @@ impl KeybindsOverlay {
         cx.new(|cx| Self {
             visible: cx.new(|_| false),
             scroll_handle: ScrollHandle::new(),
+            mounted: false,
+            generation: 0,
+            last_visible: false,
         })
     }
 }
@@ -40,10 +47,19 @@ impl Render for KeybindsOverlay {
         let theme = *cx.global::<Theme>();
         let visible = *self.visible.read(cx);
 
-        if !visible {
+        if visible {
+            if !self.last_visible {
+                self.generation = self.generation.wrapping_add(1);
+            }
+            self.mounted = true;
+        } else if !self.mounted {
+            self.last_visible = false;
             return div().into_any_element();
         }
 
+        self.last_visible = visible;
+        let generation = self.generation;
+        let overlay_entity = cx.entity();
         let shortcuts = vec![
             ("Space / K", "Play / Pause"),
             ("Ctrl+Left", "Previous Track"),
@@ -75,8 +91,25 @@ impl Render for KeybindsOverlay {
             .on_click({
                 let visible = self.visible.clone();
                 move |_, _, cx| {
-                    visible.update(cx, |v, _| *v = false);
+                    visible.update(cx, |v, cx| {
+                        *v = false;
+                        cx.notify();
+                    });
                 }
+            })
+            .opacity(1.0)
+            .motion(ElementId::NamedInteger(
+                "keybinds_overlay".into(),
+                generation,
+            ))
+            .transition(page_transition())
+            .enter(|style| style.opacity(0.0))
+            .exit_when(!visible, |style| style.opacity(0.0))
+            .on_exit_complete(move |_, _, cx| {
+                overlay_entity.update(cx, |this, cx| {
+                    this.mounted = false;
+                    cx.notify();
+                });
             })
             .child(
                 div()
@@ -91,6 +124,13 @@ impl Render for KeybindsOverlay {
                     .flex()
                     .flex_col()
                     .on_click(|_, _, cx| cx.stop_propagation())
+                    .relative()
+                    .top_0()
+                    .opacity(1.0)
+                    .motion(ElementId::NamedInteger("keybinds_modal".into(), generation))
+                    .transition(page_transition())
+                    .enter(|style| style.top(px(12.0)).opacity(0.0))
+                    .variant_when(!visible, |style| style.top(px(12.0)).opacity(0.0))
                     .child(
                         div()
                             .id("keybinds_header")

@@ -153,6 +153,7 @@ impl Render for PlayerPage {
         let (gx, gy) = gradient_pos.unwrap_or((0.5, 0.4));
 
         let is_portrait = window.bounds().size.width < px(1000.0);
+        let panel_visible = *show_panel.read(cx);
 
         div()
             .size_full()
@@ -182,12 +183,20 @@ impl Render for PlayerPage {
                     .w_full()
                     .flex()
                     .flex_col()
-                    .when(is_portrait, |this| this.h(relative(0.5)))
+                    .when(is_portrait, |this| {
+                        this.h(if panel_visible {
+                            relative(0.5)
+                        } else {
+                            relative(1.0)
+                        })
+                    })
                     .when(!is_portrait, |this| this.flex_1().h_full())
                     .px_16()
                     .pt_8()
                     .pb_2()
                     .bg(theme.player_bg)
+                    .motion("player_main_content")
+                    .transition(page_transition())
                     .child(if let Some(track) = current {
                         div()
                             .w_auto()
@@ -502,43 +511,67 @@ impl Render for PlayerPage {
                     )
                     .child(self.controlbar.clone()),
             )
-            .when(!is_portrait && *show_panel.read(cx), |this| {
-                this.child(
-                    div()
+            .child(
+                div()
+                    .relative()
+                    .overflow_hidden()
+                    .when(is_portrait, |this| {
+                        this.w_full().h(if panel_visible {
+                            relative(0.5)
+                        } else {
+                            relative(0.0)
+                        })
+                    })
+                    .when(!is_portrait, |this| {
+                        this.w(if panel_visible {
+                            px(panel_width + 6.0)
+                        } else {
+                            px(0.0)
+                        })
                         .h_full()
-                        .flex_shrink_0()
-                        .bg(theme.player_panel_bg)
-                        .child(ResizeHandle::new(&self.panel_width)),
-                )
-            })
-            .when(*show_panel.read(cx), |this| {
-                this.child(
-                    div()
-                        .h_full()
-                        .when(is_portrait, |this| this.w_full().flex_1())
-                        .when(!is_portrait, |this| this.w(px(panel_width)).h_full())
-                        .flex_shrink_0()
-                        .flex()
-                        .flex_col()
-                        .bg(theme.player_panel_bg)
-                        .child({
-                            let current_panel = self.current_panel.clone();
+                    })
+                    .flex_shrink_0()
+                    .flex()
+                    .bg(theme.player_panel_bg)
+                    .left(px(if panel_visible { 0.0 } else { 20.0 }))
+                    .opacity(if panel_visible { 1.0 } else { 0.0 })
+                    .motion("player_side_panel")
+                    .transition(page_transition())
+                    .child(
+                        div()
+                            .size_full()
+                            .flex()
+                            .flex_shrink_0()
+                            .when(!is_portrait && panel_visible, |this| {
+                                this.child(ResizeHandle::new(&self.panel_width))
+                            })
+                            .child(
+                                div()
+                                    .h_full()
+                                    .when(is_portrait, |this| this.w_full())
+                                    .when(!is_portrait, |this| this.w(px(panel_width)))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .flex_col()
+                                    .bg(theme.player_panel_bg)
+                                    .child({
+                                        let current_panel = self.current_panel.clone();
 
-                            div()
-                                .w_full()
-                                .relative()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .py_3()
-                                .child(
-                                    div()
-                                        .relative()
-                                        .h_full()
-                                        .flex()
-                                        .items_center()
-                                        .child({
-                                            div()
+                                        div()
+                                            .w_full()
+                                            .relative()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .py_3()
+                                            .child(
+                                                div()
+                                                    .relative()
+                                                    .h_full()
+                                                    .flex()
+                                                    .items_center()
+                                                    .child({
+                                                        div()
                                                 .id("panel_switcher_queue")
                                                 .py_1()
                                                 .px_5()
@@ -604,12 +637,13 @@ impl Render for PlayerPage {
                                                         )
                                                         .child("QUEUE"),
                                                 )
-                                        })
-                                        .child({
-                                            let current_panel = current_panel.clone();
-                                            let lyrics_tab_hovered = lyrics_tab_hovered.clone();
+                                                    })
+                                                    .child({
+                                                        let current_panel = current_panel.clone();
+                                                        let lyrics_tab_hovered =
+                                                            lyrics_tab_hovered.clone();
 
-                                            div()
+                                                        div()
                                                 .id("panel_switcher_lyrics")
                                                 .py_1()
                                                 .px_5()
@@ -671,78 +705,81 @@ impl Render for PlayerPage {
                                                         )
                                                         .child("LYRICS"),
                                                 )
-                                        }),
-                                )
-                        })
-                        .child({
-                            let panel_state = self.current_panel.clone();
-                            let transition_state = panel_transition_state.clone();
-                            let panel = if selected_panel == Panel::Queue {
-                                div()
-                                    .id("queue_container")
-                                    .w_full()
-                                    .h_full()
-                                    .child(self.queue.clone())
-                                    .child(floating_scrollbar(
-                                        "queue_scrollbar",
-                                        queue_scroll_handle,
-                                        RightPad::Pad,
-                                    ))
-                            } else {
-                                div()
-                                    .id("lyrics_container")
-                                    .w_full()
-                                    .h_full()
-                                    .px_8()
-                                    .child(self.lyrics.clone())
-                                    .child(floating_scrollbar(
-                                        "lyrics_scrollbar",
-                                        lyrics_scroll_handle,
-                                        RightPad::Pad,
-                                    ))
-                            };
-
-                            let panel = div()
-                                .w_full()
-                                .h_full()
-                                .px_4()
-                                .flex()
-                                .relative()
-                                .child(panel);
-                            if panel_is_transitioning {
-                                let generation = panel_transition.generation;
-                                let offset = match selected_panel {
-                                    Panel::Lyrics => 24.0,
-                                    Panel::Queue => -24.0,
-                                };
-                                panel
-                                    .motion(ElementId::NamedInteger(
-                                        "player_panel".into(),
-                                        generation,
-                                    ))
-                                    .transition(page_transition())
-                                    .enter(move |style| style.left(px(offset)).opacity(0.0))
-                                    .base(|style| style.left(px(0.0)).opacity(1.0))
-                                    .on_settle(move |_, _, cx| {
-                                        if *panel_state.read(cx) == selected_panel {
-                                            transition_state.update(cx, |state, cx| {
-                                                if state.generation == generation
-                                                    && state.target == selected_panel
-                                                {
-                                                    state.settled = selected_panel;
-                                                    state.from = selected_panel;
-                                                    cx.notify();
-                                                }
-                                            });
-                                        }
+                                                    }),
+                                            )
                                     })
-                                    .into_any_element()
-                            } else {
-                                panel.into_any_element()
-                            }
-                        }),
-                )
-            })
+                                    .child({
+                                        let panel_state = self.current_panel.clone();
+                                        let transition_state = panel_transition_state.clone();
+                                        let panel = if selected_panel == Panel::Queue {
+                                            div()
+                                                .id("queue_container")
+                                                .w_full()
+                                                .h_full()
+                                                .child(self.queue.clone())
+                                                .child(floating_scrollbar(
+                                                    "queue_scrollbar",
+                                                    queue_scroll_handle,
+                                                    RightPad::Pad,
+                                                ))
+                                        } else {
+                                            div()
+                                                .id("lyrics_container")
+                                                .w_full()
+                                                .h_full()
+                                                .px_8()
+                                                .child(self.lyrics.clone())
+                                                .child(floating_scrollbar(
+                                                    "lyrics_scrollbar",
+                                                    lyrics_scroll_handle,
+                                                    RightPad::Pad,
+                                                ))
+                                        };
+
+                                        let panel = div()
+                                            .w_full()
+                                            .h_full()
+                                            .px_4()
+                                            .flex()
+                                            .relative()
+                                            .child(panel);
+                                        if panel_is_transitioning {
+                                            let generation = panel_transition.generation;
+                                            let offset = match selected_panel {
+                                                Panel::Lyrics => 24.0,
+                                                Panel::Queue => -24.0,
+                                            };
+                                            panel
+                                                .motion(ElementId::NamedInteger(
+                                                    "player_panel".into(),
+                                                    generation,
+                                                ))
+                                                .transition(page_transition())
+                                                .enter(move |style| {
+                                                    style.left(px(offset)).opacity(0.0)
+                                                })
+                                                .base(|style| style.left(px(0.0)).opacity(1.0))
+                                                .on_settle(move |_, _, cx| {
+                                                    if *panel_state.read(cx) == selected_panel {
+                                                        transition_state.update(cx, |state, cx| {
+                                                            if state.generation == generation
+                                                                && state.target == selected_panel
+                                                            {
+                                                                state.settled = selected_panel;
+                                                                state.from = selected_panel;
+                                                                cx.notify();
+                                                            }
+                                                        });
+                                                    }
+                                                })
+                                                .into_any_element()
+                                        } else {
+                                            panel.into_any_element()
+                                        }
+                                    }),
+                            ),
+                    ),
+            )
             .child(
                 div()
                     .id("show_hide_queue")
@@ -761,7 +798,12 @@ impl Render for PlayerPage {
                         this.bg(theme.player_panel_show_hide_bg_hover)
                             .text_color(theme.player_panel_show_hide_text_hover)
                     })
-                    .on_click(move |_, _, cx| show_panel.update(cx, |this, _| *this = !*this))
+                    .on_click(move |_, _, cx| {
+                        show_panel.update(cx, |this, cx| {
+                            *this = !*this;
+                            cx.notify();
+                        });
+                    })
                     .child(icon(Icons::PanelRight).size_4()),
             )
     }
