@@ -3,7 +3,6 @@ mod routes;
 mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
-use crate::ui::animations::ease_in_out_expo;
 use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
@@ -22,10 +21,10 @@ use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicato
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
-    InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
-    UniformListScrollHandle, Window, div, px,
+    App, AppContext, Context, ElementId, Entity, Global, InteractiveElement, IntoElement,
+    ParentElement, Render, ScrollHandle, Styled, UniformListScrollHandle, Window, div, px,
 };
+use wgpui_motion::prelude::{MotionExt, Spring, Transition};
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -234,28 +233,16 @@ impl Render for LibraryPage {
                         if prev_page == section {
                             this.child(section_el).into_any_element()
                         } else {
-                            let duration = std::time::Duration::from_millis(300);
-
-                            cx.spawn({
-                                let section_state = section_state.clone();
-                                async move |_, cx| {
-                                    cx.background_executor().timer(duration).await;
-                                    let () = section_state.update(cx, |state, _| {
-                                        *state = section;
-                                    });
-                                }
-                            })
-                            .detach();
+                            let section_state = section_state.clone();
 
                             this.child(section_el)
-                                .with_animation(
-                                    ElementId::Name(format!("section_slide_{section:?}").into()),
-                                    Animation::new(duration).with_easing(ease_in_out_expo()),
-                                    move |this, delta| {
-                                        let offset = 360.0 * direction * (1.0 - delta);
-                                        this.top(px(offset)).opacity(delta)
-                                    },
-                                )
+                                .motion(ElementId::Name("library_section".into()))
+                                .transition(Transition::spring(Spring::snappy()))
+                                .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
+                                .base(|style| style.top(px(0.0)).opacity(1.0))
+                                .on_settle(move |_, _, cx| {
+                                    section_state.update(cx, |state, _| *state = section);
+                                })
                                 .into_any_element()
                         }
                     }),
