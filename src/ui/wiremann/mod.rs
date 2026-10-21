@@ -2,7 +2,7 @@ mod navbar;
 mod titlebar;
 
 use crate::controller::Controller;
-use crate::ui::animations::ease_in_out_expo;
+use crate::ui::animations::page_transition;
 use crate::ui::components::keybinds_overlay::{KeybindsOverlay, KeybindsOverlayHandle};
 use crate::ui::components::slider::{SliderEvent, SliderState};
 use crate::ui::components::toasts::ToastManager;
@@ -20,11 +20,12 @@ use crate::ui::{components, global_keybinds};
 use components::{Page, image_cache::ImageCache, window_border::window_border};
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, AppContext, BorrowAppContext, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, px,
+    AppContext, BorrowAppContext, Context, ElementId, Entity, InteractiveElement, IntoElement,
+    ParentElement, Render, Styled, Window, div, px,
 };
 use std::time::Duration;
 use titlebar::Titlebar;
+use wgpui_motion::prelude::MotionExt;
 
 pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
@@ -33,6 +34,14 @@ pub struct Wiremann {
     pub toast_manager: Entity<ToastManager>,
     pub keybinds_overlay: Entity<KeybindsOverlay>,
     pub popout_player: Entity<PopOutPlayer>,
+}
+
+#[derive(Clone, Copy)]
+struct PageTransitionState {
+    settled: Page,
+    from: Page,
+    target: Page,
+    generation: u64,
 }
 
 impl Wiremann {
@@ -137,14 +146,29 @@ impl Render for Wiremann {
         let page = *cx.global::<Page>();
         let popout_enabled = cx.global::<PopOutState>().enabled;
 
-        let page_state = window.use_keyed_state("page_transition", cx, |_, _| page);
-        let prev_page = *page_state.read(cx);
+        let page_state =
+            window.use_keyed_state("page_transition", cx, |_, _| PageTransitionState {
+                settled: page,
+                from: page,
+                target: page,
+                generation: 0,
+            });
+        if page_state.read(cx).target != page {
+            page_state.update(cx, |state, _| {
+                state.from = state.target;
+                state.target = page;
+                state.generation = state.generation.wrapping_add(1);
+            });
+        }
+        let transition = *page_state.read(cx);
 
-        let direction = match (prev_page, page) {
+        let direction = match (transition.from, page) {
             (Page::Library, Page::Player) => 1.0,
             (Page::Player, Page::Library) => -1.0,
             _ => 0.0,
         };
+        let is_transitioning =
+            transition.target != transition.settled || transition.from != transition.target;
 
         let page_el = match page {
             Page::Player => div().w_full().h_full().child(self.player_page.clone()),
@@ -166,32 +190,30 @@ impl Render for Wiremann {
                 .h_full()
                 .min_h_0()
                 .map(move |this| {
-                    if prev_page == page {
+                    if !is_transitioning {
                         this.child(page_el).into_any_element()
                     } else {
-                        let duration = std::time::Duration::from_millis(300);
+                        let page_state = page_state.clone();
+                        let generation = transition.generation;
+                        let offset = 360.0 * direction;
 
-                        cx.spawn({
-                            let page_state = page_state.clone();
-                            async move |_, cx| {
-                                cx.background_executor().timer(duration).await;
-                                let () = page_state.update(cx, |state, _| {
-                                    *state = page;
-                                });
-                            }
-                        })
-                        .detach();
-
-                        this.child(page_el)
-                            .with_animation(
-                                ElementId::NamedInteger("page_slide".into(), page as u64),
-                                Animation::new(duration).with_easing(ease_in_out_expo()),
-                                move |this, delta| {
-                                    let offset = 360.0 * direction * (1.0 - delta);
-                                    this.left(px(offset)).opacity(delta)
-                                },
-                            )
-                            .into_any_element()
+                        this.child(
+                            page_el
+                                .motion(ElementId::NamedInteger("page_slide".into(), generation))
+                                .transition(page_transition())
+                                .enter(move |style| style.left(px(offset)).opacity(0.0))
+                                .base(|style| style.left(px(0.0)).opacity(1.0))
+                                .on_settle(move |_, _, cx| {
+                                    page_state.update(cx, |state, cx| {
+                                        if state.generation == generation && state.target == page {
+                                            state.settled = page;
+                                            state.from = page;
+                                            cx.notify();
+                                        }
+                                    });
+                                }),
+                        )
+                        .into_any_element()
                     }
                 })
                 .into_any_element()

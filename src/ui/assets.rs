@@ -1,7 +1,7 @@
 use anyhow::anyhow;
-use gpui::{App, AssetSource, Result, SharedString};
 use rust_embed::RustEmbed;
 use std::borrow::Cow;
+use gpui::{App, AssetSource, Result, SharedString};
 
 #[derive(RustEmbed, Clone)]
 #[folder = "$CARGO_MANIFEST_DIR/assets"]

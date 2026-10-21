@@ -1,8 +1,8 @@
 use crate::controller::state::PlaylistId;
 use crate::controller::state::TrackId;
-use gpui::RenderImage;
 use std::sync::Arc;
 use std::time::Duration;
+use gpui::RenderImage;
 
 #[must_use]
 #[allow(

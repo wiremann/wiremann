@@ -1,15 +1,16 @@
 use crate::controller::state::{ArtistId, TrackId};
 use crate::controller::{Controller, state::Track};
+use crate::ui::animations::page_transition;
 use crate::ui::components::image_cache::ImageCache;
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
-use gpui::prelude::FluentBuilder;
 use gpui::{
     App, AppContext, Context, Entity, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollStrategy, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, uniform_list,
+    UniformListScrollHandle, Window, div, img, px, transparent_black, uniform_list,
 };
 use std::sync::Arc;
+use wgpui_motion::prelude::MotionExt;
 
 const THUMBNAIL_MARGIN: usize = 16;
 
@@ -54,7 +55,7 @@ impl Render for Item {
 
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
 
-        let theme = cx.global::<Theme>();
+        let theme = *cx.global::<Theme>();
         let state = cx.global::<Controller>().state.read(cx);
 
         let is_current = Some(&self.data.id) == state.playback.current.as_ref();
@@ -69,12 +70,6 @@ impl Render for Item {
             .gap_4()
             .mb_2()
             .rounded_lg()
-            .hover(|d| d.bg(theme.queue_item_bg_hover))
-            .when(is_current, |d| {
-                d.bg(theme.queue_item_bg_current)
-                    .border_1()
-                    .border_color(theme.border)
-            })
             .cursor_pointer()
             .child(match thumbnail {
                 Some(image) => div().size_12().flex_shrink_0().child(
@@ -203,13 +198,21 @@ impl Render for Queue {
             self.last_order.clone_from(&order);
         }
 
+        if current_changed {
+            self.last_current = current;
+            let items = self.views.read(cx).values().cloned().collect::<Vec<_>>();
+            cx.defer(move |cx| {
+                for item in items {
+                    item.update(cx, |_, cx| cx.notify());
+                }
+            });
+        }
+
         if (queue_changed || current_changed) && !self.stop_auto_scroll.read(cx) {
             let this = self.clone();
             cx.defer(move |cx| {
                 this.scroll_to_item(cx);
             });
-
-            self.last_current = current;
         }
 
         let tracks = self.last_tracks.clone();
@@ -241,19 +244,39 @@ impl Render for Queue {
                     range
                         .map(|i| {
                             let state = cx.global::<Controller>().state.read(cx).clone();
+                            let theme = *cx.global::<Theme>();
 
                             let real_index = &tracks[queue_order[i]];
 
                             if let Some(track) = state.library.tracks.get(real_index) {
+                                let is_current = Some(&track.id) == state.playback.current.as_ref();
+                                let id = track.id;
+
                                 div()
                                     .id(format!("track_{:?}", track.id.0))
-                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
-                                    .on_click({
-                                        let id = track.id;
-                                        move |_, _, cx| {
-                                            cx.global::<Controller>().load_audio(&id, cx);
-                                        }
+                                    .w_full()
+                                    .rounded_lg()
+                                    .cursor_pointer()
+                                    .on_click(move |_, _, cx| {
+                                        cx.global::<Controller>().load_audio(&id, cx);
                                     })
+                                    .motion(format!("queue_track_{:?}", track.id.0))
+                                    .transition(page_transition())
+                                    .base(|style| {
+                                        style.border_1().border_color(transparent_black())
+                                    })
+                                    .when(!is_current, move |motion| {
+                                        motion.while_hovered(move |style| {
+                                            style.bg(theme.queue_item_bg_hover)
+                                        })
+                                    })
+                                    .variant_when(is_current, move |style| {
+                                        style
+                                            .bg(theme.queue_item_bg_current)
+                                            .border_color(theme.border)
+                                    })
+                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
+                                    .into_any_element()
                             } else {
                                 div()
                                     .id("undefined")
@@ -261,6 +284,7 @@ impl Render for Queue {
                                     .items_center()
                                     .justify_center()
                                     .child("Track not loaded...")
+                                    .into_any_element()
                             }
                         })
                         .collect()

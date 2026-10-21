@@ -1,4 +1,5 @@
 use crate::controller::Controller;
+use crate::ui::animations::page_transition;
 use crate::ui::components::icons::{Icons, icon};
 use crate::ui::{
     components::slider::{Slider, SliderState},
@@ -8,6 +9,7 @@ use gpui::{
     Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, div,
 };
+use wgpui_motion::prelude::MotionExt;
 
 #[derive(Clone)]
 pub struct ControlBar {
@@ -31,7 +33,7 @@ impl ControlBar {
 impl Render for ControlBar {
     #[allow(clippy::too_many_lines)]
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.global::<Theme>();
+        let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>();
         let state = controller.state.read(cx);
 
@@ -124,6 +126,26 @@ impl Render for ControlBar {
                                                 move |_, _, cx| controller.set_mute(cx)
                                             })
                                             .text_color(theme.volume_icon)
+                                            .cursor_pointer()
+                                            .motion("player_volume")
+                                            .transition(page_transition())
+                                            .variant_when(state.playback.mute, move |style| {
+                                                style
+                                                    .text_color(theme.player_icons_text_active)
+                                                    .bg(theme.player_icons_bg_active)
+                                            })
+                                            .while_hovered(move |style| {
+                                                style
+                                                    .opacity(0.9)
+                                                    .bg(theme.player_icons_bg_hover)
+                                                    .text_color(theme.player_icons_text_hover)
+                                            })
+                                            .while_pressed(move |style| {
+                                                style
+                                                    .opacity(0.72)
+                                                    .bg(theme.player_icons_bg_active)
+                                                    .text_color(theme.player_icons_text_active)
+                                            })
                                             .child(
                                                 icon(if state.playback.mute {
                                                     Icons::VolumeMute

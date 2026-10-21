@@ -3,9 +3,10 @@ use crate::ui::theme::Theme;
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt as _, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, px,
+    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render,
+    StatefulInteractiveElement, Styled, Window, div, px,
 };
+use wgpui_motion::prelude::{DurationExt, MotionExt, Transition, quint_out};
 
 #[derive(Clone)]
 pub struct NavBar;
@@ -20,7 +21,7 @@ impl NavBar {
 
 impl Render for NavBar {
     #[allow(clippy::too_many_lines)]
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let page = *cx.global::<Page>();
 
@@ -41,12 +42,6 @@ impl Render for NavBar {
             .border_1()
             .border_color(theme.border)
             .child({
-                let pill_state = window
-                    .use_keyed_state("navbar_pill", cx, |_, _| (page, active_highlight_offset));
-
-                let (prev_page, prev_offset) = *pill_state.read(cx);
-                let duration = std::time::Duration::from_millis(250);
-
                 div()
                     .id("active_highlight")
                     .absolute()
@@ -55,33 +50,9 @@ impl Render for NavBar {
                     .w_24()
                     .rounded_full()
                     .bg(theme.switcher_active)
-                    .map(move |this| {
-                        if prev_page == page {
-                            this.left(px(active_highlight_offset)).into_any_element()
-                        } else {
-                            cx.spawn({
-                                let pill_state = pill_state.clone();
-                                async move |_, cx| {
-                                    cx.background_executor().timer(duration).await;
-                                    let () = pill_state.update(cx, |state, _| {
-                                        *state = (page, active_highlight_offset);
-                                    });
-                                }
-                            })
-                            .detach();
-
-                            this.with_animation(
-                                ElementId::NamedInteger("pill_move".into(), page as u64),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
-                                move |this, delta| {
-                                    let x = prev_offset
-                                        + (active_highlight_offset - prev_offset) * delta;
-                                    this.left(px(x))
-                                },
-                            )
-                            .into_any_element()
-                        }
-                    })
+                    .left(px(active_highlight_offset))
+                    .motion("navbar-pill")
+                    .transition(Transition::new(250.ms()).curve(quint_out()))
             })
             .child(
                 div()

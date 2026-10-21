@@ -1,9 +1,10 @@
-use crate::ui::{components::element_ext::ElementExt, theme::Theme};
+use crate::ui::{animations::page_transition, components::element_ext::ElementExt, theme::Theme};
 use gpui::{
     App, AppContext, Bounds, Context, DragMoveEvent, Entity, EntityId, InteractiveElement,
     IntoElement, ParentElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement,
-    Styled, Window, div, px,
+    Styled, Window, div, px, rgba,
 };
+use wgpui_motion::prelude::MotionExt;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ResizeSide {
@@ -91,13 +92,15 @@ impl RenderOnce for ResizeHandle {
             .flex()
             .justify_center()
             .items_center()
+            .bg(rgba(0x00000000))
             .child(
                 div()
                     .id("resize_handle_inner")
-                    .w(px(2.0))
+                    .w(px(1.0))
                     .h_full()
                     .bg(theme.resize_handle),
             )
+            .opacity(0.55)
             .on_drag(ResizeDrag(entity_id), |drag, _, _, cx| {
                 cx.new(|_| drag.clone())
             })
@@ -117,5 +120,8 @@ impl RenderOnce for ResizeHandle {
                 let state = self.state.clone();
                 move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
             })
+            .motion(("resize_handle", entity_id))
+            .transition(page_transition())
+            .while_hovered(|style| style.bg(rgba(0xFFFFFF10)).opacity(1.0))
     }
 }

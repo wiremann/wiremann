@@ -2248,7 +2248,7 @@ dependencies = [
 [[package]]
 name = "gpui-ce"
 version = "1.0.0"
-source = "git+https://github.com/Far-Beyond-Pulsar/WGPUI#7b64df67e15fbd363e72799a376e26b57dd57226"
+source = "git+https://github.com/Far-Beyond-Pulsar/WGPUI?rev=afcb6bf3c73ed5a33077dc8544d7b6db9cb90619#afcb6bf3c73ed5a33077dc8544d7b6db9cb90619"
 dependencies = [
  "anyhow",
  "arboard",
@@ -7241,6 +7241,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wgpui-motion"
+version = "0.1.0"
+source = "git+https://github.com/Far-Beyond-Pulsar/WGPUI-Motion#7e8a5dadd0247d7dbea5ccdd5f5846afbcc86b8a"
+dependencies = [
+ "gpui-ce",
+ "log",
+ "web-time",
+]
+
+[[package]]
 name = "which"
 version = "6.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7878,6 +7888,7 @@ dependencies = [
  "twox-hash",
  "uuid",
  "walkdir",
+ "wgpui-motion",
  "winres",
  "zstd",
 ]

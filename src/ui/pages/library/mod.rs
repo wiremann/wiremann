@@ -3,7 +3,7 @@ mod routes;
 mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
-use crate::ui::animations::ease_in_out_expo;
+use crate::ui::animations::page_transition;
 use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
@@ -22,10 +22,10 @@ use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicato
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, Global,
-    InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, Styled,
-    UniformListScrollHandle, Window, div, px,
+    App, AppContext, Context, ElementId, Entity, Global, InteractiveElement, IntoElement,
+    ParentElement, Render, ScrollHandle, Styled, UniformListScrollHandle, Window, div, px,
 };
+use wgpui_motion::prelude::MotionExt;
 
 #[repr(u64)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -49,6 +49,14 @@ pub enum LibraryRoutes {
     // System
     Settings,
     Plugins,
+}
+
+#[derive(Clone, Copy)]
+struct LibraryTransitionState {
+    settled: LibraryRoutes,
+    from: LibraryRoutes,
+    target: LibraryRoutes,
+    generation: u64,
 }
 
 #[derive(Clone)]
@@ -97,6 +105,7 @@ impl LibraryPage {
         cx.set_global(SidebarIndicator {
             top: 0.0,
             height: 32.0,
+            route: LibraryRoutes::Home,
         });
 
         cx.set_global(SidebarBounds { top: 0.0 });
@@ -205,10 +214,25 @@ impl Render for LibraryPage {
                 div().w_full().h_full().child(self.playlist.clone())
             }
         };
-        let section_state = window.use_keyed_state("library_transition", cx, |_, _| section);
-        let prev_page = *section_state.read(cx);
+        let transition_state =
+            window.use_keyed_state("library_transition", cx, |_, _| LibraryTransitionState {
+                settled: section,
+                from: section,
+                target: section,
+                generation: 0,
+            });
+        if transition_state.read(cx).target != section {
+            transition_state.update(cx, |state, _| {
+                state.from = state.target;
+                state.target = section;
+                state.generation = state.generation.wrapping_add(1);
+            });
+        }
+        let transition = *transition_state.read(cx);
 
-        let direction = (section.index() - prev_page.index()).signum() as f32;
+        let direction = (section.index() - transition.from.index()).signum() as f32;
+        let is_transitioning =
+            transition.target != transition.settled || transition.from != transition.target;
 
         div()
             .size_full()
@@ -231,31 +255,30 @@ impl Render for LibraryPage {
                     .w_full()
                     .h_full()
                     .map(move |this| {
-                        if prev_page == section {
+                        if !is_transitioning {
                             this.child(section_el).into_any_element()
                         } else {
-                            let duration = std::time::Duration::from_millis(300);
-
-                            cx.spawn({
-                                let section_state = section_state.clone();
-                                async move |_, cx| {
-                                    cx.background_executor().timer(duration).await;
-                                    let () = section_state.update(cx, |state, _| {
-                                        *state = section;
-                                    });
-                                }
-                            })
-                            .detach();
+                            let transition_state = transition_state.clone();
+                            let generation = transition.generation;
 
                             this.child(section_el)
-                                .with_animation(
-                                    ElementId::Name(format!("section_slide_{section:?}").into()),
-                                    Animation::new(duration).with_easing(ease_in_out_expo()),
-                                    move |this, delta| {
-                                        let offset = 360.0 * direction * (1.0 - delta);
-                                        this.top(px(offset)).opacity(delta)
-                                    },
-                                )
+                                .motion(ElementId::NamedInteger(
+                                    "library_section".into(),
+                                    generation,
+                                ))
+                                .transition(page_transition())
+                                .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
+                                .base(|style| style.top(px(0.0)).opacity(1.0))
+                                .on_settle(move |_, _, cx| {
+                                    transition_state.update(cx, |state, cx| {
+                                        if state.generation == generation && state.target == section
+                                        {
+                                            state.settled = section;
+                                            state.from = section;
+                                            cx.notify();
+                                        }
+                                    });
+                                })
                                 .into_any_element()
                         }
                     }),

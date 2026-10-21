@@ -1,10 +1,12 @@
 use gpui::{
-    Animation, AnimationExt, Context, ElementId, FontWeight, Global, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    gradient_color_stop, linear_gradient, px, transparent_black,
+    Context, ElementId, FontWeight, Global, InteractiveElement, IntoElement, ParentElement, Render,
+    StatefulInteractiveElement, Styled, Window, div, gradient_color_stop, linear_gradient, px,
+    transparent_black,
 };
+use wgpui_motion::prelude::MotionExt;
 
 use crate::ui::{
+    animations::page_transition,
     components::{
         bounds_observer::observe_bounds,
         icons::{Icons, icon},
@@ -15,10 +17,22 @@ use crate::ui::{
 
 pub struct Sidebar;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct SidebarIndicator {
     pub top: f32,
     pub height: f32,
+    pub route: LibraryRoutes,
+}
+
+#[derive(Clone, Copy)]
+struct IndicatorTransitionState {
+    settled: LibraryRoutes,
+    settled_top: f32,
+    settled_height: f32,
+    target: LibraryRoutes,
+    target_top: f32,
+    target_height: f32,
+    generation: u64,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -86,13 +100,22 @@ impl Sidebar {
                             theme.library_sidebar_item_text
                         }),
                 ),
-            move |bounds, _, cx| {
+            move |bounds, window, cx| {
                 if *cx.global::<LibraryRoutes>() == section {
                     let sidebar_top = cx.global::<SidebarBounds>().top;
                     let indicator = cx.global_mut::<SidebarIndicator>();
 
-                    indicator.top = bounds.top().to_f64() as f32 - sidebar_top;
-                    indicator.height = bounds.size.height.to_f64() as f32;
+                    let top = bounds.top().to_f64() as f32 - sidebar_top;
+                    let height = bounds.size.height.to_f64() as f32;
+                    if indicator.route != section
+                        || indicator.top != top
+                        || indicator.height != height
+                    {
+                        indicator.top = top;
+                        indicator.height = height;
+                        indicator.route = section;
+                        window.refresh();
+                    }
                 }
             },
         )
@@ -106,13 +129,42 @@ impl Render for Sidebar {
 
         let indicator_data = *cx.global::<SidebarIndicator>();
 
-        let indicator_state = window.use_keyed_state("sidebar_indicator", cx, |_, _| {
-            (current, indicator_data.top, indicator_data.height)
-        });
+        let indicator_state =
+            window.use_keyed_state("sidebar_indicator", cx, |_, _| IndicatorTransitionState {
+                settled: current,
+                settled_top: indicator_data.top,
+                settled_height: indicator_data.height,
+                target: current,
+                target_top: indicator_data.top,
+                target_height: indicator_data.height,
+                generation: 0,
+            });
 
-        let (prev_section, prev_top, prev_height) = *indicator_state.read(cx);
+        let indicator_matches_route = indicator_data.route == current;
+        if indicator_matches_route {
+            let state = *indicator_state.read(cx);
+            if state.target != current {
+                indicator_state.update(cx, |state, _| {
+                    state.target = current;
+                    state.target_top = indicator_data.top;
+                    state.target_height = indicator_data.height;
+                    state.generation = state.generation.wrapping_add(1);
+                });
+            } else if state.settled == current
+                && (state.settled_top != indicator_data.top
+                    || state.settled_height != indicator_data.height)
+            {
+                indicator_state.update(cx, |state, _| {
+                    state.settled_top = indicator_data.top;
+                    state.settled_height = indicator_data.height;
+                    state.target_top = indicator_data.top;
+                    state.target_height = indicator_data.height;
+                });
+            }
+        }
+        let transition = *indicator_state.read(cx);
+        let is_transitioning = indicator_matches_route && transition.target != transition.settled;
 
-        let duration = std::time::Duration::from_millis(250);
         observe_bounds(
             "sidebar_root",
             div()
@@ -149,38 +201,40 @@ impl Render for Sidebar {
                                     gradient_color_stop(transparent_black(), 1.0),
                                 )),
                         );
-                    if prev_section == current {
+                    if !is_transitioning {
                         indicator
-                            .top(px(indicator_data.top))
-                            .h(px(indicator_data.height))
+                            .top(px(transition.settled_top))
+                            .h(px(transition.settled_height))
                             .into_any_element()
                     } else {
-                        cx.spawn({
-                            let indicator_state = indicator_state.clone();
-
-                            async move |_, cx| {
-                                cx.background_executor().timer(duration).await;
-
-                                let () = indicator_state.update(cx, |state, _| {
-                                    *state = (current, indicator_data.top, indicator_data.height);
-                                });
-                            }
-                        })
-                        .detach();
-
+                        let indicator_state = indicator_state.clone();
+                        let generation = transition.generation;
                         indicator
-                            .with_animation(
-                                ElementId::Name(format!("sidebar_indicator_{current:?}").into()),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
-                                move |this, delta| {
-                                    let y = prev_top + (indicator_data.top - prev_top) * delta;
-
-                                    let h =
-                                        prev_height + (indicator_data.height - prev_height) * delta;
-
-                                    this.top(px(y)).h(px(h))
-                                },
-                            )
+                            .motion(ElementId::NamedInteger(
+                                "sidebar_indicator".into(),
+                                generation,
+                            ))
+                            .transition(page_transition())
+                            .enter(move |style| {
+                                style
+                                    .top(px(transition.settled_top))
+                                    .h(px(transition.settled_height))
+                            })
+                            .base(move |style| {
+                                style
+                                    .top(px(transition.target_top))
+                                    .h(px(transition.target_height))
+                            })
+                            .on_settle(move |_, _, cx| {
+                                indicator_state.update(cx, |state, cx| {
+                                    if state.generation == generation && state.target == current {
+                                        state.settled = current;
+                                        state.settled_top = state.target_top;
+                                        state.settled_height = state.target_height;
+                                        cx.notify();
+                                    }
+                                });
+                            })
                             .into_any_element()
                     }
                 })
