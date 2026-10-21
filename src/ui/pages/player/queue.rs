@@ -113,17 +113,6 @@ impl Render for Item {
                             ),
                     ),
             )
-            .motion(format!("queue_track_{:?}", self.data.id.0))
-            .transition(page_transition())
-            .base(|style| style.border_1().border_color(transparent_black()))
-            .variant_when(is_current, move |style| {
-                style
-                    .bg(theme.queue_item_bg_current)
-                    .border_color(theme.border)
-            })
-            .when(!is_current, move |motion| {
-                motion.while_hovered(move |style| style.bg(theme.queue_item_bg_hover))
-            })
     }
 }
 
@@ -209,13 +198,21 @@ impl Render for Queue {
             self.last_order.clone_from(&order);
         }
 
+        if current_changed {
+            self.last_current = current;
+            let items = self.views.read(cx).values().cloned().collect::<Vec<_>>();
+            cx.defer(move |cx| {
+                for item in items {
+                    item.update(cx, |_, cx| cx.notify());
+                }
+            });
+        }
+
         if (queue_changed || current_changed) && !self.stop_auto_scroll.read(cx) {
             let this = self.clone();
             cx.defer(move |cx| {
                 this.scroll_to_item(cx);
             });
-
-            self.last_current = current;
         }
 
         let tracks = self.last_tracks.clone();
@@ -247,19 +244,39 @@ impl Render for Queue {
                     range
                         .map(|i| {
                             let state = cx.global::<Controller>().state.read(cx).clone();
+                            let theme = *cx.global::<Theme>();
 
                             let real_index = &tracks[queue_order[i]];
 
                             if let Some(track) = state.library.tracks.get(real_index) {
+                                let is_current = Some(&track.id) == state.playback.current.as_ref();
+                                let id = track.id;
+
                                 div()
                                     .id(format!("track_{:?}", track.id.0))
-                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
-                                    .on_click({
-                                        let id = track.id;
-                                        move |_, _, cx| {
-                                            cx.global::<Controller>().load_audio(&id, cx);
-                                        }
+                                    .w_full()
+                                    .rounded_lg()
+                                    .cursor_pointer()
+                                    .on_click(move |_, _, cx| {
+                                        cx.global::<Controller>().load_audio(&id, cx);
                                     })
+                                    .motion(format!("queue_track_{:?}", track.id.0))
+                                    .transition(page_transition())
+                                    .base(|style| {
+                                        style.border_1().border_color(transparent_black())
+                                    })
+                                    .when(!is_current, move |motion| {
+                                        motion.while_hovered(move |style| {
+                                            style.bg(theme.queue_item_bg_hover)
+                                        })
+                                    })
+                                    .variant_when(is_current, move |style| {
+                                        style
+                                            .bg(theme.queue_item_bg_current)
+                                            .border_color(theme.border)
+                                    })
+                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
+                                    .into_any_element()
                             } else {
                                 div()
                                     .id("undefined")
@@ -267,6 +284,7 @@ impl Render for Queue {
                                     .items_center()
                                     .justify_center()
                                     .child("Track not loaded...")
+                                    .into_any_element()
                             }
                         })
                         .collect()
