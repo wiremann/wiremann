@@ -8,11 +8,11 @@ use crate::ui::{
     theme::Theme,
 };
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, AppContext, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::time::{Duration, Instant};
+use wgpui_motion::prelude::{DurationExt, MotionExt, Transition, quint_out};
 
 #[derive(Clone)]
 pub struct Toast {
@@ -21,10 +21,6 @@ pub struct Toast {
     pub created_at: Instant,
     pub duration: Option<Duration>,
     pub phase: ToastPhase,
-
-    // temp states
-    pub anim_phase: ToastPhase,
-    pub exiting_at: Option<Instant>,
 }
 
 #[derive(Clone)]
@@ -37,7 +33,6 @@ pub enum ToastKind {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ToastPhase {
-    Entering,
     Idle,
     Exiting,
 }
@@ -79,13 +74,13 @@ impl Render for ToastManager {
                             .relative()
                             .child(el.clone())
                             .on_click(move |_, _, cx| {
-                                toasts.update(cx, |list, _| {
+                                toasts.update(cx, |list, cx| {
                                     for t in list.iter_mut() {
                                         if t.id == id {
                                             t.phase = ToastPhase::Exiting;
-                                            t.exiting_at = Some(Instant::now());
                                         }
                                     }
+                                    cx.notify();
                                 });
                             }),
 
@@ -137,68 +132,37 @@ impl Render for ToastManager {
                                         .child(msg.clone()),
                                 )
                                 .on_click(move |_, _, cx| {
-                                    toasts.update(cx, |list, _| {
+                                    toasts.update(cx, |list, cx| {
                                         for t in list.iter_mut() {
                                             if t.id == id {
                                                 t.phase = ToastPhase::Exiting;
-                                                t.exiting_at = Some(Instant::now());
                                             }
                                         }
+                                        cx.notify();
                                     });
                                 })
                         }
                     };
 
-                    let duration = Duration::from_millis(250);
-
-                    let prev_phase = toast.anim_phase;
-
-                    let el = base.map(|this| {
-                        if prev_phase == phase {
-                            match phase {
-                                ToastPhase::Entering | ToastPhase::Exiting => {
-                                    this.left_72().opacity(0.0).into_any_element()
-                                }
-                                ToastPhase::Idle => {
-                                    this.left(px(0.0)).opacity(1.0).into_any_element()
-                                }
-                            }
-                        } else {
-                            cx.spawn({
-                                let toasts = self.toasts.clone();
-                                async move |_, cx| {
-                                    cx.background_executor().timer(duration).await;
-                                    toasts.update(cx, |list, _| {
-                                        for t in list.iter_mut() {
-                                            if t.id == id {
-                                                t.anim_phase = t.phase;
-                                            }
-                                        }
-                                    });
-                                }
+                    let toasts = self.toasts.clone();
+                    elements.push(
+                        base.relative()
+                            .left(px(0.0))
+                            .opacity(1.0)
+                            .motion(("toast", id))
+                            .transition(Transition::new(250.ms()).curve(quint_out()))
+                            .enter(|style| style.left(px(80.0)).opacity(0.0))
+                            .exit_when(phase == ToastPhase::Exiting, |style| {
+                                style.left(px(80.0)).opacity(0.0)
                             })
-                            .detach();
-
-                            this.with_animation(
-                                ElementId::NamedInteger("toast_anim".into(), id),
-                                Animation::new(duration).with_easing(gpui::ease_out_quint()),
-                                move |this, delta| match (prev_phase, phase) {
-                                    (ToastPhase::Entering, ToastPhase::Idle) => {
-                                        let x = 80.0 * (1.0 - delta);
-                                        this.left(px(x)).opacity(delta)
-                                    }
-                                    (ToastPhase::Idle, ToastPhase::Exiting) => {
-                                        let x = 80.0 * delta;
-                                        this.left(px(x)).opacity(1.0 - delta)
-                                    }
-                                    _ => this,
-                                },
-                            )
-                            .into_any_element()
-                        }
-                    });
-
-                    elements.push(el);
+                            .on_exit_complete(move |_, _, cx| {
+                                toasts.update(cx, |list, cx| {
+                                    list.retain(|toast| toast.id != id);
+                                    cx.notify();
+                                });
+                            })
+                            .into_any_element(),
+                    );
                 }
 
                 elements
@@ -218,31 +182,24 @@ impl ToastManager {
                     .timer(Duration::from_millis(128))
                     .await;
 
-                toasts_clone.update(cx, |toasts, _| {
+                toasts_clone.update(cx, |toasts, cx| {
+                    let mut changed = false;
                     toasts.retain_mut(|t| {
                         let now = Instant::now();
 
-                        if t.phase == ToastPhase::Entering
-                            && now.duration_since(t.created_at) > Duration::from_millis(250)
-                        {
-                            t.phase = ToastPhase::Idle;
-                        }
                         if let Some(duration) = t.duration
                             && now.duration_since(t.created_at) >= duration
                             && t.phase != ToastPhase::Exiting
                         {
                             t.phase = ToastPhase::Exiting;
-                            t.exiting_at = Some(now);
-                        }
-
-                        if let Some(exit_time) = t.exiting_at
-                            && now.duration_since(exit_time) >= Duration::from_millis(250)
-                        {
-                            return false;
+                            changed = true;
                         }
 
                         true
                     });
+                    if changed {
+                        cx.notify();
+                    }
                 });
             }
         })
@@ -255,16 +212,15 @@ impl ToastManager {
         let id = self.next_id;
         self.next_id += 1;
 
-        self.toasts.update(cx, |toasts, _| {
+        self.toasts.update(cx, |toasts, cx| {
             toasts.push(Toast {
                 id,
                 kind,
                 created_at: Instant::now(),
                 duration,
-                phase: ToastPhase::Entering,
-                anim_phase: ToastPhase::Entering,
-                exiting_at: None,
+                phase: ToastPhase::Idle,
             });
+            cx.notify();
         });
     }
 

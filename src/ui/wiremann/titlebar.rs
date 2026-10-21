@@ -8,11 +8,11 @@ use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Animation, AnimationExt, App, AppContext, Context, ElementId, Entity, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, StatefulInteractiveElement, Styled,
-    StyledImage, Window, div, img, px, white,
+    App, AppContext, Context, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, StatefulInteractiveElement, Styled, StyledImage, Window, div, img, px, white,
 };
 use std::time::Duration;
+use wgpui_motion::prelude::{MotionExt, Params, SpacingParams, Timeline, linear};
 
 #[derive(Clone)]
 pub struct Titlebar {
@@ -298,10 +298,14 @@ fn mini_player(
                                     .whitespace_nowrap()
                                     .child(title.clone())
                                     .child(title)
-                                    .with_animation(
-                                        ElementId::Name("mini_title_scroll".into()),
-                                        Animation::new(scroll_dur).repeat(),
-                                        move |this, delta| this.left(px(-total_width * delta)),
+                                    .relative()
+                                    .motion("mini_title_scroll")
+                                    .timeline(
+                                        Timeline::new(scroll_dur)
+                                            .curve(linear())
+                                            .looping()
+                                            .key(0.0, Params::new().inset_left(0.0))
+                                            .key(1.0, Params::new().inset_left(-total_width)),
                                     ),
                             )
                             .into_any_element()
