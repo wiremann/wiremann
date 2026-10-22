@@ -12,8 +12,8 @@ use crate::ui::{
 };
 
 pub(super) const COLLAPSED_SIDEBAR_WIDTH: f32 = 72.0;
-const EXPANDED_ITEM_VERTICAL_PADDING: f32 = 12.0;
-const COLLAPSED_ITEM_VERTICAL_PADDING: f32 = 4.0;
+const ITEM_VERTICAL_PADDING: f32 = 12.0;
+const ITEM_ICON_LABEL_GAP: f32 = 20.0;
 
 pub struct Sidebar {
     pub(super) collapsed: gpui::Entity<bool>,
@@ -115,11 +115,7 @@ impl Sidebar {
             .id(format!("library_sidebar_item_{text}"))
             .w_full()
             .px(px(if collapsed { 24.0 } else { 32.0 }))
-            .py(px(if collapsed {
-                COLLAPSED_ITEM_VERTICAL_PADDING
-            } else {
-                EXPANDED_ITEM_VERTICAL_PADDING
-            }))
+            .py(px(ITEM_VERTICAL_PADDING))
             .cursor_pointer()
             .text_color(if active {
                 theme.library_sidebar_item_text_active
@@ -138,7 +134,7 @@ impl Sidebar {
                     .w_full()
                     .flex()
                     .items_center()
-                    .gap(px(if collapsed { 0.0 } else { 20.0 }))
+                    .gap(px(ITEM_ICON_LABEL_GAP))
                     .rounded_lg()
                     .motion(format!("sidebar_item_layout_{text}"))
                     .transition(page_transition())
@@ -220,13 +216,6 @@ impl Render for Sidebar {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .child(
-                        div()
-                            .flex_grow()
-                            .when(!collapsed, |this| this.flex_grow_0())
-                            .motion("library_sidebar_top_spacer")
-                            .transition(page_transition()),
-                    )
                     .child(Self::section_header("DISCOVERY", collapsed, &theme))
                     .child(Self::item(
                         Icons::Home,
@@ -301,13 +290,7 @@ impl Render for Sidebar {
                         current,
                         collapsed,
                         &theme,
-                    ))
-                    .child(
-                        div()
-                            .flex_grow()
-                            .motion("library_sidebar_bottom_spacer")
-                            .transition(page_transition()),
-                    ),
+                    )),
             )
             .child(self.collapse_control(collapsed, &theme))
     }
@@ -315,9 +298,7 @@ impl Render for Sidebar {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        COLLAPSED_ITEM_VERTICAL_PADDING, COLLAPSED_SIDEBAR_WIDTH, EXPANDED_ITEM_VERTICAL_PADDING,
-    };
+    use super::{COLLAPSED_SIDEBAR_WIDTH, ITEM_ICON_LABEL_GAP, ITEM_VERTICAL_PADDING};
     use crate::ui::{
         animations::{
             PAGE_TRANSITION_DURATION, SIDEBAR_HOVER_SPRING, page_transition, sidebar_transition,
@@ -364,8 +345,8 @@ mod tests {
                 <= std::time::Duration::from_millis(350)
         );
         assert_eq!(COLLAPSED_SIDEBAR_WIDTH, 72.0);
-        assert_eq!(EXPANDED_ITEM_VERTICAL_PADDING, 12.0);
-        assert_eq!(COLLAPSED_ITEM_VERTICAL_PADDING, 4.0);
+        assert_eq!(ITEM_VERTICAL_PADDING, 12.0);
+        assert_eq!(ITEM_ICON_LABEL_GAP, 20.0);
         assert_eq!(
             page_transition().timing_for(Channel::Layout).duration(),
             PAGE_TRANSITION_DURATION
