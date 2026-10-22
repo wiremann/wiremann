@@ -36,10 +36,11 @@ impl Sidebar {
         let active = current == section;
         let hover_text_color = theme.library_sidebar_item_text_active;
         let hover_bg_color = theme.library_sidebar_item_bg_hover;
+        let active_icon_color = theme.library_sidebar_bg;
         let highlight = div()
             .absolute()
             .size(px(44.0))
-            .left_0()
+            .left(px(-10.0))
             .top(px(-10.0))
             .rounded_lg()
             .bg(theme.library_sidebar_item_bg_active)
@@ -54,18 +55,11 @@ impl Sidebar {
             .flex()
             .items_center()
             .justify_center()
-            .text_color(if active {
-                theme.library_sidebar_bg
-            } else {
-                theme.library_sidebar_item_text
-            })
             .child(highlight)
             .child(icon(icon_type).size_5())
             .motion(format!("sidebar_icon_{text}"))
             .transition(page_transition())
-            .when(!active, move |motion| {
-                motion.while_hovered(move |style| style.text_color(hover_text_color))
-            });
+            .variant_when(active, move |style| style.text_color(active_icon_color));
 
         let label = div()
             .text_sm()
@@ -74,22 +68,12 @@ impl Sidebar {
             } else {
                 FontWeight::NORMAL
             })
-            .text_color(if active {
-                theme.library_sidebar_item_text_active
-            } else {
-                theme.library_sidebar_item_text
-            })
-            .child(text)
-            .motion(format!("sidebar_label_{text}"))
-            .transition(page_transition())
-            .when(!active, move |motion| {
-                motion.while_hovered(move |style| style.text_color(hover_text_color))
-            });
+            .child(text);
 
         div()
             .id(format!("library_sidebar_item_{text}"))
             .w_full()
-            .px_6()
+            .px_8()
             .py_3()
             .cursor_pointer()
             .on_click(move |_, window, cx| {
@@ -103,11 +87,18 @@ impl Sidebar {
                     .items_center()
                     .gap_5()
                     .rounded_lg()
+                    .text_color(if active {
+                        hover_text_color
+                    } else {
+                        theme.library_sidebar_item_text
+                    })
                     .child(icon)
                     .child(label)
                     .motion(format!("sidebar_item_{text}"))
                     .transition(page_transition())
-                    .while_hovered(move |style| style.bg(hover_bg_color)),
+                    .while_hovered(move |style| {
+                        style.bg(hover_bg_color).text_color(hover_text_color)
+                    }),
             )
     }
 }
