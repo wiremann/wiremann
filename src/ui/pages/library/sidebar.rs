@@ -1,6 +1,6 @@
 use gpui::{
     Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use wgpui_motion::prelude::MotionExt;
 
@@ -12,6 +12,8 @@ use crate::ui::{
 };
 
 pub(super) const COLLAPSED_SIDEBAR_WIDTH: f32 = 72.0;
+const EXPANDED_ITEM_VERTICAL_PADDING: f32 = 12.0;
+const COLLAPSED_ITEM_VERTICAL_PADDING: f32 = 4.0;
 
 pub struct Sidebar {
     pub(super) collapsed: gpui::Entity<bool>,
@@ -23,13 +25,15 @@ impl Sidebar {
             .relative()
             .w_full()
             .px_6()
-            .pt_8()
-            .pb_4()
+            .pt(px(if collapsed { 6.0 } else { 32.0 }))
+            .pb(px(if collapsed { 6.0 } else { 16.0 }))
             .text_xs()
             .font_weight(FontWeight::MEDIUM)
             .text_color(theme.library_sidebar_group_text)
             .tracking_widest()
             .overflow_hidden()
+            .motion(format!("sidebar_header_layout_{text}"))
+            .transition(page_transition())
             .child(
                 div()
                     .w_full()
@@ -110,8 +114,12 @@ impl Sidebar {
         div()
             .id(format!("library_sidebar_item_{text}"))
             .w_full()
-            .px_8()
-            .py_3()
+            .px(px(if collapsed { 24.0 } else { 32.0 }))
+            .py(px(if collapsed {
+                COLLAPSED_ITEM_VERTICAL_PADDING
+            } else {
+                EXPANDED_ITEM_VERTICAL_PADDING
+            }))
             .cursor_pointer()
             .text_color(if active {
                 theme.library_sidebar_item_text_active
@@ -130,28 +138,31 @@ impl Sidebar {
                     .w_full()
                     .flex()
                     .items_center()
-                    .gap_5()
+                    .gap(px(if collapsed { 0.0 } else { 20.0 }))
                     .rounded_lg()
+                    .motion(format!("sidebar_item_layout_{text}"))
+                    .transition(page_transition())
                     .child(icon)
                     .child(label),
             )
     }
 
-    fn collapse_control(&self, theme: &Theme) -> impl IntoElement {
+    fn collapse_control(&self, collapsed: bool, theme: &Theme) -> impl IntoElement {
         let toggle = self.collapsed.clone();
         let click_toggle = toggle.clone();
         let key_toggle = toggle;
-        let hover_text_color = theme.library_sidebar_item_text_hover;
+        let hover_text_color = theme.library_sidebar_toggle_text_hover;
+        let hover_bg_color = theme.library_sidebar_toggle_bg_hover;
 
         div()
             .id("library_sidebar_collapse")
             .w_full()
-            .px_8()
+            .px(px(if collapsed { 0.0 } else { 32.0 }))
             .py_3()
             .flex()
             .items_center()
+            .when(collapsed, |this| this.justify_center())
             .cursor_pointer()
-            .text_color(theme.library_sidebar_item_text)
             .tab_index(0)
             .on_click(move |_, _, cx| {
                 click_toggle.update(cx, |collapsed, cx| {
@@ -167,10 +178,27 @@ impl Sidebar {
                     });
                 }
             })
-            .motion("library_sidebar_collapse_control")
-            .transition(sidebar_transition())
-            .while_hovered(move |style| style.text_color(hover_text_color))
-            .child(icon(Icons::Menu).size_6())
+            .child(
+                div()
+                    .px_2()
+                    .py_2()
+                    .rounded_md()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .text_sm()
+                    .font_weight(FontWeight(400.0))
+                    .bg(theme.library_sidebar_toggle_bg)
+                    .text_color(theme.library_sidebar_toggle_text)
+                    .motion("library_sidebar_collapse_control")
+                    .transition(page_transition())
+                    .while_hovered(move |style| {
+                        style.bg(hover_bg_color).text_color(hover_text_color)
+                    })
+                    .while_pressed(|style| style.opacity(0.75))
+                    .child(icon(Icons::Menu).size_4()),
+            )
     }
 }
 
@@ -187,89 +215,109 @@ impl Render for Sidebar {
             .bg(theme.library_sidebar_bg)
             .flex()
             .flex_col()
-            .child(Self::section_header("DISCOVERY", collapsed, &theme))
-            .child(Self::item(
-                Icons::Home,
-                "Home",
-                LibraryRoutes::Home,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::Heart,
-                "Favorites",
-                LibraryRoutes::Favorites,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::Chart,
-                "Stats",
-                LibraryRoutes::Stats,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::section_header("COLLECTION", collapsed, &theme))
-            .child(Self::item(
-                Icons::Music,
-                "Tracks",
-                LibraryRoutes::Tracks,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::Disc,
-                "Albums",
-                LibraryRoutes::Albums,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::User,
-                "Artists",
-                LibraryRoutes::Artists,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::Playlist,
-                "Playlists",
-                LibraryRoutes::Playlists,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::section_header("SYSTEM", collapsed, &theme))
-            .child(Self::item(
-                Icons::Plugins,
-                "Plugins",
-                LibraryRoutes::Plugins,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(Self::item(
-                Icons::Settings,
-                "Settings",
-                LibraryRoutes::Settings,
-                current,
-                collapsed,
-                &theme,
-            ))
-            .child(div().flex_grow())
-            .child(self.collapse_control(&theme))
+            .child(
+                div()
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .child(
+                        div()
+                            .flex_grow()
+                            .when(!collapsed, |this| this.flex_grow_0())
+                            .motion("library_sidebar_top_spacer")
+                            .transition(page_transition()),
+                    )
+                    .child(Self::section_header("DISCOVERY", collapsed, &theme))
+                    .child(Self::item(
+                        Icons::Home,
+                        "Home",
+                        LibraryRoutes::Home,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::Heart,
+                        "Favorites",
+                        LibraryRoutes::Favorites,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::Chart,
+                        "Stats",
+                        LibraryRoutes::Stats,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::section_header("COLLECTION", collapsed, &theme))
+                    .child(Self::item(
+                        Icons::Music,
+                        "Tracks",
+                        LibraryRoutes::Tracks,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::Disc,
+                        "Albums",
+                        LibraryRoutes::Albums,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::User,
+                        "Artists",
+                        LibraryRoutes::Artists,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::Playlist,
+                        "Playlists",
+                        LibraryRoutes::Playlists,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::section_header("SYSTEM", collapsed, &theme))
+                    .child(Self::item(
+                        Icons::Plugins,
+                        "Plugins",
+                        LibraryRoutes::Plugins,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(Self::item(
+                        Icons::Settings,
+                        "Settings",
+                        LibraryRoutes::Settings,
+                        current,
+                        collapsed,
+                        &theme,
+                    ))
+                    .child(
+                        div()
+                            .flex_grow()
+                            .motion("library_sidebar_bottom_spacer")
+                            .transition(page_transition()),
+                    ),
+            )
+            .child(self.collapse_control(collapsed, &theme))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::COLLAPSED_SIDEBAR_WIDTH;
+    use super::{
+        COLLAPSED_ITEM_VERTICAL_PADDING, COLLAPSED_SIDEBAR_WIDTH, EXPANDED_ITEM_VERTICAL_PADDING,
+    };
     use crate::ui::{
         animations::{
             PAGE_TRANSITION_DURATION, SIDEBAR_HOVER_SPRING, page_transition, sidebar_transition,
@@ -277,7 +325,7 @@ mod tests {
         components::icons::{IconNamed, Icons},
         theme::Theme,
     };
-    use gpui::rgb;
+    use gpui::{rgb, rgba};
     use wgpui_motion::prelude::{Channel, Spring};
 
     #[test]
@@ -288,6 +336,10 @@ mod tests {
         assert_eq!(theme.library_sidebar_item_text_hover, rgb(0xFFFFFF));
         assert_eq!(theme.library_sidebar_item_text_active, rgb(0xFFFFFF));
         assert_eq!(theme.library_sidebar_bg, rgb(0x050505));
+        assert_eq!(theme.library_sidebar_toggle_text, rgba(0xFFFFFFCC));
+        assert_eq!(theme.library_sidebar_toggle_text_hover, rgb(0xFFFFFF));
+        assert_eq!(theme.library_sidebar_toggle_bg, rgba(0x00000000));
+        assert_eq!(theme.library_sidebar_toggle_bg_hover, rgba(0xFFFFFF24));
         assert_eq!(Icons::Menu.path(), "icons/menu.svg");
         assert_eq!(
             PAGE_TRANSITION_DURATION,
@@ -312,6 +364,8 @@ mod tests {
                 <= std::time::Duration::from_millis(350)
         );
         assert_eq!(COLLAPSED_SIDEBAR_WIDTH, 72.0);
+        assert_eq!(EXPANDED_ITEM_VERTICAL_PADDING, 12.0);
+        assert_eq!(COLLAPSED_ITEM_VERTICAL_PADDING, 4.0);
         assert_eq!(
             page_transition().timing_for(Channel::Layout).duration(),
             PAGE_TRANSITION_DURATION
