@@ -18,7 +18,7 @@ use crate::ui::pages::library::routes::plugins::PluginsSection;
 use crate::ui::pages::library::routes::settings::SettingsSection;
 use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
-use crate::ui::pages::library::sidebar::Sidebar;
+use crate::ui::pages::library::sidebar::{COLLAPSED_SIDEBAR_WIDTH, Sidebar};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -62,6 +62,7 @@ struct LibraryTransitionState {
 #[derive(Clone)]
 pub struct LibraryPage {
     sidebar: Entity<Sidebar>,
+    sidebar_collapsed: Entity<bool>,
     sidebar_width: Entity<ResizeState>,
     album: Entity<AlbumViewSection>,
     albums: Entity<AlbumsSection>,
@@ -102,8 +103,12 @@ impl LibraryRoutes {
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
+        let sidebar_collapsed = cx.new(|_| false);
         LibraryPage {
-            sidebar: cx.new(|_| Sidebar),
+            sidebar: cx.new(|_| Sidebar {
+                collapsed: sidebar_collapsed.clone(),
+            }),
+            sidebar_collapsed,
             sidebar_width: cx.new(|_| ResizeState::new(ResizeSide::Left, 256.0, 220.0, 420.0)),
             album: cx.new(|cx| AlbumViewSection {
                 album_id: cx.new(|_| None),
@@ -167,6 +172,7 @@ impl Render for LibraryPage {
         let section = *cx.global::<LibraryRoutes>();
 
         let sidebar_width = self.sidebar_width.read(cx).width();
+        let sidebar_collapsed = *self.sidebar_collapsed.read(cx);
 
         let section_el = match section {
             LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
@@ -235,12 +241,21 @@ impl Render for LibraryPage {
             .flex()
             .child(
                 div()
-                    .w(px(sidebar_width))
+                    .w(px(if sidebar_collapsed {
+                        COLLAPSED_SIDEBAR_WIDTH
+                    } else {
+                        sidebar_width
+                    }))
                     .h_full()
                     .flex_shrink_0()
+                    .overflow_hidden()
+                    .motion("library_sidebar_width")
+                    .transition(page_transition())
                     .child(self.sidebar.clone()),
             )
-            .child(ResizeHandle::new(&self.sidebar_width))
+            .when(!sidebar_collapsed, |this| {
+                this.child(ResizeHandle::new(&self.sidebar_width))
+            })
             .child(
                 div()
                     .id("animation_container")
