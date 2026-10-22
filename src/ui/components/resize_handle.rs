@@ -1,8 +1,8 @@
 use crate::ui::{animations::page_transition, theme::Theme};
 use gpui::{
     App, AppContext, Context, DragMoveEvent, Entity, EntityId, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Pixels, Point, Render, RenderOnce, StatefulInteractiveElement,
-    Styled, Window, div, px, rgba,
+    MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, div, px, rgba,
 };
 use std::time::Duration;
 use wgpui_motion::prelude::{MotionExt, Transition};
@@ -13,15 +13,8 @@ pub enum ResizeSide {
     Right,
 }
 
-#[derive(Clone)]
-struct ResizeDrag {
-    id: EntityId,
-    start_position: Point<Pixels>,
-    start_width: f32,
-}
-
 #[derive(Clone, Copy)]
-struct ResizeDragSource(EntityId);
+struct ResizeDrag(EntityId);
 
 impl Render for ResizeDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -197,37 +190,34 @@ impl RenderOnce for ResizeHandle {
                     .bg(theme.resize_handle),
             )
             .opacity(0.55)
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                let position = window.mouse_position();
+            .on_mouse_down(MouseButton::Left, move |event: &MouseDownEvent, _, cx| {
+                let position = event.position;
                 state_for_mouse_down.update(cx, |state, _| {
                     state.drag_start = Some((position, state.width));
                 });
             })
-            .on_drag(ResizeDragSource(entity_id), move |source, _, window, cx| {
-                let resize_state = state_for_drag.read(cx);
-                let (start_position, start_width) = resize_state
-                    .drag_start
-                    .unwrap_or((window.mouse_position(), resize_state.width()));
+            .on_drag(ResizeDrag(entity_id), move |drag, _, _, cx| {
                 state_for_drag.update(cx, |state, cx| {
                     state.is_resizing = true;
                     cx.notify();
                 });
-                cx.new(|_| ResizeDrag {
-                    id: source.0,
-                    start_position,
-                    start_width,
-                })
+                cx.new(|_| *drag)
             })
             .on_drag_move(window.listener_for(
                 &self.state,
-                move |state, e: &DragMoveEvent<ResizeDrag>, _, cx| {
-                    let position = e.event.position;
-                    let (drag_id, start_position, start_width) = {
-                        let drag = e.drag(cx);
-                        (drag.id, drag.start_position, drag.start_width)
-                    };
-                    if drag_id == entity_id {
-                        state.update_from_drag(start_position, start_width, position, cx);
+                move |state, e: &DragMoveEvent<ResizeDrag>, _, cx| match e.drag(cx) {
+                    ResizeDrag(id) => {
+                        if *id != entity_id {
+                            return;
+                        }
+                        if let Some((start_position, start_width)) = state.drag_start {
+                            state.update_from_drag(
+                                start_position,
+                                start_width,
+                                e.event.position,
+                                cx,
+                            );
+                        }
                     }
                 },
             ))
