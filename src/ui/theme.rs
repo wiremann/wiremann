@@ -78,11 +78,13 @@ pub struct Theme {
     pub library_sidebar_group_text: Rgba,
     pub library_sidebar_header_text: Rgba,
     pub library_sidebar_item_bg: Rgba,
-    pub library_sidebar_item_bg_hover: Rgba,
     pub library_sidebar_item_bg_active: Rgba,
     pub library_sidebar_item_text_active: Rgba,
-    pub library_sidebar_indicator: Rgba,
-    pub library_sidebar_indicator_glow: Rgba,
+    pub library_sidebar_item_text_hover: Rgba,
+    pub library_sidebar_toggle_text: Rgba,
+    pub library_sidebar_toggle_text_hover: Rgba,
+    pub library_sidebar_toggle_bg: Rgba,
+    pub library_sidebar_toggle_bg_hover: Rgba,
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
@@ -319,15 +321,16 @@ impl Default for Theme {
             library_sidebar_group_text: rgb(0x71717A),
 
             library_sidebar_item_bg: rgba(0xFFFFFF00),
-            library_sidebar_item_bg_hover: rgba(0xFFFFFF00),
-            library_sidebar_item_bg_active: rgba(0xFFFFFF00),
+            library_sidebar_item_bg_active: rgb(0xFFFFFF),
             library_sidebar_item_text: rgb(0x71717A),
             library_sidebar_item_text_active: rgb(0xFFFFFF),
+            library_sidebar_item_text_hover: rgb(0xFFFFFF),
+            library_sidebar_toggle_text: rgba(0xFFFFFFCC),
+            library_sidebar_toggle_text_hover: rgb(0xFFFFFF),
+            library_sidebar_toggle_bg: rgba(0x00000000),
+            library_sidebar_toggle_bg_hover: rgba(0xFFFFFF24),
 
             library_sidebar_header_text: rgb(0xFAFAFA),
-
-            library_sidebar_indicator: rgb(0xFFFFFF),
-            library_sidebar_indicator_glow: rgba(0xFFFFFF4D),
 
             library_home_section_title: rgb(0xFFFFFF),
             library_home_section_meta: rgb(0x71717A),

@@ -18,7 +18,7 @@ use crate::ui::pages::library::routes::plugins::PluginsSection;
 use crate::ui::pages::library::routes::settings::SettingsSection;
 use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
-use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
+use crate::ui::pages::library::sidebar::{COLLAPSED_SIDEBAR_WIDTH, Sidebar};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -62,6 +62,7 @@ struct LibraryTransitionState {
 #[derive(Clone)]
 pub struct LibraryPage {
     sidebar: Entity<Sidebar>,
+    sidebar_collapsed: Entity<bool>,
     sidebar_width: Entity<ResizeState>,
     album: Entity<AlbumViewSection>,
     albums: Entity<AlbumsSection>,
@@ -102,16 +103,12 @@ impl LibraryRoutes {
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
-        cx.set_global(SidebarIndicator {
-            top: 0.0,
-            height: 32.0,
-            route: LibraryRoutes::Home,
-        });
-
-        cx.set_global(SidebarBounds { top: 0.0 });
-
+        let sidebar_collapsed = cx.new(|_| false);
         LibraryPage {
-            sidebar: cx.new(|_| Sidebar),
+            sidebar: cx.new(|_| Sidebar {
+                collapsed: sidebar_collapsed.clone(),
+            }),
+            sidebar_collapsed,
             sidebar_width: cx.new(|_| ResizeState::new(ResizeSide::Left, 256.0, 220.0, 420.0)),
             album: cx.new(|cx| AlbumViewSection {
                 album_id: cx.new(|_| None),
@@ -175,6 +172,8 @@ impl Render for LibraryPage {
         let section = *cx.global::<LibraryRoutes>();
 
         let sidebar_width = self.sidebar_width.read(cx).width();
+        let sidebar_resizing = self.sidebar_width.read(cx).is_resizing();
+        let sidebar_collapsed = *self.sidebar_collapsed.read(cx);
 
         let section_el = match section {
             LibraryRoutes::Home => div().w_full().h_full().child(self.home.clone()),
@@ -234,6 +233,28 @@ impl Render for LibraryPage {
         let is_transitioning =
             transition.target != transition.settled || transition.from != transition.target;
 
+        let sidebar_container = div()
+            .w(px(if sidebar_collapsed {
+                COLLAPSED_SIDEBAR_WIDTH
+            } else {
+                sidebar_width
+            }))
+            .h_full()
+            .flex_shrink_0()
+            .overflow_hidden()
+            .child(self.sidebar.clone());
+        let sidebar_container = if sidebar_resizing {
+            sidebar_container.into_any_element()
+        } else {
+            sidebar_container
+                .motion(ElementId::NamedInteger(
+                    "library_sidebar_width".into(),
+                    self.sidebar_width.read(cx).motion_generation(),
+                ))
+                .transition(page_transition())
+                .into_any_element()
+        };
+
         div()
             .size_full()
             .bg(theme.library_bg)
@@ -241,14 +262,10 @@ impl Render for LibraryPage {
             .px_2()
             .pt_2()
             .flex()
-            .child(
-                div()
-                    .w(px(sidebar_width))
-                    .h_full()
-                    .flex_shrink_0()
-                    .child(self.sidebar.clone()),
-            )
-            .child(ResizeHandle::new(&self.sidebar_width))
+            .child(sidebar_container)
+            .when(!sidebar_collapsed, |this| {
+                this.child(ResizeHandle::new(&self.sidebar_width))
+            })
             .child(
                 div()
                     .id("animation_container")
