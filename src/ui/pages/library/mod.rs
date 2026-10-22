@@ -4,9 +4,7 @@ mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::page_transition;
-use crate::ui::components::resize_handle::{
-    ResizeHandle, ResizeSide, ResizeState, resize_transition,
-};
+use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
 use crate::ui::pages::library::routes::albums::AlbumsSection;
@@ -235,6 +233,28 @@ impl Render for LibraryPage {
         let is_transitioning =
             transition.target != transition.settled || transition.from != transition.target;
 
+        let sidebar_container = div()
+            .w(px(if sidebar_collapsed {
+                COLLAPSED_SIDEBAR_WIDTH
+            } else {
+                sidebar_width
+            }))
+            .h_full()
+            .flex_shrink_0()
+            .overflow_hidden()
+            .child(self.sidebar.clone());
+        let sidebar_container = if sidebar_resizing {
+            sidebar_container.into_any_element()
+        } else {
+            sidebar_container
+                .motion(ElementId::NamedInteger(
+                    "library_sidebar_width".into(),
+                    self.sidebar_width.read(cx).motion_generation(),
+                ))
+                .transition(page_transition())
+                .into_any_element()
+        };
+
         div()
             .size_full()
             .bg(theme.library_bg)
@@ -242,20 +262,7 @@ impl Render for LibraryPage {
             .px_2()
             .pt_2()
             .flex()
-            .child(
-                div()
-                    .w(px(if sidebar_collapsed {
-                        COLLAPSED_SIDEBAR_WIDTH
-                    } else {
-                        sidebar_width
-                    }))
-                    .h_full()
-                    .flex_shrink_0()
-                    .overflow_hidden()
-                    .motion("library_sidebar_width")
-                    .transition(resize_transition(sidebar_resizing))
-                    .child(self.sidebar.clone()),
-            )
+            .child(sidebar_container)
             .when(!sidebar_collapsed, |this| {
                 this.child(ResizeHandle::new(&self.sidebar_width))
             })

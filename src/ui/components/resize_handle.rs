@@ -4,8 +4,7 @@ use gpui::{
     MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render, RenderOnce,
     StatefulInteractiveElement, Styled, Window, div, px, rgba,
 };
-use std::time::Duration;
-use wgpui_motion::prelude::{MotionExt, Transition};
+use wgpui_motion::prelude::MotionExt;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ResizeSide {
@@ -28,6 +27,7 @@ pub struct ResizeState {
     max: f32,
     side: ResizeSide,
     is_resizing: bool,
+    motion_generation: u64,
     drag_start: Option<(Point<Pixels>, f32)>,
 }
 
@@ -40,6 +40,7 @@ impl ResizeState {
             max,
             side,
             is_resizing: false,
+            motion_generation: 0,
             drag_start: None,
         }
     }
@@ -51,6 +52,10 @@ impl ResizeState {
 
     pub fn is_resizing(&self) -> bool {
         self.is_resizing
+    }
+
+    pub fn motion_generation(&self) -> u64 {
+        self.motion_generation
     }
 
     fn update_from_drag(
@@ -94,14 +99,6 @@ fn resized_width(
         ResizeSide::Right => -1.0,
     };
     (start_width + direction * delta).clamp(min, max)
-}
-
-pub fn resize_transition(is_resizing: bool) -> Transition {
-    if is_resizing {
-        Transition::new(Duration::from_millis(1))
-    } else {
-        page_transition()
-    }
 }
 
 #[cfg(test)]
@@ -199,6 +196,7 @@ impl RenderOnce for ResizeHandle {
             .on_drag(ResizeDrag(entity_id), move |drag, _, _, cx| {
                 state_for_drag.update(cx, |state, cx| {
                     state.is_resizing = true;
+                    state.motion_generation = state.motion_generation.wrapping_add(1);
                     cx.notify();
                 });
                 cx.new(|_| *drag)
