@@ -78,7 +78,6 @@ pub struct Theme {
     pub library_sidebar_group_text: Rgba,
     pub library_sidebar_header_text: Rgba,
     pub library_sidebar_item_bg: Rgba,
-    pub library_sidebar_item_bg_hover: Rgba,
     pub library_sidebar_item_bg_active: Rgba,
     pub library_sidebar_item_text_active: Rgba,
     pub library_sidebar_item_text_hover: Rgba,
@@ -318,7 +317,6 @@ impl Default for Theme {
             library_sidebar_group_text: rgb(0x71717A),
 
             library_sidebar_item_bg: rgba(0xFFFFFF00),
-            library_sidebar_item_bg_hover: rgba(0xFFFFFF24),
             library_sidebar_item_bg_active: rgb(0xFFFFFF),
             library_sidebar_item_text: rgb(0x71717A),
             library_sidebar_item_text_active: rgb(0xFFFFFF),

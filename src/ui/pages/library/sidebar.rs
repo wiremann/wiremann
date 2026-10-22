@@ -5,7 +5,7 @@ use gpui::{
 use wgpui_motion::prelude::MotionExt;
 
 use crate::ui::{
-    animations::page_transition,
+    animations::sidebar_transition,
     components::icons::{Icons, icon},
     pages::library::LibraryRoutes,
     theme::Theme,
@@ -35,7 +35,6 @@ impl Sidebar {
     ) -> impl IntoElement {
         let active = current == section;
         let hover_text_color = theme.library_sidebar_item_text_hover;
-        let hover_bg_color = theme.library_sidebar_item_bg_hover;
         let active_icon_color = theme.library_sidebar_bg;
         let highlight = div()
             .absolute()
@@ -45,7 +44,7 @@ impl Sidebar {
             .rounded_lg()
             .bg(theme.library_sidebar_item_bg_active)
             .motion(format!("sidebar_icon_highlight_{text}"))
-            .transition(page_transition())
+            .transition(sidebar_transition())
             .opacity(f32::from(active));
 
         let icon = div()
@@ -58,7 +57,7 @@ impl Sidebar {
             .child(highlight)
             .child(icon(icon_type).size_5())
             .motion(format!("sidebar_icon_{text}"))
-            .transition(page_transition())
+            .transition(sidebar_transition())
             .variant_when(active, move |style| style.text_color(active_icon_color));
 
         let label = div()
@@ -70,30 +69,34 @@ impl Sidebar {
             })
             .child(text);
 
-        div().w_full().px_8().py_3().child(
-            div()
-                .id(format!("library_sidebar_item_{text}"))
-                .w_full()
-                .flex()
-                .items_center()
-                .gap_5()
-                .rounded_lg()
-                .cursor_pointer()
-                .text_color(if active {
-                    theme.library_sidebar_item_text_active
-                } else {
-                    theme.library_sidebar_item_text
-                })
-                .on_click(move |_, window, cx| {
-                    *cx.global_mut::<LibraryRoutes>() = section;
-                    window.refresh();
-                })
-                .child(icon)
-                .child(label)
-                .motion(format!("sidebar_item_{text}"))
-                .transition(page_transition())
-                .while_hovered(move |style| style.bg(hover_bg_color).text_color(hover_text_color)),
-        )
+        div()
+            .id(format!("library_sidebar_item_{text}"))
+            .w_full()
+            .px_8()
+            .py_3()
+            .cursor_pointer()
+            .text_color(if active {
+                theme.library_sidebar_item_text_active
+            } else {
+                theme.library_sidebar_item_text
+            })
+            .on_click(move |_, window, cx| {
+                *cx.global_mut::<LibraryRoutes>() = section;
+                window.refresh();
+            })
+            .motion(format!("sidebar_item_{text}"))
+            .transition(sidebar_transition())
+            .while_hovered(move |style| style.text_color(hover_text_color))
+            .child(
+                div()
+                    .w_full()
+                    .flex()
+                    .items_center()
+                    .gap_5()
+                    .rounded_lg()
+                    .child(icon)
+                    .child(label),
+            )
     }
 }
 
@@ -181,8 +184,12 @@ impl Render for Sidebar {
 
 #[cfg(test)]
 mod tests {
-    use crate::ui::{animations::PAGE_TRANSITION_DURATION, theme::Theme};
+    use crate::ui::{
+        animations::{PAGE_TRANSITION_DURATION, SIDEBAR_HOVER_SPRING, sidebar_transition},
+        theme::Theme,
+    };
     use gpui::rgb;
+    use wgpui_motion::prelude::{Channel, Spring};
 
     #[test]
     fn sidebar_colors_and_transition_match_hover_and_active_states() {
@@ -195,6 +202,24 @@ mod tests {
         assert_eq!(
             PAGE_TRANSITION_DURATION,
             std::time::Duration::from_millis(300)
+        );
+        assert_eq!(SIDEBAR_HOVER_SPRING, Spring::SNAPPY.with_mass(0.5));
+        let transition = sidebar_transition();
+        assert_eq!(
+            transition.timing_for(Channel::Text).spring(),
+            Some(SIDEBAR_HOVER_SPRING)
+        );
+        assert_eq!(
+            transition.timing_for(Channel::Effects).spring(),
+            Some(SIDEBAR_HOVER_SPRING)
+        );
+        assert_eq!(
+            transition.timing_for(Channel::Text).duration(),
+            transition.timing_for(Channel::Effects).duration()
+        );
+        assert!(
+            transition.timing_for(Channel::Text).duration()
+                <= std::time::Duration::from_millis(350)
         );
     }
 }
