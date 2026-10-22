@@ -4,7 +4,9 @@ mod sidebar;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::page_transition;
-use crate::ui::components::resize_handle::{ResizeHandle, ResizeSide, ResizeState};
+use crate::ui::components::resize_handle::{
+    ResizeHandle, ResizeSide, ResizeState, resize_transition,
+};
 use crate::ui::components::virtual_grid::VirtualGridScrollController;
 use crate::ui::pages::library::routes::album::AlbumViewSection;
 use crate::ui::pages::library::routes::albums::AlbumsSection;
@@ -172,6 +174,7 @@ impl Render for LibraryPage {
         let section = *cx.global::<LibraryRoutes>();
 
         let sidebar_width = self.sidebar_width.read(cx).width();
+        let sidebar_resizing = self.sidebar_width.read(cx).is_resizing();
         let sidebar_collapsed = *self.sidebar_collapsed.read(cx);
 
         let section_el = match section {
@@ -250,7 +253,7 @@ impl Render for LibraryPage {
                     .flex_shrink_0()
                     .overflow_hidden()
                     .motion("library_sidebar_width")
-                    .transition(page_transition())
+                    .transition(resize_transition(sidebar_resizing))
                     .child(self.sidebar.clone()),
             )
             .when(!sidebar_collapsed, |this| {

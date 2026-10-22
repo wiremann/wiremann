@@ -10,7 +10,7 @@ use crate::{
             bounds_observer::observe_bounds,
             icons::{Icons, icon},
             image_cache::ImageCache,
-            resize_handle::{ResizeHandle, ResizeSide, ResizeState},
+            resize_handle::{ResizeHandle, ResizeSide, ResizeState, resize_transition},
             scrollbar::{RightPad, floating_scrollbar},
         },
         theme::{DominantColors, Theme},
@@ -123,7 +123,9 @@ impl Render for PlayerPage {
         };
 
         let current_id = state.playback.current;
-        let panel_width = self.panel_width.read(cx).width();
+        let panel_width_state = self.panel_width.read(cx);
+        let panel_width = panel_width_state.width();
+        let panel_resizing = panel_width_state.is_resizing();
 
         let (current_artist_str, _current_album_str) = if let Some(track) = current {
             (
@@ -619,7 +621,7 @@ impl Render for PlayerPage {
                     .left(px(if panel_visible { 0.0 } else { 20.0 }))
                     .opacity(if panel_visible { 1.0 } else { 0.0 })
                     .motion("player_side_panel")
-                    .transition(page_transition())
+                    .transition(resize_transition(panel_resizing))
                     .child(
                         div()
                             .size_full()
