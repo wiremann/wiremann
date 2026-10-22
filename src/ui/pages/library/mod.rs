@@ -18,7 +18,7 @@ use crate::ui::pages::library::routes::plugins::PluginsSection;
 use crate::ui::pages::library::routes::settings::SettingsSection;
 use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
-use crate::ui::pages::library::sidebar::{Sidebar, SidebarBounds, SidebarIndicator};
+use crate::ui::pages::library::sidebar::Sidebar;
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -102,14 +102,6 @@ impl LibraryRoutes {
 
 impl LibraryPage {
     pub fn new(cx: &mut App) -> Self {
-        cx.set_global(SidebarIndicator {
-            top: 0.0,
-            height: 32.0,
-            route: LibraryRoutes::Home,
-        });
-
-        cx.set_global(SidebarBounds { top: 0.0 });
-
         LibraryPage {
             sidebar: cx.new(|_| Sidebar),
             sidebar_width: cx.new(|_| ResizeState::new(ResizeSide::Left, 256.0, 220.0, 420.0)),
