@@ -1,6 +1,6 @@
 use gpui::{
     Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    StatefulInteractiveElement, Styled, Window, div, px,
 };
 use wgpui_motion::prelude::MotionExt;
 
@@ -143,7 +143,7 @@ impl Sidebar {
             )
     }
 
-    fn collapse_control(&self, collapsed: bool, theme: &Theme) -> impl IntoElement {
+    fn collapse_control(&self, theme: &Theme) -> impl IntoElement {
         let toggle = self.collapsed.clone();
         let click_toggle = toggle.clone();
         let key_toggle = toggle;
@@ -153,11 +153,9 @@ impl Sidebar {
         div()
             .id("library_sidebar_collapse")
             .w_full()
-            .px(px(if collapsed { 0.0 } else { 32.0 }))
             .py_3()
             .flex()
             .items_center()
-            .when(collapsed, |this| this.justify_center())
             .cursor_pointer()
             .tab_index(0)
             .on_click(move |_, _, cx| {
@@ -176,24 +174,30 @@ impl Sidebar {
             })
             .child(
                 div()
-                    .px_2()
-                    .py_2()
-                    .rounded_md()
+                    .w(px(COLLAPSED_SIDEBAR_WIDTH))
+                    .flex_none()
                     .flex()
                     .items_center()
                     .justify_center()
-                    .cursor_pointer()
-                    .text_sm()
-                    .font_weight(FontWeight(400.0))
-                    .bg(theme.library_sidebar_toggle_bg)
-                    .text_color(theme.library_sidebar_toggle_text)
-                    .motion("library_sidebar_collapse_control")
-                    .transition(page_transition())
-                    .while_hovered(move |style| {
-                        style.bg(hover_bg_color).text_color(hover_text_color)
-                    })
-                    .while_pressed(|style| style.opacity(0.75))
-                    .child(icon(Icons::Menu).size_4()),
+                    .child(
+                        div()
+                            .px_2()
+                            .py_2()
+                            .text_center()
+                            .rounded_md()
+                            .text_sm()
+                            .font_weight(FontWeight(400.0))
+                            .cursor_pointer()
+                            .bg(theme.library_sidebar_toggle_bg)
+                            .text_color(theme.library_sidebar_toggle_text)
+                            .motion("library_sidebar_collapse_control")
+                            .transition(page_transition())
+                            .while_hovered(move |style| {
+                                style.bg(hover_bg_color).text_color(hover_text_color)
+                            })
+                            .while_pressed(|style| style.opacity(0.75))
+                            .child(icon(Icons::Menu).size_4()),
+                    ),
             )
     }
 }
@@ -292,7 +296,7 @@ impl Render for Sidebar {
                         &theme,
                     )),
             )
-            .child(self.collapse_control(collapsed, &theme))
+            .child(self.collapse_control(&theme))
     }
 }
 
@@ -321,6 +325,18 @@ mod tests {
         assert_eq!(theme.library_sidebar_toggle_text_hover, rgb(0xFFFFFF));
         assert_eq!(theme.library_sidebar_toggle_bg, rgba(0x00000000));
         assert_eq!(theme.library_sidebar_toggle_bg_hover, rgba(0xFFFFFF24));
+        assert_eq!(
+            theme.library_sidebar_toggle_text,
+            theme.player_panel_show_hide_text
+        );
+        assert_eq!(
+            theme.library_sidebar_toggle_text_hover,
+            theme.player_panel_show_hide_text_hover
+        );
+        assert_eq!(
+            theme.library_sidebar_toggle_bg_hover,
+            theme.player_panel_show_hide_bg_hover
+        );
         assert_eq!(Icons::Menu.path(), "icons/menu.svg");
         assert_eq!(
             PAGE_TRANSITION_DURATION,
