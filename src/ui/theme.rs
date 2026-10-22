@@ -81,6 +81,7 @@ pub struct Theme {
     pub library_sidebar_item_bg_hover: Rgba,
     pub library_sidebar_item_bg_active: Rgba,
     pub library_sidebar_item_text_active: Rgba,
+    pub library_sidebar_item_text_hover: Rgba,
 
     // Library Page Home Section
     pub library_home_section_title: Rgba,
@@ -321,6 +322,7 @@ impl Default for Theme {
             library_sidebar_item_bg_active: rgb(0xFFFFFF),
             library_sidebar_item_text: rgb(0x71717A),
             library_sidebar_item_text_active: rgb(0xFFFFFF),
+            library_sidebar_item_text_hover: rgb(0xFFFFFF),
 
             library_sidebar_header_text: rgb(0xFAFAFA),
 

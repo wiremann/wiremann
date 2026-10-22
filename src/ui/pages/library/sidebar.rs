@@ -34,7 +34,7 @@ impl Sidebar {
         theme: &Theme,
     ) -> impl IntoElement {
         let active = current == section;
-        let hover_text_color = theme.library_sidebar_item_text_active;
+        let hover_text_color = theme.library_sidebar_item_text_hover;
         let hover_bg_color = theme.library_sidebar_item_bg_hover;
         let active_icon_color = theme.library_sidebar_bg;
         let highlight = div()
@@ -70,36 +70,30 @@ impl Sidebar {
             })
             .child(text);
 
-        div()
-            .id(format!("library_sidebar_item_{text}"))
-            .w_full()
-            .px_8()
-            .py_3()
-            .cursor_pointer()
-            .on_click(move |_, window, cx| {
-                *cx.global_mut::<LibraryRoutes>() = section;
-                window.refresh();
-            })
-            .child(
-                div()
-                    .w_full()
-                    .flex()
-                    .items_center()
-                    .gap_5()
-                    .rounded_lg()
-                    .text_color(if active {
-                        hover_text_color
-                    } else {
-                        theme.library_sidebar_item_text
-                    })
-                    .child(icon)
-                    .child(label)
-                    .motion(format!("sidebar_item_{text}"))
-                    .transition(page_transition())
-                    .while_hovered(move |style| {
-                        style.bg(hover_bg_color).text_color(hover_text_color)
-                    }),
-            )
+        div().w_full().px_8().py_3().child(
+            div()
+                .id(format!("library_sidebar_item_{text}"))
+                .w_full()
+                .flex()
+                .items_center()
+                .gap_5()
+                .rounded_lg()
+                .cursor_pointer()
+                .text_color(if active {
+                    theme.library_sidebar_item_text_active
+                } else {
+                    theme.library_sidebar_item_text
+                })
+                .on_click(move |_, window, cx| {
+                    *cx.global_mut::<LibraryRoutes>() = section;
+                    window.refresh();
+                })
+                .child(icon)
+                .child(label)
+                .motion(format!("sidebar_item_{text}"))
+                .transition(page_transition())
+                .while_hovered(move |style| style.bg(hover_bg_color).text_color(hover_text_color)),
+        )
     }
 }
 
@@ -182,5 +176,25 @@ impl Render for Sidebar {
                 &theme,
             ))
             .child(div().flex_grow())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ui::{animations::PAGE_TRANSITION_DURATION, theme::Theme};
+    use gpui::rgb;
+
+    #[test]
+    fn sidebar_colors_and_transition_match_hover_and_active_states() {
+        let theme = Theme::default();
+
+        assert_eq!(theme.library_sidebar_item_text, rgb(0x71717A));
+        assert_eq!(theme.library_sidebar_item_text_hover, rgb(0xFFFFFF));
+        assert_eq!(theme.library_sidebar_item_text_active, rgb(0xFFFFFF));
+        assert_eq!(theme.library_sidebar_bg, rgb(0x050505));
+        assert_eq!(
+            PAGE_TRANSITION_DURATION,
+            std::time::Duration::from_millis(300)
+        );
     }
 }
