@@ -90,7 +90,9 @@ impl Sidebar {
                         .child(
                             div()
                                 .absolute()
-                                .inset_0()
+                                .size(px(44.0))
+                                .left(px(-10.0))
+                                .top(px(-10.0))
                                 .rounded_md()
                                 .bg(theme.library_sidebar_item_bg_active)
                                 .motion(format!("sidebar_icon_highlight_{text}"))
