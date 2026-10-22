@@ -1,7 +1,6 @@
 use gpui::{
     Context, ElementId, FontWeight, Global, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, div, gradient_color_stop, linear_gradient, px,
-    transparent_black,
+    StatefulInteractiveElement, Styled, Window, div, px,
 };
 use wgpui_motion::prelude::MotionExt;
 
@@ -80,11 +79,31 @@ impl Sidebar {
                 .on_click(move |_, _, cx| {
                     *cx.global_mut::<LibraryRoutes>() = section;
                 })
-                .child(icon(icon_type).size_5().text_color(if active {
-                    theme.library_sidebar_item_text_active
-                } else {
-                    theme.library_sidebar_item_text
-                }))
+                .child(
+                    div()
+                        .relative()
+                        .size_6()
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(
+                            div()
+                                .absolute()
+                                .inset_0()
+                                .rounded_md()
+                                .bg(theme.library_sidebar_item_bg_active)
+                                .motion(format!("sidebar_icon_highlight_{text}"))
+                                .transition(page_transition())
+                                .enter(|style| style.opacity(0.0))
+                                .base(move |style| style.opacity(f32::from(active))),
+                        )
+                        .child(icon(icon_type).size_5().text_color(if active {
+                            theme.library_sidebar_bg
+                        } else {
+                            theme.library_sidebar_item_text
+                        })),
+                )
                 .child(
                     div()
                         .child(text)
@@ -164,6 +183,10 @@ impl Render for Sidebar {
         }
         let transition = *indicator_state.read(cx);
         let is_transitioning = indicator_matches_route && transition.target != transition.settled;
+        let settled_dot_top =
+            transition.settled_top + (transition.settled_height - 6.0).max(0.0) / 2.0;
+        let target_dot_top =
+            transition.target_top + (transition.target_height - 6.0).max(0.0) / 2.0;
 
         observe_bounds(
             "sidebar_root",
@@ -177,35 +200,12 @@ impl Render for Sidebar {
                 .child({
                     let indicator = div()
                         .absolute()
-                        .right_0()
-                        .w_full()
-                        .child(
-                            div()
-                                .absolute()
-                                .right_0()
-                                .top_0()
-                                .bottom_0()
-                                .w(px(4.0))
-                                .bg(theme.library_sidebar_indicator),
-                        )
-                        .child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .bottom_0()
-                                .right(px(4.0))
-                                .w_64()
-                                .bg(linear_gradient(
-                                    270.0,
-                                    gradient_color_stop(theme.library_sidebar_indicator_glow, 0.0),
-                                    gradient_color_stop(transparent_black(), 1.0),
-                                )),
-                        );
+                        .right_6()
+                        .size(px(6.0))
+                        .rounded_full()
+                        .bg(theme.library_sidebar_indicator);
                     if !is_transitioning {
-                        indicator
-                            .top(px(transition.settled_top))
-                            .h(px(transition.settled_height))
-                            .into_any_element()
+                        indicator.top(px(settled_dot_top)).into_any_element()
                     } else {
                         let indicator_state = indicator_state.clone();
                         let generation = transition.generation;
@@ -215,16 +215,8 @@ impl Render for Sidebar {
                                 generation,
                             ))
                             .transition(page_transition())
-                            .enter(move |style| {
-                                style
-                                    .top(px(transition.settled_top))
-                                    .h(px(transition.settled_height))
-                            })
-                            .base(move |style| {
-                                style
-                                    .top(px(transition.target_top))
-                                    .h(px(transition.target_height))
-                            })
+                            .enter(move |style| style.top(px(settled_dot_top)))
+                            .base(move |style| style.top(px(target_dot_top)))
                             .on_settle(move |_, _, cx| {
                                 indicator_state.update(cx, |state, cx| {
                                     if state.generation == generation && state.target == current {
