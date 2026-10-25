@@ -112,9 +112,7 @@ impl Controller {
 
     fn persist_queue_state(&self, cx: &mut App, state: crate::controller::state::QueueState) {
         if self.state.read(cx).startup_complete {
-            let _ = self
-                .cacher_tx
-                .send(CacherCommand::WriteQueueState(state));
+            let _ = self.cacher_tx.send(CacherCommand::WriteQueueState(state));
             return;
         }
 
@@ -123,7 +121,10 @@ impl Controller {
             this.pending_queue_write = Some(queued);
             tracing::info!(
                 action = "startup_buffered_queue_write",
-                queue_len = this.pending_queue_write.as_ref().map_or(0, |q| q.tracks.len()),
+                queue_len = this
+                    .pending_queue_write
+                    .as_ref()
+                    .map_or(0, |q| q.tracks.len()),
                 "startup not complete; buffering queue write"
             );
         });
