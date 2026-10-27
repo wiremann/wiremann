@@ -136,7 +136,7 @@ impl Render for Dock {
 
         div()
             .w_4_5()
-            .max_w(px(1100.0))
+            .max_w(px(1200.0))
             .min_w_0()
             .rounded_2xl()
             .border_1()
@@ -165,8 +165,7 @@ impl Render for Dock {
                     .py_3()
                     .child(
                         div()
-                            .w(if is_compact { px(220.0) } else { px(280.0) })
-                            .flex_shrink_0()
+                            .max_w_80()
                             .min_w_0()
                             .flex()
                             .items_center()
@@ -253,17 +252,12 @@ impl Render for Dock {
                         div()
                             .flex_1()
                             .min_w_0()
+                            .min_h_0()
                             .flex()
+                            .flex_col()
+                            .justify_center()
                             .items_center()
                             .gap_2()
-                            .child(
-                                div()
-                                    .flex_shrink_0()
-                                    .font_family("JetBrains Mono")
-                                    .text_xs()
-                                    .text_color(theme.dock_text_secondary)
-                                    .child(sec_to_text(elapsed)),
-                            )
                             .child(
                                 div().flex_1().min_w_0().child(
                                     Slider::new(
@@ -276,13 +270,24 @@ impl Render for Dock {
                                 ),
                             )
                             .child(
-                                div()
-                                    .flex_shrink_0()
-                                    .font_family("JetBrains Mono")
-                                    .text_xs()
-                                    .text_color(theme.dock_text_secondary)
-                                    .child(sec_to_text(total_duration)),
-                            ),
+                                div().flex_1().min_w_0().flex().items_center().justify_between()
+                                    .child(
+                                        div()
+                                            .flex_shrink_0()
+                                            .font_family("JetBrains Mono")
+                                            .text_xs()
+                                            .text_color(theme.dock_text_secondary)
+                                            .child(sec_to_text(elapsed)),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_shrink_0()
+                                            .font_family("JetBrains Mono")
+                                            .text_xs()
+                                            .text_color(theme.dock_text_secondary)
+                                            .child(sec_to_text(total_duration)),
+                                    ),
+                            )
                     )
                     .child(
                         div()
@@ -301,7 +306,7 @@ impl Render for Dock {
                                     .cursor_pointer()
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
-                                    .motion("library_dock_transport")
+                                    .motion("library_dock_prev")
                                     .transition(page_transition())
                                     .while_hovered(move |style| {
                                         style
@@ -361,7 +366,7 @@ impl Render for Dock {
                                     .cursor_pointer()
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
-                                    .motion("library_dock_transport")
+                                    .motion("library_dock_next")
                                     .transition(page_transition())
                                     .while_hovered(move |style| {
                                         style
@@ -394,7 +399,7 @@ impl Render for Dock {
                                         let controller = controller.clone();
                                         move |_, _, cx| controller.set_mute(cx)
                                     })
-                                    .motion("library_dock_transport")
+                                    .motion("library_dock_volume")
                                     .transition(page_transition())
                                     .while_hovered(move |style| {
                                         style
