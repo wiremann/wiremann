@@ -252,14 +252,13 @@ impl Render for Dock {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .min_h_0()
                             .flex()
                             .flex_col()
                             .justify_center()
                             .items_center()
                             .gap_2()
                             .child(
-                                div().flex_1().min_w_0().child(
+                                div().w_full().child(
                                     Slider::new(
                                         &self.playback_slider_state,
                                         "library_dock_seek",
@@ -270,7 +269,11 @@ impl Render for Dock {
                                 ),
                             )
                             .child(
-                                div().flex_1().min_w_0().flex().items_center().justify_between()
+                                div()
+                                    .w_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
                                     .child(
                                         div()
                                             .flex_shrink_0()
@@ -287,7 +290,7 @@ impl Render for Dock {
                                             .text_color(theme.dock_text_secondary)
                                             .child(sec_to_text(total_duration)),
                                     ),
-                            )
+                            ),
                     )
                     .child(
                         div()
