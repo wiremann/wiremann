@@ -1,7 +1,7 @@
 use crate::{
     controller::{Controller, state::PlaybackStatus},
     ui::{
-        animations::page_transition,
+        animations::{page_transition, sidebar_transition},
         components::{
             icons::{Icons, icon},
             image_cache::ImageCache,
@@ -20,7 +20,7 @@ use wgpui_motion::prelude::MotionExt;
 pub struct Dock {
     playback_slider_state: Entity<SliderState>,
     vol_slider_state: Entity<SliderState>,
-    volume_hovered: (bool, bool),
+    volume_hovered: bool,
 }
 
 impl Dock {
@@ -32,7 +32,7 @@ impl Dock {
         Self {
             playback_slider_state,
             vol_slider_state,
-            volume_hovered: (false, false),
+            volume_hovered: false,
         }
     }
 }
@@ -132,17 +132,8 @@ impl Render for Dock {
         };
         let is_compact = window.bounds().size.width < px(900.0);
         let is_narrow = window.bounds().size.width < px(1200.0);
-        let metadata_width = if window.bounds().size.width < px(760.0) {
-            px(180.0)
-        } else if is_compact {
-            px(240.0)
-        } else {
-            px(320.0)
-        };
-        let show_volume_slider = is_narrow && {
-            let (toggle_hovered, popover_hovered) = self.volume_hovered;
-            toggle_hovered || popover_hovered
-        };
+        let metadata_max_width = if is_compact { px(240.0) } else { px(280.0) };
+        let show_volume_slider = is_narrow && self.volume_hovered;
         let dock = cx.entity();
         let sec_to_text = |duration: std::time::Duration| {
             let total = duration.as_secs();
@@ -158,24 +149,12 @@ impl Render for Dock {
             .rounded_md()
             .cursor_pointer()
             .text_color(theme.dock_icon)
-            .on_hover({
-                let dock = dock.clone();
-                move |hovered, _, cx| {
-                    dock.update(cx, |dock, cx| {
-                        let (toggle_hovered, _) = &mut dock.volume_hovered;
-                        if *toggle_hovered != *hovered {
-                            *toggle_hovered = *hovered;
-                            cx.notify();
-                        }
-                    });
-                }
-            })
             .on_click({
                 let controller = controller.clone();
                 move |_, _, cx| controller.set_mute(cx)
             })
             .motion("library_dock_volume")
-            .transition(page_transition())
+            .transition(sidebar_transition())
             .while_hovered(move |style| {
                 style
                     .text_color(theme.dock_icon_hover)
@@ -183,55 +162,46 @@ impl Render for Dock {
             })
             .child(icon(volume_icon).size_4());
         let volume_control = if is_narrow {
-            let dock_for_popover = dock.clone();
+            let volume_width = if show_volume_slider {
+                px(156.0)
+            } else {
+                px(32.0)
+            };
             let mut control = div()
                 .id("library_dock_volume")
-                .relative()
+                .w(volume_width)
                 .flex_shrink_0()
-                .child(volume_toggle);
+                .flex()
+                .items_center()
+                .justify_end()
+                .gap_2()
+                .on_hover({
+                    let dock = dock.clone();
+                    move |hovered, _, cx| {
+                        dock.update(cx, |dock, cx| {
+                            if dock.volume_hovered != *hovered {
+                                dock.volume_hovered = *hovered;
+                                cx.notify();
+                            }
+                        });
+                    }
+                });
             if show_volume_slider {
                 control = control.child(
                     div()
-                        .id("library_dock_volume_popover")
-                        .absolute()
-                        .right(px(-4.0))
-                        .bottom(px(30.0))
-                        .w(px(40.0))
-                        .h(px(128.0))
-                        .p_2()
-                        .rounded_lg()
-                        .border_1()
-                        .border_color(theme.dock_border)
-                        .bg(theme.dock_surface)
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .on_hover({
-                            move |hovered, _, cx| {
-                                dock_for_popover.update(cx, |dock, cx| {
-                                    let (_, popover_hovered) = &mut dock.volume_hovered;
-                                    if *popover_hovered != *hovered {
-                                        *popover_hovered = *hovered;
-                                        cx.notify();
-                                    }
-                                });
-                            }
-                        })
+                        .id("library_dock_volume_popout")
+                        .w(px(116.0))
+                        .flex_shrink_0()
                         .child(
-                            div().h_full().child(
-                                Slider::new(
-                                    &self.vol_slider_state,
-                                    "library_dock_volume_vertical",
-                                    4.0,
-                                )
-                                .vertical()
+                            Slider::new(&self.vol_slider_state, "library_dock_volume_popout", 4.0)
                                 .bg(theme.dock_volume_track)
                                 .text_color(theme.dock_volume_fill),
-                            ),
-                        ),
+                        )
+                        .motion("library_dock_volume_popout")
+                        .transition(sidebar_transition()),
                 );
             }
-            control.into_any_element()
+            control.child(volume_toggle).into_any_element()
         } else {
             div()
                 .w(px(140.0))
@@ -281,7 +251,8 @@ impl Render for Dock {
                     .py_3()
                     .child(
                         div()
-                            .w(metadata_width)
+                            .w_auto()
+                            .max_w(metadata_max_width)
                             .min_w_0()
                             .flex_shrink_0()
                             .flex()
@@ -300,8 +271,9 @@ impl Render for Dock {
                             )
                             .child(
                                 div()
+                                    .max_w(if is_compact { px(136.0) } else { px(168.0) })
                                     .min_w_0()
-                                    .flex_1()
+                                    .flex_shrink_0()
                                     .flex()
                                     .flex_col()
                                     .gap_0()
@@ -350,7 +322,7 @@ impl Render for Dock {
                                         }
                                     })
                                     .motion("library_dock_favorite")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .variant_when(is_favorite, move |style| {
                                         style
                                             .text_color(theme.dock_icon_active)
@@ -428,7 +400,7 @@ impl Render for Dock {
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
                                     .motion("library_dock_prev")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .text_color(theme.dock_icon_hover)
@@ -466,7 +438,7 @@ impl Render for Dock {
                                         }
                                     })
                                     .motion("library_dock_play_pause")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style.bg(theme.dock_play_pause_bg_hover)
                                     })
@@ -490,7 +462,7 @@ impl Render for Dock {
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
                                     .motion("library_dock_next")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .text_color(theme.dock_icon_hover)
