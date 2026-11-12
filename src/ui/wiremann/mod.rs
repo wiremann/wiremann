@@ -63,8 +63,6 @@ impl Wiremann {
                 .default_value(0.0)
                 .step(1.0)
         });
-        let dock_volume_hovered = cx.new(|_| (false, false));
-
         cx.subscribe(
             &vol_slider_state,
             |_, _, event: &SliderEvent, cx| match event {
@@ -124,8 +122,7 @@ impl Wiremann {
             cx.new(|_| ControlBar::new(playback_slider_state.clone(), vol_slider_state.clone()));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar.clone()));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
-        let dock =
-            cx.new(|_| Dock::new(playback_slider_state, vol_slider_state, dock_volume_hovered));
+        let dock = cx.new(|_| Dock::new(playback_slider_state, vol_slider_state));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
         let popout_player = cx.new(|_| PopOutPlayer::new(controlbar));

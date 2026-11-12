@@ -20,7 +20,7 @@ use wgpui_motion::prelude::MotionExt;
 pub struct Dock {
     playback_slider_state: Entity<SliderState>,
     vol_slider_state: Entity<SliderState>,
-    volume_hovered: Entity<(bool, bool)>,
+    volume_hovered: (bool, bool),
 }
 
 impl Dock {
@@ -28,12 +28,11 @@ impl Dock {
     pub fn new(
         playback_slider_state: Entity<SliderState>,
         vol_slider_state: Entity<SliderState>,
-        volume_hovered: Entity<(bool, bool)>,
     ) -> Self {
         Self {
             playback_slider_state,
             vol_slider_state,
-            volume_hovered,
+            volume_hovered: (false, false),
         }
     }
 }
@@ -132,7 +131,7 @@ impl Render for Dock {
                 .into_any_element(),
         };
         let is_compact = window.bounds().size.width < px(900.0);
-        let is_narrow = window.bounds().size.width < px(1000.0);
+        let is_narrow = window.bounds().size.width < px(1200.0);
         let metadata_width = if window.bounds().size.width < px(760.0) {
             px(180.0)
         } else if is_compact {
@@ -141,9 +140,10 @@ impl Render for Dock {
             px(320.0)
         };
         let show_volume_slider = is_narrow && {
-            let (toggle_hovered, popover_hovered) = *self.volume_hovered.read(cx);
+            let (toggle_hovered, popover_hovered) = self.volume_hovered;
             toggle_hovered || popover_hovered
         };
+        let dock = cx.entity();
         let sec_to_text = |duration: std::time::Duration| {
             let total = duration.as_secs();
             format!("{:02}:{:02}", total / 60, total % 60)
@@ -159,9 +159,10 @@ impl Render for Dock {
             .cursor_pointer()
             .text_color(theme.dock_icon)
             .on_hover({
-                let volume_hovered = self.volume_hovered.clone();
+                let dock = dock.clone();
                 move |hovered, _, cx| {
-                    volume_hovered.update(cx, |(toggle_hovered, _), cx| {
+                    dock.update(cx, |dock, cx| {
+                        let (toggle_hovered, _) = &mut dock.volume_hovered;
                         if *toggle_hovered != *hovered {
                             *toggle_hovered = *hovered;
                             cx.notify();
@@ -182,7 +183,7 @@ impl Render for Dock {
             })
             .child(icon(volume_icon).size_4());
         let volume_control = if is_narrow {
-            let volume_hovered = self.volume_hovered.clone();
+            let dock_for_popover = dock.clone();
             let mut control = div()
                 .id("library_dock_volume")
                 .relative()
@@ -207,7 +208,8 @@ impl Render for Dock {
                         .justify_center()
                         .on_hover({
                             move |hovered, _, cx| {
-                                volume_hovered.update(cx, |(_, popover_hovered), cx| {
+                                dock_for_popover.update(cx, |dock, cx| {
+                                    let (_, popover_hovered) = &mut dock.volume_hovered;
                                     if *popover_hovered != *hovered {
                                         *popover_hovered = *hovered;
                                         cx.notify();
@@ -412,7 +414,7 @@ impl Render for Dock {
                             .flex_shrink_0()
                             .flex()
                             .items_center()
-                            .gap_1()
+                            .gap_2()
                             .child(
                                 div()
                                     .id("library_dock_prev")
