@@ -20,7 +20,7 @@ use wgpui_motion::prelude::MotionExt;
 pub struct Dock {
     playback_slider_state: Entity<SliderState>,
     vol_slider_state: Entity<SliderState>,
-    volume_hovered: bool,
+    volume_hovered: (bool, bool),
 }
 
 impl Dock {
@@ -32,7 +32,7 @@ impl Dock {
         Self {
             playback_slider_state,
             vol_slider_state,
-            volume_hovered: false,
+            volume_hovered: (false, false),
         }
     }
 }
@@ -133,7 +133,7 @@ impl Render for Dock {
         let is_compact = window.bounds().size.width < px(900.0);
         let is_narrow = window.bounds().size.width < px(1200.0);
         let metadata_max_width = if is_compact { px(240.0) } else { px(280.0) };
-        let show_volume_slider = is_narrow && self.volume_hovered;
+        let show_volume_slider = is_narrow && (self.volume_hovered.0 || self.volume_hovered.1);
         let dock = cx.entity();
         let sec_to_text = |duration: std::time::Duration| {
             let total = duration.as_secs();
@@ -162,46 +162,64 @@ impl Render for Dock {
             })
             .child(icon(volume_icon).size_4());
         let volume_control = if is_narrow {
-            let volume_width = if show_volume_slider {
-                px(156.0)
-            } else {
-                px(32.0)
-            };
             let mut control = div()
                 .id("library_dock_volume")
-                .w(volume_width)
+                .w(px(32.0))
                 .flex_shrink_0()
+                .relative()
                 .flex()
                 .items_center()
-                .justify_end()
-                .gap_2()
-                .on_hover({
-                    let dock = dock.clone();
-                    move |hovered, _, cx| {
-                        dock.update(cx, |dock, cx| {
-                            if dock.volume_hovered != *hovered {
-                                dock.volume_hovered = *hovered;
-                                cx.notify();
-                            }
-                        });
-                    }
-                });
+                .justify_center()
+                .child(volume_toggle);
             if show_volume_slider {
                 control = control.child(
                     div()
                         .id("library_dock_volume_popout")
+                        .absolute()
+                        .right(px(32.0))
+                        .top(px(-8.0))
                         .w(px(116.0))
-                        .flex_shrink_0()
+                        .h(px(48.0))
+                        .flex()
+                        .items_center()
                         .child(
-                            Slider::new(&self.vol_slider_state, "library_dock_volume_popout", 4.0)
-                                .bg(theme.dock_volume_track)
-                                .text_color(theme.dock_volume_fill),
+                            Slider::new(
+                                &self.vol_slider_state,
+                                "library_dock_volume_popout_slider",
+                                4.0,
+                            )
+                            .bg(theme.dock_volume_track)
+                            .text_color(theme.dock_volume_fill),
                         )
+                        .on_hover({
+                            let dock = dock.clone();
+                            move |hovered, _, cx| {
+                                dock.update(cx, |dock, cx| {
+                                    let popout_hovered = &mut dock.volume_hovered.1;
+                                    if *popout_hovered != *hovered {
+                                        *popout_hovered = *hovered;
+                                        cx.notify();
+                                    }
+                                });
+                            }
+                        })
                         .motion("library_dock_volume_popout")
                         .transition(sidebar_transition()),
                 );
             }
-            control.child(volume_toggle).into_any_element()
+            control
+                .on_hover({
+                    let dock = dock.clone();
+                    move |hovered, _, cx| {
+                        dock.update(cx, |dock, cx| {
+                            if dock.volume_hovered.0 != *hovered {
+                                dock.volume_hovered.0 = *hovered;
+                                cx.notify();
+                            }
+                        });
+                    }
+                })
+                .into_any_element()
         } else {
             div()
                 .w(px(140.0))
