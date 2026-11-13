@@ -20,7 +20,6 @@ use wgpui_motion::prelude::MotionExt;
 pub struct Dock {
     playback_slider_state: Entity<SliderState>,
     vol_slider_state: Entity<SliderState>,
-    volume_hovered: bool,
 }
 
 impl Dock {
@@ -32,7 +31,6 @@ impl Dock {
         Self {
             playback_slider_state,
             vol_slider_state,
-            volume_hovered: false,
         }
     }
 }
@@ -131,10 +129,7 @@ impl Render for Dock {
                 .into_any_element(),
         };
         let is_compact = window.bounds().size.width < px(900.0);
-        let is_narrow = window.bounds().size.width < px(1200.0);
         let metadata_max_width = if is_compact { px(240.0) } else { px(280.0) };
-        let show_volume_slider = is_narrow && self.volume_hovered;
-        let dock = cx.entity();
         let sec_to_text = |duration: std::time::Duration| {
             let total = duration.as_secs();
             format!("{:02}:{:02}", total / 60, total % 60)
@@ -163,75 +158,20 @@ impl Render for Dock {
                 })
                 .child(icon(volume_icon).size_4())
         };
-        let volume_overlay = if is_narrow {
-            let mut overlay = div()
-                .id("library_dock_volume_overlay")
-                .absolute()
-                .right(px(16.0))
-                .top(px(16.0))
-                .w(if show_volume_slider {
-                    px(148.0)
-                } else {
-                    px(32.0)
-                })
-                .h(px(48.0))
-                .flex()
-                .items_center()
-                .gap_2();
-            if show_volume_slider {
-                overlay = overlay.child(
-                    div()
-                        .w(px(108.0))
-                        .flex_shrink_0()
-                        .child(
-                            Slider::new(
-                                &self.vol_slider_state,
-                                "library_dock_volume_overlay_slider",
-                                4.0,
-                            )
-                            .bg(theme.dock_volume_track)
-                            .text_color(theme.dock_volume_fill),
-                        )
-                        .motion("library_dock_volume_popout")
-                        .transition(sidebar_transition()),
-                );
-            }
-            overlay
-                .child(volume_toggle())
-                .on_hover({
-                    let dock = dock.clone();
-                    move |hovered, _, cx| {
-                        dock.update(cx, |dock, cx| {
-                            if dock.volume_hovered != *hovered {
-                                dock.volume_hovered = *hovered;
-                                cx.notify();
-                            }
-                        });
-                    }
-                })
-                .into_any_element()
-        } else {
-            gpui::Empty.into_any_element()
-        };
-        let volume_control = if is_narrow {
-            div().w(px(32.0)).flex_shrink_0().into_any_element()
-        } else {
-            div()
-                .w(px(140.0))
-                .flex_shrink_0()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(volume_toggle())
-                .child(
-                    div().flex_1().min_w_0().child(
-                        Slider::new(&self.vol_slider_state, "library_dock_volume", 4.0)
-                            .bg(theme.dock_volume_track)
-                            .text_color(theme.dock_volume_fill),
-                    ),
-                )
-                .into_any_element()
-        };
+        let volume_control = div()
+            .w(px(140.0))
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(volume_toggle())
+            .child(
+                div().flex_1().min_w_0().child(
+                    Slider::new(&self.vol_slider_state, "library_dock_volume", 4.0)
+                        .bg(theme.dock_volume_track)
+                        .text_color(theme.dock_volume_fill),
+                ),
+            );
 
         div()
             .w_4_5()
@@ -257,7 +197,6 @@ impl Render for Dock {
             .child(
                 div()
                     .w_full()
-                    .relative()
                     .flex()
                     .items_center()
                     .gap_4()
@@ -359,7 +298,6 @@ impl Render for Dock {
                             .flex_col()
                             .justify_center()
                             .items_center()
-                            .gap_2()
                             .child(
                                 div().w_full().child(
                                     Slider::new(
@@ -486,8 +424,7 @@ impl Render for Dock {
                                     .child(icon(Icons::Next).size_4()),
                             ),
                     )
-                    .child(volume_control)
-                    .child(volume_overlay),
+                    .child(volume_control),
             )
     }
 }
