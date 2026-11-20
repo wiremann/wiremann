@@ -201,7 +201,7 @@ impl Render for Dock {
                     .items_center()
                     .gap_4()
                     .px_4()
-                    .py_1()
+                    .py_2()
                     .child(
                         div()
                             .w_auto()
@@ -213,7 +213,7 @@ impl Render for Dock {
                             .gap_3()
                             .child(
                                 div()
-                                    .size(if is_compact { px(36.0) } else { px(40.0) })
+                                    .size(if is_compact { px(44.0) } else { px(48.0) })
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
@@ -364,7 +364,7 @@ impl Render for Dock {
                             .child(
                                 div()
                                     .id("library_dock_play_pause")
-                                    .size(px(40.0))
+                                    .size(px(44.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
