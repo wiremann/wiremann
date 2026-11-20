@@ -7,6 +7,7 @@ pub mod resize_handle;
 pub mod scrollbar;
 pub mod slider;
 pub mod toasts;
+pub mod uniform_list;
 pub mod virtual_grid;
 pub mod virtual_list;
 pub mod window_border;
