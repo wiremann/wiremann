@@ -9,6 +9,7 @@ use crate::{
             icons::{Icons, icon},
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
+            uniform_list::uniform_list_with_scroll_past,
         },
         theme::Theme,
     },
@@ -17,7 +18,7 @@ use gpui::Entity;
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, rems, uniform_list,
+    UniformListScrollHandle, Window, div, img, px, rems,
 };
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -407,19 +408,25 @@ impl Render for ArtistViewSection {
             .child(
                 div().flex_1().relative().px_12().pb_2().child(
                     div().id("tracks_list_container").size_full().child(
-                        uniform_list("tracks", len, move |range, _, cx| {
-                            let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
-                            let end = (range.end + THUMBNAIL_MARGIN).min(len);
+                        uniform_list_with_scroll_past(
+                            "tracks",
+                            len,
+                            px(128.0),
+                            px(64.0),
+                            move |range, _, cx| {
+                                let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
+                                let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
-                            let thumb_tracks: Vec<TrackId> =
-                                (start..end).map(|i| track_ids[i]).collect();
+                                let thumb_tracks: Vec<TrackId> =
+                                    (start..end).map(|i| track_ids[i]).collect();
 
-                            controller.request_track_thumbnails(&thumb_tracks, cx);
+                                controller.request_track_thumbnails(&thumb_tracks, cx);
 
-                            range
-                                .map(|i| Self::render_track(i + 1, track_ids[i], cx))
-                                .collect()
-                        })
+                                range
+                                    .map(|i| Self::render_track(i + 1, track_ids[i], cx))
+                                    .collect()
+                            },
+                        )
                         .w_full()
                         .h_full()
                         .flex()

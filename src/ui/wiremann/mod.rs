@@ -63,7 +63,6 @@ impl Wiremann {
                 .default_value(0.0)
                 .step(1.0)
         });
-
         cx.subscribe(
             &vol_slider_state,
             |_, _, event: &SliderEvent, cx| match event {

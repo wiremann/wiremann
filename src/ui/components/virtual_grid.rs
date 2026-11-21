@@ -43,6 +43,7 @@ pub struct VirtualGrid {
     min_card_width: Pixels,
     footer_height: Pixels,
     cell_padding: Pixels,
+    scroll_past: Pixels,
     content_height: Pixels,
     scroll_state: Rc<RefCell<VirtualGridScrollState>>,
     render: Box<
@@ -97,10 +98,18 @@ where
         min_card_width,
         footer_height,
         cell_padding: vertical_padding,
+        scroll_past: px(0.0),
         content_height: px(0.0),
         scroll_state: controller.state.clone(),
         render: Box::new(render),
         overscan: 1,
+    }
+}
+
+impl VirtualGrid {
+    pub fn scroll_past(mut self, height: Pixels) -> Self {
+        self.scroll_past = height;
+        self
     }
 }
 
@@ -177,7 +186,7 @@ impl Element for VirtualGrid {
 
         let rows = self.item_count.div_ceil(cols);
 
-        self.content_height = px(rows as f32 * row_height_px);
+        self.content_height = px(rows as f32 * row_height_px) + self.scroll_past;
         let mut logical_scroll = self.scroll_handle.offset().y;
 
         if let Some(deferred) = self.scroll_state.borrow_mut().deferred_scroll.take() {

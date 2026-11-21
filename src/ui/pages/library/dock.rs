@@ -1,7 +1,7 @@
 use crate::{
     controller::{Controller, state::PlaybackStatus},
     ui::{
-        animations::page_transition,
+        animations::{page_transition, sidebar_transition},
         components::{
             icons::{Icons, icon},
             image_cache::ImageCache,
@@ -129,10 +129,49 @@ impl Render for Dock {
                 .into_any_element(),
         };
         let is_compact = window.bounds().size.width < px(900.0);
+        let metadata_max_width = if is_compact { px(240.0) } else { px(280.0) };
         let sec_to_text = |duration: std::time::Duration| {
             let total = duration.as_secs();
             format!("{:02}:{:02}", total / 60, total % 60)
         };
+        let volume_toggle = || {
+            div()
+                .id("library_dock_volume_toggle")
+                .size(px(32.0))
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded_md()
+                .cursor_pointer()
+                .text_color(theme.dock_icon)
+                .on_click({
+                    let controller = controller.clone();
+                    move |_, _, cx| controller.set_mute(cx)
+                })
+                .motion("library_dock_volume")
+                .transition(sidebar_transition())
+                .while_hovered(move |style| {
+                    style
+                        .text_color(theme.dock_icon_hover)
+                        .bg(theme.dock_icon_bg_hover)
+                })
+                .child(icon(volume_icon).size_4())
+        };
+        let volume_control = div()
+            .w(px(140.0))
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(volume_toggle())
+            .child(
+                div().flex_1().min_w_0().child(
+                    Slider::new(&self.vol_slider_state, "library_dock_volume", 4.0)
+                        .bg(theme.dock_volume_track)
+                        .text_color(theme.dock_volume_fill),
+                ),
+            );
 
         div()
             .w_4_5()
@@ -162,17 +201,19 @@ impl Render for Dock {
                     .items_center()
                     .gap_4()
                     .px_4()
-                    .py_3()
+                    .py_2()
                     .child(
                         div()
-                            .max_w_80()
+                            .w_auto()
+                            .max_w(metadata_max_width)
                             .min_w_0()
+                            .flex_shrink_0()
                             .flex()
                             .items_center()
                             .gap_3()
                             .child(
                                 div()
-                                    .size(if is_compact { px(48.0) } else { px(56.0) })
+                                    .size(if is_compact { px(44.0) } else { px(48.0) })
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
@@ -183,8 +224,9 @@ impl Render for Dock {
                             )
                             .child(
                                 div()
+                                    .max_w(if is_compact { px(136.0) } else { px(168.0) })
                                     .min_w_0()
-                                    .flex_1()
+                                    .flex_shrink_0()
                                     .flex()
                                     .flex_col()
                                     .gap_0()
@@ -233,7 +275,7 @@ impl Render for Dock {
                                         }
                                     })
                                     .motion("library_dock_favorite")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .variant_when(is_favorite, move |style| {
                                         style
                                             .text_color(theme.dock_icon_active)
@@ -252,14 +294,12 @@ impl Render for Dock {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .min_h_0()
                             .flex()
                             .flex_col()
                             .justify_center()
                             .items_center()
-                            .gap_2()
                             .child(
-                                div().flex_1().min_w_0().child(
+                                div().w_full().child(
                                     Slider::new(
                                         &self.playback_slider_state,
                                         "library_dock_seek",
@@ -270,7 +310,11 @@ impl Render for Dock {
                                 ),
                             )
                             .child(
-                                div().flex_1().min_w_0().flex().items_center().justify_between()
+                                div()
+                                    .w_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
                                     .child(
                                         div()
                                             .flex_shrink_0()
@@ -287,18 +331,19 @@ impl Render for Dock {
                                             .text_color(theme.dock_text_secondary)
                                             .child(sec_to_text(total_duration)),
                                     ),
-                            )
+                            ),
                     )
                     .child(
                         div()
                             .flex_shrink_0()
                             .flex()
                             .items_center()
-                            .gap_1()
+                            .gap_2()
                             .child(
                                 div()
                                     .id("library_dock_prev")
                                     .size(px(32.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .items_center()
                                     .justify_center()
@@ -307,7 +352,7 @@ impl Render for Dock {
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().prev(cx))
                                     .motion("library_dock_prev")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .text_color(theme.dock_icon_hover)
@@ -320,6 +365,7 @@ impl Render for Dock {
                                 div()
                                     .id("library_dock_play_pause")
                                     .size(px(44.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .items_center()
                                     .justify_center()
@@ -344,7 +390,7 @@ impl Render for Dock {
                                         }
                                     })
                                     .motion("library_dock_play_pause")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style.bg(theme.dock_play_pause_bg_hover)
                                     })
@@ -359,6 +405,7 @@ impl Render for Dock {
                                 div()
                                     .id("library_dock_next")
                                     .size(px(32.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .items_center()
                                     .justify_center()
@@ -367,7 +414,7 @@ impl Render for Dock {
                                     .text_color(theme.dock_icon)
                                     .on_click(|_, _, cx| cx.global::<Controller>().clone().next(cx))
                                     .motion("library_dock_next")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .text_color(theme.dock_icon_hover)
@@ -377,45 +424,7 @@ impl Render for Dock {
                                     .child(icon(Icons::Next).size_4()),
                             ),
                     )
-                    .child(
-                        div()
-                            .w(if is_compact { px(100.0) } else { px(140.0) })
-                            .flex_shrink_0()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .id("library_dock_volume_toggle")
-                                    .size(px(24.0))
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .rounded_md()
-                                    .cursor_pointer()
-                                    .text_color(theme.dock_icon)
-                                    .on_click({
-                                        let controller = controller.clone();
-                                        move |_, _, cx| controller.set_mute(cx)
-                                    })
-                                    .motion("library_dock_volume")
-                                    .transition(page_transition())
-                                    .while_hovered(move |style| {
-                                        style
-                                            .text_color(theme.dock_icon_hover)
-                                            .bg(theme.dock_icon_bg_hover)
-                                    })
-                                    .child(icon(volume_icon).size_4()),
-                            )
-                            .child(
-                                div().flex_1().min_w_0().child(
-                                    Slider::new(&self.vol_slider_state, "library_dock_volume", 4.0)
-                                        .bg(theme.dock_volume_track)
-                                        .text_color(theme.dock_volume_fill),
-                                ),
-                            ),
-                    ),
+                    .child(volume_control),
             )
     }
 }

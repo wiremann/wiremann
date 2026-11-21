@@ -5,7 +5,7 @@ pub mod queue;
 use crate::{
     controller::{Controller, state::PlaybackStatus},
     ui::{
-        animations::page_transition,
+        animations::{page_transition, sidebar_transition},
         components::{
             bounds_observer::observe_bounds,
             icons::{Icons, icon},
@@ -346,7 +346,7 @@ impl Render for PlayerPage {
                                         }
                                     })
                                     .motion("player_favorite")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .variant_when(
                                         current_id.is_some_and(|id| controller.is_favorite(id, cx)),
                                         move |style| {
@@ -384,7 +384,7 @@ impl Render for PlayerPage {
                                     })
                                     .cursor_pointer()
                                     .motion("player_shuffle")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .variant_when(
                                         cx.global::<Controller>().state.read(cx).playback.shuffling,
                                         move |style| {
@@ -419,7 +419,7 @@ impl Render for PlayerPage {
                                     .text_color(theme.player_icons_text)
                                     .cursor_pointer()
                                     .motion("player_previous")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .opacity(0.9)
@@ -469,7 +469,7 @@ impl Render for PlayerPage {
                                             .bg(theme.player_play_pause_bg)
                                             .text_color(theme.player_play_pause_text)
                                             .motion("player_play_pause")
-                                            .transition(page_transition())
+                                            .transition(sidebar_transition())
                                             .while_hovered(move |style| {
                                                 style.bg(theme.player_play_pause_hover)
                                             })
@@ -504,7 +504,7 @@ impl Render for PlayerPage {
                                     .cursor_pointer()
                                     .text_color(theme.player_icons_text)
                                     .motion("player_next")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .opacity(0.9)
@@ -534,7 +534,7 @@ impl Render for PlayerPage {
                                         move |_, _, cx| controller.set_repeat(cx)
                                     })
                                     .motion("player_repeat")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .variant_when(
                                         cx.global::<Controller>().state.read(cx).playback.repeat,
                                         move |style| {
@@ -579,7 +579,7 @@ impl Render for PlayerPage {
                                         }
                                     })
                                     .motion("player_reveal_in_folder")
-                                    .transition(page_transition())
+                                    .transition(sidebar_transition())
                                     .while_hovered(move |style| {
                                         style
                                             .opacity(0.9)

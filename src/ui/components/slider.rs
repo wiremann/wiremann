@@ -102,9 +102,13 @@ impl SliderState {
         position: Point<Pixels>,
         _: &mut Window,
         cx: &mut Context<Self>,
+        vertical: bool,
     ) {
-        let inner = position.x - self.bounds.left();
-        let total = self.bounds.size.width;
+        let (inner, total) = if vertical {
+            (self.bounds.bottom() - position.y, self.bounds.size.height)
+        } else {
+            (position.x - self.bounds.left(), self.bounds.size.width)
+        };
 
         let p = (inner / total).clamp(0.0, 1.0);
 
@@ -127,6 +131,7 @@ pub struct Slider {
     style: StyleRefinement,
     id: SharedString,
     height: Pixels,
+    vertical: bool,
 }
 
 impl Slider {
@@ -136,7 +141,14 @@ impl Slider {
             style: StyleRefinement::default(),
             id: id.into(),
             height: px(height),
+            vertical: false,
         }
+    }
+
+    #[must_use]
+    pub fn vertical(mut self) -> Self {
+        self.vertical = true;
+        self
     }
 }
 
@@ -163,83 +175,119 @@ impl RenderOnce for Slider {
             .as_ref()
             .and_then(|t| t.color.map(|this| this.to_hsla()))
             .unwrap_or_else(white);
+        let vertical = self.vertical;
 
-        let mut root = div()
-            .id(("slider", self.state.entity_id()))
-            .h(px(24.))
-            .w_full()
-            .flex()
-            .items_center();
+        let mut root = div().id(("slider", self.state.entity_id()));
+        root = if vertical {
+            root.w(px(24.))
+                .h_full()
+                .flex()
+                .justify_center()
+                .items_center()
+        } else {
+            root.h(px(24.)).w_full().flex().items_center()
+        };
 
         let entity_id = self.state.entity_id();
 
         root.style().refine(&self.style);
 
-        root.bg(transparent_black()).child(
-            div()
-                .id(self.id)
-                .relative()
-                .cursor_pointer()
-                .w_full()
-                .h(px(24.))
-                .flex()
-                .items_center()
-                .on_mouse_down(
-                    MouseButton::Left,
-                    window.listener_for(
-                        &self.state,
-                        move |state, e: &MouseDownEvent, window, cx| {
-                            state.update_from_position(e.position, window, cx);
-                        },
-                    ),
-                )
-                .on_drag(DragSlider(entity_id), |drag, _, _, cx| {
-                    cx.new(|_| drag.clone())
-                })
-                .on_drag_move(window.listener_for(
-                    &self.state,
-                    move |state, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx) {
-                        DragSlider(id) => {
-                            if *id != entity_id {
-                                return;
-                            }
-
-                            state.update_from_position(e.event.position, window, cx);
+        let mut slider = div()
+            .id(self.id)
+            .relative()
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .on_mouse_down(
+                MouseButton::Left,
+                window.listener_for(&self.state, move |state, e: &MouseDownEvent, window, cx| {
+                    state.update_from_position(e.position, window, cx, vertical);
+                }),
+            )
+            .on_drag(DragSlider(entity_id), |drag, _, _, cx| {
+                cx.new(|_| drag.clone())
+            })
+            .on_drag_move(window.listener_for(
+                &self.state,
+                move |state, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx) {
+                    DragSlider(id) => {
+                        if *id != entity_id {
+                            return;
                         }
-                    },
-                ))
-                .child(
-                    div()
-                        .id("inner_visual_bar")
-                        .relative()
-                        .w_full()
-                        .h(self.height)
-                        .bg(bar_color)
-                        .rounded_full()
-                        .child(
-                            div()
-                                .absolute()
-                                .left(px(0.))
-                                .right(relative(1.0 - percentage))
-                                .h_full()
-                                .bg(fill_color)
-                                .rounded_full(),
-                        )
-                        .child(
-                            div()
-                                .absolute()
-                                .left(relative(percentage))
-                                .ml(-px(6.))
-                                .size(px(12.))
-                                .rounded_full(),
-                        )
-                        .hover(|this| this.bg(bar_color))
-                        .active(|this| this.bg(bar_color))
-                        .on_prepaint({
-                            let state = self.state.clone();
-                            move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
-                        }),
-                ),
-        )
+
+                        state.update_from_position(e.event.position, window, cx, vertical);
+                    }
+                },
+            ));
+        slider = if vertical {
+            slider.w(px(24.)).h_full().justify_center().child(
+                div()
+                    .id("inner_visual_bar")
+                    .relative()
+                    .w(self.height)
+                    .h_full()
+                    .bg(bar_color)
+                    .rounded_full()
+                    .child(
+                        div()
+                            .absolute()
+                            .top(relative(1.0 - percentage))
+                            .bottom(px(0.))
+                            .w_full()
+                            .bg(fill_color)
+                            .rounded_full(),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .top(relative(1.0 - percentage))
+                            .left(px(-4.))
+                            .mt(-px(6.))
+                            .size(px(12.))
+                            .rounded_full(),
+                    )
+                    .hover(|this| this.bg(bar_color))
+                    .active(|this| this.bg(bar_color))
+                    .on_prepaint({
+                        let state = self.state.clone();
+                        move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
+                    }),
+            )
+        } else {
+            slider.w_full().h(px(24.)).child(
+                div()
+                    .id("inner_visual_bar")
+                    .relative()
+                    .w_full()
+                    .h(self.height)
+                    .bg(bar_color)
+                    .rounded_full()
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.))
+                            .right(relative(1.0 - percentage))
+                            .h_full()
+                            .bg(fill_color)
+                            .rounded_full(),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(relative(percentage))
+                            .ml(-px(6.))
+                            .size(px(12.))
+                            .rounded_full(),
+                    )
+                    .hover(|this| this.bg(bar_color))
+                    .active(|this| this.bg(bar_color))
+                    .on_prepaint({
+                        let state = self.state.clone();
+                        move |bounds, _, cx| state.update(cx, |s, _| s.bounds = bounds)
+                    }),
+            )
+        };
+
+        root.bg(transparent_black()).child(slider)
     }
 }
