@@ -1,9 +1,7 @@
 use super::navbar::NavBar;
 use crate::controller::Controller;
 use crate::controller::state::PlaybackStatus;
-use crate::ui::components::Page;
 use crate::ui::components::icons::{Icons, icon};
-use crate::ui::components::image_cache::ImageCache;
 use crate::ui::popout::{PopOutState, toggle_pop_out};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
@@ -22,20 +20,8 @@ pub struct Titlebar {
 impl Render for Titlebar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
-        let page = *cx.global::<Page>();
         let popout_enabled = cx.global::<PopOutState>().enabled;
         let is_maximized = window.is_maximized();
-
-        let controller = cx.global::<Controller>().clone();
-        let state = controller.state.read(cx);
-        let is_playing = state.playback.status == PlaybackStatus::Playing;
-        let current_track = state
-            .playback
-            .current
-            .and_then(|id| state.library.tracks.get(&id).cloned());
-        let current_image = cx.global::<ImageCache>().current.clone();
-
-        let show_mini_player = !popout_enabled && page != Page::Player && current_track.is_some();
 
         div()
             .id("titlebar")
@@ -63,23 +49,7 @@ impl Render for Titlebar {
                     .flex_1()
                     .flex()
                     .items_center()
-                    .justify_start()
-                    .when(show_mini_player, |parent| {
-                        let track = current_track.as_ref().unwrap();
-                        let artist = track
-                            .artists(&state.library)
-                            .map(|a| a.name.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        parent.child(mini_player(
-                            &theme,
-                            track,
-                            current_image.as_ref(),
-                            is_playing,
-                            &controller,
-                            &artist,
-                        ))
-                    }),
+                    .justify_start(),
             )
             .when(!popout_enabled, |this| {
                 this.child(
@@ -232,6 +202,7 @@ impl Render for Titlebar {
     }
 }
 
+#[allow(dead_code)]
 fn mini_player(
     theme: &Theme,
     track: &crate::controller::state::Track,
