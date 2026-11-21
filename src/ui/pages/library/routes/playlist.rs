@@ -10,6 +10,7 @@ use crate::{
             icons::{Icons, icon},
             image_cache::ImageCache,
             scrollbar::{RightPad, floating_scrollbar},
+            uniform_list::uniform_list_with_scroll_past,
         },
         pages::library::LibraryRoutes,
         theme::Theme,
@@ -20,7 +21,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     App, Bounds, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Pixels, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, rems, rgba, uniform_list,
+    UniformListScrollHandle, Window, div, img, px, rems, rgba,
 };
 
 const THUMBNAIL_MARGIN: usize = 16;
@@ -499,7 +500,12 @@ impl Render for PlaylistViewSection {
             .child(
                 div().flex_1().relative().px_12().pb_2().child(
                     div().id("tracks_list_container").size_full().child(
-                        uniform_list("tracks", len, move |range, _, cx| {
+                        uniform_list_with_scroll_past(
+                            "tracks",
+                            len,
+                            px(128.0),
+                            px(64.0),
+                            move |range, _, cx| {
                             let start = range.start.saturating_sub(THUMBNAIL_MARGIN);
                             let end = (range.end + THUMBNAIL_MARGIN).min(len);
 
@@ -511,7 +517,8 @@ impl Render for PlaylistViewSection {
                             range
                                 .map(|i| Self::render_track(i + 1, track_ids[i], cx))
                                 .collect()
-                        })
+                            },
+                        )
                         .w_full()
                         .h_full()
                         .flex()

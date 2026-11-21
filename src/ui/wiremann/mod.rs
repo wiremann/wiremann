@@ -9,6 +9,7 @@ use crate::ui::components::toasts::ToastManager;
 use crate::ui::components::toasts::scanning_status::ScanningStatus;
 use crate::ui::helpers::slider_to_duration;
 use crate::ui::pages::library::LibraryRoutes;
+use crate::ui::pages::library::dock::Dock;
 use crate::ui::pages::player::{
     controlbar::ControlBar,
     lyrics::{LyricsState, LyricsStateInner},
@@ -31,6 +32,7 @@ pub struct Wiremann {
     pub titlebar: Entity<Titlebar>,
     pub player_page: Entity<PlayerPage>,
     pub library_page: Entity<LibraryPage>,
+    pub dock: Entity<Dock>,
     pub toast_manager: Entity<ToastManager>,
     pub keybinds_overlay: Entity<KeybindsOverlay>,
     pub popout_player: Entity<PopOutPlayer>,
@@ -61,7 +63,6 @@ impl Wiremann {
                 .default_value(0.0)
                 .step(1.0)
         });
-
         cx.subscribe(
             &vol_slider_state,
             |_, _, event: &SliderEvent, cx| match event {
@@ -117,9 +118,11 @@ impl Wiremann {
         global_keybinds::register_keybinds(cx);
 
         let titlebar = cx.new(|cx| Titlebar::new(cx));
-        let controlbar = cx.new(|_| ControlBar::new(playback_slider_state, vol_slider_state));
+        let controlbar =
+            cx.new(|_| ControlBar::new(playback_slider_state.clone(), vol_slider_state.clone()));
         let player_page = cx.new(|cx| PlayerPage::new(cx, controlbar.clone()));
         let library_page = cx.new(|cx| LibraryPage::new(cx));
+        let dock = cx.new(|_| Dock::new(playback_slider_state, vol_slider_state));
         let toast_manager = cx.new(|cx| ToastManager::new(cx));
 
         let popout_player = cx.new(|_| PopOutPlayer::new(controlbar));
@@ -132,6 +135,7 @@ impl Wiremann {
             titlebar,
             player_page,
             library_page,
+            dock,
             toast_manager,
             keybinds_overlay,
             popout_player,
@@ -237,6 +241,20 @@ impl Render for Wiremann {
                 })
                 .when(!popout_enabled, |this| {
                     this.child(self.keybinds_overlay.clone())
+                })
+                .when(!popout_enabled && page == Page::Library, |this| {
+                    this.child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .bottom_4()
+                            .w_full()
+                            .flex()
+                            .justify_center()
+                            .px_2()
+                            .child(self.dock.clone()),
+                    )
                 })
                 .into_any_element(),
         )

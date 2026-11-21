@@ -169,23 +169,26 @@ impl Render for AlbumsSection {
             } else {
                 div()
                     .size_full()
-                    .child(vgrid(
-                        cx.entity(),
-                        "albums_grid",
-                        len,
-                        px(280.0),
-                        px(56.0),
-                        px(2.0),
-                        self.scroll_handle.clone(),
-                        &self.grid_controller,
-                        move |_, range, _, _, cx| {
-                            controller.request_album_thumbnails(&album_ids[range.clone()], cx);
+                    .child(
+                        vgrid(
+                            cx.entity(),
+                            "albums_grid",
+                            len,
+                            px(280.0),
+                            px(56.0),
+                            px(2.0),
+                            self.scroll_handle.clone(),
+                            &self.grid_controller,
+                            move |_, range, _, _, cx| {
+                                controller.request_album_thumbnails(&album_ids[range.clone()], cx);
 
-                            range
-                                .map(|i| Self::render_album(album_ids[i], cx))
-                                .collect::<Vec<_>>()
-                        },
-                    ))
+                                range
+                                    .map(|i| Self::render_album(album_ids[i], cx))
+                                    .collect::<Vec<_>>()
+                            },
+                        )
+                        .scroll_past(px(128.0)),
+                    )
                     .child(floating_scrollbar(
                         "albums_scrollbar",
                         self.scroll_handle.clone(),

@@ -238,7 +238,8 @@ impl Render for PlaylistsSection {
                                 .map(|i| Self::render_playlist(playlist_ids[i], cx))
                                 .collect::<Vec<_>>()
                         },
-                    ))
+                    )
+                    .scroll_past(px(128.0)))
                     .child(floating_scrollbar(
                         "playlists_scrollbar",
                         self.scroll_handle.clone(),

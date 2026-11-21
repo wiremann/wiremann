@@ -753,7 +753,8 @@ impl Render for StatsSection {
                             rows
                         } else {
                             vec![Self::empty_state(&theme)]
-                        }),
+                        })
+                        .child(div().h(px(128.0)).flex_shrink_0()),
                 ),
             )
             .child(floating_scrollbar(

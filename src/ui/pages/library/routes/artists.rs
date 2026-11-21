@@ -169,23 +169,27 @@ impl Render for ArtistsSection {
             } else {
                 div()
                     .size_full()
-                    .child(vgrid(
-                        cx.entity(),
-                        "artists_grid",
-                        len,
-                        px(280.0),
-                        px(56.0),
-                        px(2.0),
-                        self.scroll_handle.clone(),
-                        &self.grid_controller,
-                        move |_, range, _, _, cx| {
-                            controller.request_artist_thumbnails(&artist_ids[range.clone()], cx);
+                    .child(
+                        vgrid(
+                            cx.entity(),
+                            "artists_grid",
+                            len,
+                            px(280.0),
+                            px(56.0),
+                            px(2.0),
+                            self.scroll_handle.clone(),
+                            &self.grid_controller,
+                            move |_, range, _, _, cx| {
+                                controller
+                                    .request_artist_thumbnails(&artist_ids[range.clone()], cx);
 
-                            range
-                                .map(|i| Self::render_artist(artist_ids[i], cx))
-                                .collect::<Vec<_>>()
-                        },
-                    ))
+                                range
+                                    .map(|i| Self::render_artist(artist_ids[i], cx))
+                                    .collect::<Vec<_>>()
+                            },
+                        )
+                        .scroll_past(px(128.0)),
+                    )
                     .child(floating_scrollbar(
                         "artists_scrollbar",
                         self.scroll_handle.clone(),

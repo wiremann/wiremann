@@ -1,3 +1,4 @@
+pub(crate) mod dock;
 mod helpers;
 mod routes;
 mod sidebar;
@@ -255,6 +256,38 @@ impl Render for LibraryPage {
                 .into_any_element()
         };
 
+        let library_section = div()
+            .id("library_page_content")
+            .w_full()
+            .h_full()
+            .map(move |this| {
+                if !is_transitioning {
+                    this.child(section_el).into_any_element()
+                } else {
+                    let transition_state = transition_state.clone();
+                    let generation = transition.generation;
+
+                    this.child(section_el)
+                        .motion(ElementId::NamedInteger(
+                            "library_section".into(),
+                            generation,
+                        ))
+                        .transition(page_transition())
+                        .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
+                        .base(|style| style.top(px(0.0)).opacity(1.0))
+                        .on_settle(move |_, _, cx| {
+                            transition_state.update(cx, |state, cx| {
+                                if state.generation == generation && state.target == section {
+                                    state.settled = section;
+                                    state.from = section;
+                                    cx.notify();
+                                }
+                            });
+                        })
+                        .into_any_element()
+                }
+            });
+
         div()
             .size_full()
             .bg(theme.library_bg)
@@ -268,37 +301,10 @@ impl Render for LibraryPage {
             })
             .child(
                 div()
-                    .id("animation_container")
+                    .id("library_content_area")
                     .w_full()
                     .h_full()
-                    .map(move |this| {
-                        if !is_transitioning {
-                            this.child(section_el).into_any_element()
-                        } else {
-                            let transition_state = transition_state.clone();
-                            let generation = transition.generation;
-
-                            this.child(section_el)
-                                .motion(ElementId::NamedInteger(
-                                    "library_section".into(),
-                                    generation,
-                                ))
-                                .transition(page_transition())
-                                .enter(move |style| style.top(px(360.0 * direction)).opacity(0.0))
-                                .base(|style| style.top(px(0.0)).opacity(1.0))
-                                .on_settle(move |_, _, cx| {
-                                    transition_state.update(cx, |state, cx| {
-                                        if state.generation == generation && state.target == section
-                                        {
-                                            state.settled = section;
-                                            state.from = section;
-                                            cx.notify();
-                                        }
-                                    });
-                                })
-                                .into_any_element()
-                        }
-                    }),
+                    .child(library_section),
             )
     }
 }

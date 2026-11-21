@@ -4,11 +4,11 @@ use crate::controller::state::{
 };
 use crate::errors::CacherError;
 use sqlx::{Row, Sqlite, SqlitePool, Transaction};
-use tracing::info;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::info;
 
 /// Operations against the on-disk SQLite database that backs all data which
 /// grows with use: the library, queue, favorites and listen metrics.

@@ -1,5 +1,5 @@
 use crate::controller::Controller;
-use crate::ui::animations::page_transition;
+use crate::ui::animations::sidebar_transition;
 use crate::ui::components::icons::{Icons, icon};
 use crate::ui::{
     components::slider::{Slider, SliderState},
@@ -128,7 +128,7 @@ impl Render for ControlBar {
                                             .text_color(theme.volume_icon)
                                             .cursor_pointer()
                                             .motion("player_volume")
-                                            .transition(page_transition())
+                                            .transition(sidebar_transition())
                                             .variant_when(state.playback.mute, move |style| {
                                                 style
                                                     .text_color(theme.player_icons_text_active)
