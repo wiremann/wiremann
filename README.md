@@ -1,4 +1,28 @@
 <p align="center">
+  <img src="assets/readme/README%20Banner.svg" alt="Wiremann - A fast, no-nonsense music player built in Rust." width="100%">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%">
+      <a href="#installation">
+        <img src="assets/readme/Installation.svg" alt="Installation" width="180">
+      </a>
+    </td>
+    <td align="center" width="33%">
+      <a href="#documentation">
+        <img src="assets/readme/Documentation.svg" alt="Documentation" width="180">
+      </a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://discord.gg/gWkxZuqfKT">
+        <img src="assets/readme/Discord.svg" alt="Join our Discord community" width="180">
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
     <img src="https://img.shields.io/github/languages/top/wiremann/wiremann?style=for-the-badge" alt="languages"/>
     <img src="https://img.shields.io/github/commit-activity/m/wiremann/wiremann?style=for-the-badge" alt="commits"/>
     <img src="https://img.shields.io/github/stars/wiremann/wiremann?style=for-the-badge" alt="stars"/>
