@@ -30,8 +30,6 @@
     <img src="https://img.shields.io/github/license/wiremann/wiremann.svg?style=for-the-badge" alt="license"/>
 </p>
 
-# Wiremann
-
 ![Main Showcase.png](assets/screenshots/Main%20Showcase.png)
 ![Library Showcase.png](assets/screenshots/Library.png)
 
