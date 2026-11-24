@@ -252,7 +252,7 @@ Embedded artwork takes priority. If a track doesn't have any, Wiremann looks up 
 
 Thumbnails and playlist artwork are generated and cached locally. Playlist covers can even combine artwork from multiple albums.
 
-### Under the hood
+## Under the hood
 
 Wiremann is written entirely in Rust. The UI runs on GPUI and WGPUI, with GPU-backed rendering.
 
@@ -268,14 +268,6 @@ A few other things doing the heavy lifting:
 The scanner, audio engine, image processor, lyrics manager and other components run in separate workers. This keeps the expensive stuff away from the UI thread.
 
 SQLite operations run through a small Tokio runtime inside the database worker. The rest of the application isn't built around Tokio.
-
-## A few things worth knowing
-
-Wiremann is still under active development. The core library and playback features are implemented, but some areas are still being worked on.
-
-Settings and Plugins currently have placeholder pages. There's no plugin API yet, and Spotify/YouTube Music migration and Winamp skin support aren't implemented.
-
-The project is currently at `v0.4.1`. You can also try the [latest unstable build](https://github.com/wiremann/wiremann/releases/tag/latest-unstable) if you want to keep up with newer changes. Just keep in mind that prereleases may be less stable.
 
 ## Privacy
 
