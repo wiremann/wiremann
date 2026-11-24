@@ -146,9 +146,7 @@ The executable will be available under `target/release/`.
     libssl-dev \
     libdbus-1-dev
   ```
-
 </details>
-
 <details>
     <summary>
         <h4>Arch Linux</h4>
@@ -170,9 +168,7 @@ sudo pacman -S --needed \
   libxcb \
   wayland
   ```
-
 </details>
-
 <details>
     <summary>
         <h4>Fedora</h4>
@@ -194,9 +190,7 @@ sudo dnf install \
   libxcb-devel \
   wayland-devel
   ```
-
 </details>
-
 <details>
     <summary>
         <h4>openSuse</h4>
@@ -217,7 +211,6 @@ sudo dnf install \
     libxcb-devel \
     wayland-devel
   ```
-
 </details>
 
 ## Features
