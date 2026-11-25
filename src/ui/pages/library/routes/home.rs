@@ -104,7 +104,7 @@ impl HomeSection {
                     state.library.tracks.get(track_id).and_then(|t| t.image_id)
                 })
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
 
         div().child(
             div()
@@ -181,7 +181,7 @@ impl HomeSection {
                     state.library.tracks.get(track_id).and_then(|t| t.image_id)
                 })
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
 
         div().child(
             div()
@@ -258,7 +258,7 @@ impl HomeSection {
                     state.library.tracks.get(track_id).and_then(|t| t.image_id)
                 })
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+            .and_then(|id| cx.global_mut::<ImageCache>().get_playlist(&id));
 
         div().child(
             div()

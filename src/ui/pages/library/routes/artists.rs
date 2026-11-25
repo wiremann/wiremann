@@ -41,7 +41,7 @@ impl ArtistsSection {
                     state.library.tracks.get(track_id).and_then(|t| t.image_id)
                 })
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
 
         div().p_4().size_full().child(
             div()

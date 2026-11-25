@@ -441,7 +441,7 @@ impl StatsSection {
             (artist.clone(), image_id)
         };
 
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -517,7 +517,7 @@ impl StatsSection {
             (album.clone(), image_id)
         };
 
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()

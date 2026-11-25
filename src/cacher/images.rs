@@ -96,6 +96,7 @@ impl Cacher {
                 info!("cacher thumbnail worker started");
                 let mut batch = HashMap::with_capacity(16);
                 let mut missing = Vec::new();
+                let mut last_kind = ImageKind::ThumbnailSmall;
 
                 loop {
                     select! {
@@ -113,6 +114,21 @@ impl Cacher {
                                     }
                                 }
                                 Ok(CacheJob::LoadThumbnails(ids, kind)) => {
+                                    if kind != last_kind {
+                                        if !batch.is_empty() {
+                                            let _ = cacher.tx.send(CacherEvent::Thumbnails(
+                                                std::mem::take(&mut batch),
+                                                last_kind,
+                                            ));
+                                        }
+                                        if !missing.is_empty() {
+                                            let _ = cacher.tx.send(CacherEvent::MissingThumbnails(
+                                                std::mem::take(&mut missing),
+                                                last_kind,
+                                            ));
+                                        }
+                                        last_kind = kind;
+                                    }
                                     let job_start = Instant::now();
                                     trace!(thread_id = ?std::thread::current().id(), worker = "cacher", "processing LoadThumbnails count={}", ids.len());
                                     for id in ids {
@@ -122,11 +138,11 @@ impl Cacher {
                                         }
 
                                         if batch.len() >= 16 {
-                                            let _ = cacher.tx.send(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                                            let _ = cacher.tx.send(CacherEvent::Thumbnails(std::mem::take(&mut batch), kind));
                                         }
 
                                         if missing.len() >= 16 {
-                                            let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                            let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing), kind));
                                         }
                                     }
                                     trace!(thread_id = ?std::thread::current().id(), worker = "cacher", elapsed_ms = ?job_start.elapsed().as_millis(), "finished LoadThumbnails processed");
@@ -137,11 +153,17 @@ impl Cacher {
 
                         recv(ticker) -> _ => {
                             if !batch.is_empty() {
-                                let _ = cacher.tx.send(CacherEvent::Thumbnails(std::mem::take(&mut batch)));
+                                let _ = cacher.tx.send(CacherEvent::Thumbnails(
+                                    std::mem::take(&mut batch),
+                                    last_kind,
+                                ));
                             }
 
                             if !missing.is_empty() {
-                                let _ = cacher.tx.send(CacherEvent::MissingThumbnails(std::mem::take(&mut missing)));
+                                let _ = cacher.tx.send(CacherEvent::MissingThumbnails(
+                                    std::mem::take(&mut missing),
+                                    last_kind,
+                                ));
                             }
                         }
                     }

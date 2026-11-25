@@ -212,7 +212,7 @@ impl Render for PlaylistViewSection {
         controller.request_playlist_thumbnails(&[playlist.id], cx);
 
         let cache = cx.global_mut::<ImageCache>();
-        let thumbnail = playlist.image_id.and_then(|id| cache.get(&id));
+        let thumbnail = playlist.image_id.and_then(|id| cache.get_playlist(&id));
 
         let track_ids = playlist.tracks.clone();
         let len = track_ids.len();

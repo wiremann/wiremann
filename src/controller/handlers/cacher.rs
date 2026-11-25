@@ -71,12 +71,11 @@ impl Controller {
                     });
                 });
             }
-            CacherEvent::Thumbnails(thumbnails) => {
+            CacherEvent::Thumbnails(thumbnails, kind) => {
                 for (id, image) in thumbnails {
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
-                        thumbnail_cache.inflight.remove(id);
-                        thumbnail_cache.add(*id, image.clone())
+                        thumbnail_cache.add_kind(*id, *kind, image.clone())
                     };
 
                     if let Some(img) = evicted {
@@ -153,11 +152,9 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             CacherEvent::PlaylistThumbnail(id, thumbnail) => {
-                cx.global_mut::<ImageCache>().inflight.remove(id);
-
                 let evicted = {
                     let image_cache = cx.global_mut::<ImageCache>();
-                    image_cache.add(*id, thumbnail.clone())
+                    image_cache.add_kind(*id, ImageKind::Playlist, thumbnail.clone())
                 };
 
                 if let Some(img) = evicted {
@@ -166,7 +163,9 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             CacherEvent::MissingAlbumArt(id) => {
-                cx.global_mut::<ImageCache>().inflight.remove(id);
+                cx.global_mut::<ImageCache>()
+                    .inflight
+                    .remove(&(*id, ImageKind::AlbumArt));
 
                 let state = self.state.read(cx);
                 let tracks = state.library.tracks.clone();
@@ -191,11 +190,11 @@ impl Controller {
                             ));
                 }
             }
-            CacherEvent::MissingThumbnails(ids) => {
+            CacherEvent::MissingThumbnails(ids, kind) => {
                 let cache = cx.global_mut::<ImageCache>();
 
                 for id in ids {
-                    cache.inflight.remove(id);
+                    cache.inflight.remove(&(*id, *kind));
                 }
 
                 let state = self.state.read(cx);
@@ -218,15 +217,14 @@ impl Controller {
                         set.insert((*track_id, source.path.clone()));
                         let _ = self
                             .image_processor_tx
-                            .send(ImageProcessorCommand::GetThumbnails(
-                                set,
-                                ImageKind::ThumbnailSmall,
-                            ));
+                            .send(ImageProcessorCommand::GetThumbnails(set, *kind));
                     }
                 }
             }
             CacherEvent::MissingPlaylistThumbnail(id) => {
-                cx.global_mut::<ImageCache>().inflight.remove(id);
+                cx.global_mut::<ImageCache>()
+                    .inflight
+                    .remove(&(*id, ImageKind::Playlist));
 
                 let state = self.state.read(cx);
                 let playlists = state.library.playlists.clone();

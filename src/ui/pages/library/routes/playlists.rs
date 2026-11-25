@@ -36,7 +36,7 @@ impl PlaylistsSection {
 
         let thumbnail = playlist
             .image_id
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+            .and_then(|id| cx.global_mut::<ImageCache>().get_playlist(&id));
 
         div().p_4().size_full().child(
             div()

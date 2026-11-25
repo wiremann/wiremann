@@ -73,8 +73,7 @@ impl Controller {
 
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
-                        thumbnail_cache.inflight.remove(id);
-                        thumbnail_cache.add(*id, image.clone())
+                        thumbnail_cache.add_kind(*id, *kind, image.clone())
                     };
 
                     if let Some(img) = evicted {
@@ -99,9 +98,7 @@ impl Controller {
             ImageProcessorEvent::InsertPlaylistThumbnail(id, image_id, image) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
-                thumbnail_cache.add(*image_id, image.clone());
-
-                thumbnail_cache.inflight.remove(image_id);
+                thumbnail_cache.add_kind(*image_id, ImageKind::Playlist, image.clone());
 
                 let _ = self
                     .image_processor_tx
