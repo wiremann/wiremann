@@ -176,6 +176,16 @@ impl ImageProcessor {
                                 }
                             finished_batch.push(id);
                             if finished_batch.len() >= 64 {
+                                if !image_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                        std::mem::take(&mut image_batch), kind
+                                    ));
+                                }
+                                if !lookup_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                        std::mem::take(&mut lookup_batch)
+                                    ));
+                                }
                                 let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
                                     std::mem::take(&mut finished_batch), kind
                                 ));
