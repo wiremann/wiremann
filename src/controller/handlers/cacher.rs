@@ -1,7 +1,7 @@
 use super::{
     App, CacherEvent, Controller, ControllerError, DominantColors, Entity, HashSet, ImageCache,
     ImageKind, ImageProcessorCommand, PlaybackStatus, Rgb, Rgba, SystemIntegrationCommand,
-    Wiremann, drop_image_from_app, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
+    Wiremann, drop_images_from_app, duration_to_slider, pick_playlist_thumbnail_tracks, rgb,
 };
 use crate::ui::pages::player::lyrics::{LyricsState, LyricsStatus};
 
@@ -72,16 +72,18 @@ impl Controller {
                 });
             }
             CacherEvent::Thumbnails(thumbnails, kind) => {
+                let mut evicted_images = Vec::new();
                 for (id, image) in thumbnails {
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
                         thumbnail_cache.add_kind(*id, *kind, image.clone())
                     };
 
-                    if let Some(img) = evicted {
-                        drop_image_from_app(cx, img);
+                    if let Some(image) = evicted {
+                        evicted_images.push(image);
                     }
                 }
+                drop_images_from_app(cx, evicted_images);
                 cx.notify(view.entity_id());
             }
             CacherEvent::AlbumArt(image) => {
@@ -157,8 +159,8 @@ impl Controller {
                     image_cache.add_kind(*id, ImageKind::Playlist, thumbnail.clone())
                 };
 
-                if let Some(img) = evicted {
-                    drop_image_from_app(cx, img);
+                if let Some(image) = evicted {
+                    drop_images_from_app(cx, vec![image]);
                 }
                 cx.notify(view.entity_id());
             }

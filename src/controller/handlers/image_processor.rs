@@ -1,8 +1,34 @@
 use super::{
     App, Arc, CacherCommand, Controller, ControllerError, Entity, ImageCache, ImageKind,
     ImageProcessorCommand, ImageProcessorEvent, SystemIntegrationCommand, Wiremann,
-    drop_image_from_app,
+    drop_images_from_app,
 };
+use crate::controller::state::ImageId;
+use gpui::RenderImage;
+
+fn persist_render_image(
+    cx: &App,
+    cacher_tx: crossbeam_channel::Sender<CacherCommand>,
+    id: ImageId,
+    kind: ImageKind,
+    image: Arc<RenderImage>,
+) {
+    cx.background_executor()
+        .spawn(async move {
+            let width = image.size(0).width.0.cast_unsigned();
+            let height = image.size(0).height.0.cast_unsigned();
+            if let Some(image) = image.as_bytes(0) {
+                let _ = cacher_tx.send(CacherCommand::WriteImage {
+                    id,
+                    kind,
+                    width,
+                    height,
+                    image: image.to_vec(),
+                });
+            }
+        })
+        .detach();
+}
 
 impl Controller {
     pub fn handle_image_processor_event(
@@ -16,18 +42,19 @@ impl Controller {
                 let image_cache = cx.global_mut::<ImageCache>();
                 image_cache.current = Some(image.clone());
 
+                persist_render_image(
+                    cx,
+                    self.cacher_tx.clone(),
+                    *image_id,
+                    ImageKind::AlbumArt,
+                    image.clone(),
+                );
+
                 let image = image.clone();
                 let width = image.size(0).width.0.cast_unsigned();
                 let height = image.size(0).height.0.cast_unsigned();
                 if let Some(image) = image.as_bytes(0) {
                     let image = image.to_vec();
-                    let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                        id: *image_id,
-                        kind: ImageKind::AlbumArt,
-                        width,
-                        height,
-                        image: image.clone(),
-                    });
                     let state = self.state.read(cx);
                     if let Some(track_id) = &state.playback.current
                         && let Some(track) = state.library.tracks.get(track_id)
@@ -57,29 +84,19 @@ impl Controller {
                 cx.notify(view.entity_id());
             }
             ImageProcessorEvent::InsertThumbnails(thumbnails, kind) => {
+                let mut evicted_images = Vec::new();
                 for (id, image) in thumbnails {
-                    let width = image.size(0).width.0.cast_unsigned();
-                    let height = image.size(0).height.0.cast_unsigned();
-                    if let Some(image) = image.as_bytes(0) {
-                        let image = image.to_vec();
-                        let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                            id: *id,
-                            kind: *kind,
-                            width,
-                            height,
-                            image,
-                        });
-                    }
-
+                    persist_render_image(cx, self.cacher_tx.clone(), *id, *kind, image.clone());
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
                         thumbnail_cache.add_kind(*id, *kind, image.clone())
                     };
 
-                    if let Some(img) = evicted {
-                        drop_image_from_app(cx, img);
+                    if let Some(image) = evicted {
+                        evicted_images.push(image);
                     }
                 }
+                drop_images_from_app(cx, evicted_images);
                 cx.notify(view.entity_id());
             }
             ImageProcessorEvent::UpdateImageLookup(lookup) => {
@@ -104,18 +121,13 @@ impl Controller {
                     .image_processor_tx
                     .send(ImageProcessorCommand::PlaylistJobFinished(*id));
 
-                let width = image.size(0).width.0.cast_unsigned();
-                let height = image.size(0).height.0.cast_unsigned();
-                if let Some(image) = image.as_bytes(0) {
-                    let image = image.to_vec();
-                    let _ = self.cacher_tx.send(CacherCommand::WriteImage {
-                        id: *image_id,
-                        kind: ImageKind::Playlist,
-                        width,
-                        height,
-                        image,
-                    });
-                }
+                persist_render_image(
+                    cx,
+                    self.cacher_tx.clone(),
+                    *image_id,
+                    ImageKind::Playlist,
+                    image.clone(),
+                );
 
                 self.state.update(cx, |this, cx| {
                     if let Some(playlist) = this.library.playlists.get_mut(id) {

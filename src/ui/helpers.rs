@@ -30,14 +30,20 @@ pub fn duration_to_slider(pos: Duration, duration: Duration) -> f32 {
     }
 }
 
-pub fn drop_image_from_app(cx: &mut gpui::App, image: Arc<RenderImage>) {
+pub fn drop_images_from_app(cx: &mut gpui::App, images: Vec<Arc<RenderImage>>) {
+    if images.is_empty() {
+        return;
+    }
+
     cx.defer(move |cx| {
         for window in cx.windows() {
-            let image = image.clone();
+            let images = images.clone();
 
             window
                 .update(cx, move |_, window, _| {
-                    let _ = window.drop_image(image);
+                    for image in images {
+                        let _ = window.drop_image(image);
+                    }
                 })
                 .ok();
         }
