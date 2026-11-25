@@ -7,7 +7,7 @@ use crate::{
         components::{
             Page,
             icons::{Icons, icon},
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
             uniform_list::uniform_list_with_scroll_past,
         },
@@ -63,6 +63,12 @@ impl AlbumViewSection {
         let thumbnail = track
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = track.image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(track.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         div().h_16().py_1().child(
             div()
@@ -101,24 +107,29 @@ impl AlbumViewSection {
                         .gap_x_4()
                         .items_center()
                         .justify_start()
-                        .child(match thumbnail {
-                            Some(image) => div().w_11().h_11().flex_shrink_0().child(
-                                img(ImageSource::Render(image.clone()))
-                                    .object_fit(ObjectFit::Contain)
-                                    .size_full()
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .rounded_md(),
-                            ),
-                            None => div().w_11().h_11().flex_shrink_0().child(
-                                img("icons/placeholder.svg")
-                                    .object_fit(ObjectFit::Contain)
-                                    .size_full()
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .rounded_md(),
-                            ),
-                        })
+                        .child(
+                            image_with_loader(
+                                match thumbnail {
+                                    Some(image) => img(ImageSource::Render(image.clone()))
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .rounded_md(),
+                                    None => img("icons/placeholder.svg")
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .rounded_md(),
+                                },
+                                loading,
+                                format!("album-track-loader_{:?}", track.id.0),
+                            )
+                            .w_11()
+                            .h_11()
+                            .flex_shrink_0(),
+                        )
                         .child(
                             div().flex_1().flex().flex_col().justify_center().child(
                                 div()
@@ -205,14 +216,19 @@ impl Render for AlbumViewSection {
 
         controller.request_album_thumbnails(&[album.id], cx);
 
-        let thumbnail = album
-            .image_id
-            .or_else(|| {
-                album.tracks.first().and_then(|track_id| {
-                    state.library.tracks.get(track_id).and_then(|t| t.image_id)
-                })
-            })
-            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
+        let image_id = album.image_id.or_else(|| {
+            album
+                .tracks
+                .first()
+                .and_then(|track_id| state.library.tracks.get(track_id).and_then(|t| t.image_id))
+        });
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id
+            .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge))
+            || album.tracks.first().is_some_and(|id| {
+                cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+            });
 
         let track_ids = album.tracks.clone();
         let len = track_ids.len();
@@ -236,21 +252,27 @@ impl Render for AlbumViewSection {
                     .gap_8()
                     .items_end()
                     .child(
-                        div().size_64().flex_shrink_0().child(match thumbnail {
-                            Some(image) => img(ImageSource::Render(image.clone()))
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_xl()
-                                .border_1()
-                                .border_color(theme.border),
+                        image_with_loader(
+                            match thumbnail {
+                                Some(image) => img(ImageSource::Render(image.clone()))
+                                    .size_full()
+                                    .object_fit(ObjectFit::Contain)
+                                    .rounded_xl()
+                                    .border_1()
+                                    .border_color(theme.border),
 
-                            None => img("icons/placeholder.svg")
-                                .size_full()
-                                .object_fit(ObjectFit::Contain)
-                                .rounded_xl()
-                                .border_1()
-                                .border_color(theme.border),
-                        }),
+                                None => img("icons/placeholder.svg")
+                                    .size_full()
+                                    .object_fit(ObjectFit::Contain)
+                                    .rounded_xl()
+                                    .border_1()
+                                    .border_color(theme.border),
+                            },
+                            loading,
+                            format!("album-view-loader-{}", album.id.0),
+                        )
+                        .size_64()
+                        .flex_shrink_0(),
                     )
                     .child(
                         div()

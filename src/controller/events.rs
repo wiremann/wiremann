@@ -38,7 +38,9 @@ pub enum ScannerEvent {
 pub enum ImageProcessorEvent {
     InsertAlbumArt(ImageId, Arc<RenderImage>),
     InsertThumbnails(HashMap<ImageId, Arc<RenderImage>>, ImageKind),
+    ThumbnailJobsFinished(Vec<TrackId>, ImageKind),
     InsertPlaylistThumbnail(PlaylistId, ImageId, Arc<RenderImage>),
+    PlaylistThumbnailUnavailable(PlaylistId),
     UpdateImageLookup(HashMap<TrackId, ImageId>),
 }
 

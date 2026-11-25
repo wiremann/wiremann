@@ -122,6 +122,7 @@ impl ImageProcessor {
                 info!("image processor thumbnail worker started");
                 let mut image_batch = HashMap::with_capacity(64);
                 let mut lookup_batch = HashMap::with_capacity(64);
+                let mut finished_batch = Vec::with_capacity(64);
                 let mut last_kind = ImageKind::ThumbnailSmall;
 
                 loop {
@@ -131,13 +132,22 @@ impl ImageProcessor {
                             let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job else {
                                 continue;
                             };
-                            if kind != last_kind && (!image_batch.is_empty() || !lookup_batch.is_empty()) {
-                                let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
-                                    std::mem::take(&mut image_batch), last_kind
-                                ));
-                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
-                                    std::mem::take(&mut lookup_batch)
-                                ));
+                            if kind != last_kind {
+                                if !image_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                        std::mem::take(&mut image_batch), last_kind
+                                    ));
+                                }
+                                if !lookup_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                        std::mem::take(&mut lookup_batch)
+                                    ));
+                                }
+                                if !finished_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                        std::mem::take(&mut finished_batch), last_kind
+                                    ));
+                                }
                             }
                             last_kind = kind;
                             if let Ok(Some(bytes)) = metadata::read_album_art(&path) &&
@@ -164,14 +174,29 @@ impl ImageProcessor {
                                 } else {
                                     trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "skipped/invalid thumbnail job");
                                 }
+                            finished_batch.push(id);
+                            if finished_batch.len() >= 64 {
+                                let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                    std::mem::take(&mut finished_batch), kind
+                                ));
+                            }
                         }
 
                         recv(ticker) -> _ => {
-                            if !image_batch.is_empty() || !lookup_batch.is_empty() {
-                                let _ = events_tx.send(
-                                    ImageProcessorEvent::InsertThumbnails(std::mem::take(&mut image_batch), last_kind)
-                                );
-                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
+                            if !image_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                    std::mem::take(&mut image_batch), last_kind
+                                ));
+                            }
+                            if !lookup_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                    std::mem::take(&mut lookup_batch)
+                                ));
+                            }
+                            if !finished_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                    std::mem::take(&mut finished_batch), last_kind
+                                ));
                             }
                         }
                     }
@@ -274,6 +299,7 @@ impl ImageProcessor {
                 }
 
                 if images.is_empty() {
+                    let _ = events_tx.send(ImageProcessorEvent::PlaylistThumbnailUnavailable(id));
                     continue;
                 }
 
@@ -283,6 +309,7 @@ impl ImageProcessor {
                     ));
                 } else {
                     warn!("Failed to generate playlist thumbnail");
+                    let _ = events_tx.send(ImageProcessorEvent::PlaylistThumbnailUnavailable(id));
                 }
             }
         });

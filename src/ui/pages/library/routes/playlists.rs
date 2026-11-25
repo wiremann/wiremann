@@ -8,7 +8,7 @@ use crate::{
     controller::{Controller, state::PlaylistId},
     ui::{
         components::{
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},
         },
@@ -37,6 +37,13 @@ impl PlaylistsSection {
         let thumbnail = playlist
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get_playlist(&id));
+        let loading = {
+            let cache = cx.global::<ImageCache>();
+            cache.is_playlist_loading(playlist.id)
+                || playlist
+                    .image_id
+                    .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::Playlist))
+        };
 
         div().p_4().size_full().child(
             div()
@@ -62,25 +69,29 @@ impl PlaylistsSection {
                 })
                 .flex()
                 .flex_col()
-                .child(match thumbnail {
-                    Some(image) => div().w_full().aspect_square().child(
-                        img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_xl()
-                            .border_1()
-                            .border_color(theme.border),
-                    ),
+                .child(
+                    image_with_loader(
+                        match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_xl()
+                                .border_1()
+                                .border_color(theme.border),
 
-                    None => div().w_full().aspect_square().child(
-                        img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_xl()
-                            .border_1()
-                            .border_color(theme.border),
-                    ),
-                })
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_xl()
+                                .border_1()
+                                .border_color(theme.border),
+                        },
+                        loading,
+                        format!("playlist-loader-{}", playlist.id.0),
+                    )
+                    .w_full()
+                    .aspect_square(),
+                )
                 .child(
                     div()
                         .h(px(56.0))

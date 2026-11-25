@@ -14,7 +14,7 @@ use crate::{
     ui::{
         components::{
             Page,
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
         },
         pages::library::LibraryRoutes,
@@ -112,14 +112,18 @@ impl HomeSection {
             None => return div(),
         };
 
-        let thumbnail = album
-            .image_id
-            .or_else(|| {
-                album.tracks.first().and_then(|track_id| {
-                    state.library.tracks.get(track_id).and_then(|t| t.image_id)
-                })
+        let image_id = album.image_id.or_else(|| {
+            album.tracks.first().and_then(|track_id| {
+                state.library.tracks.get(track_id).and_then(|t| t.image_id)
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
+        });
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id.is_some_and(|id| {
+            cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge)
+        }) || album.tracks.first().is_some_and(|id| {
+            cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+        });
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -142,8 +146,7 @@ impl HomeSection {
                         *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Album(id);
                     }
                 })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
+                .child(image_with_loader(match thumbnail {
                         Some(image) => img(ImageSource::Render(image.clone()))
                             .size_full()
                             .object_fit(ObjectFit::Contain)
@@ -156,8 +159,9 @@ impl HomeSection {
                             .rounded_md()
                             .border_1()
                             .border_color(theme.border),
-                    }),
-                )
+                    }, loading, format!("old-home-album-loader-{}", album.id.0))
+                    .w_full()
+                    .aspect_square())
                 .child(
                     div()
                         .pt_1()
@@ -189,14 +193,18 @@ impl HomeSection {
             None => return div(),
         };
 
-        let thumbnail = artist
-            .image_id
-            .or_else(|| {
-                artist.tracks.first().and_then(|track_id| {
-                    state.library.tracks.get(track_id).and_then(|t| t.image_id)
-                })
+        let image_id = artist.image_id.or_else(|| {
+            artist.tracks.first().and_then(|track_id| {
+                state.library.tracks.get(track_id).and_then(|t| t.image_id)
             })
-            .and_then(|id| cx.global_mut::<ImageCache>().get_large(&id));
+        });
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id.is_some_and(|id| {
+            cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge)
+        }) || artist.tracks.first().is_some_and(|id| {
+            cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+        });
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -219,8 +227,7 @@ impl HomeSection {
                         *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Artist(id);
                     }
                 })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
+                .child(image_with_loader(match thumbnail {
                         Some(image) => img(ImageSource::Render(image.clone()))
                             .size_full()
                             .object_fit(ObjectFit::Contain)
@@ -233,8 +240,9 @@ impl HomeSection {
                             .rounded_full()
                             .border_1()
                             .border_color(theme.border),
-                    }),
-                )
+                    }, loading, format!("old-home-artist-loader-{}", artist.id.0))
+                    .w_full()
+                    .aspect_square())
                 .child(
                     div()
                         .pt_1()
@@ -266,14 +274,21 @@ impl HomeSection {
             None => return div(),
         };
 
+        let fallback_id = playlist.tracks.first().and_then(|track_id| {
+            state.library.tracks.get(track_id).and_then(|t| t.image_id)
+        });
+        let cache = cx.global_mut::<ImageCache>();
         let thumbnail = playlist
             .image_id
-            .or_else(|| {
-                playlist.tracks.first().and_then(|track_id| {
-                    state.library.tracks.get(track_id).and_then(|t| t.image_id)
-                })
-            })
-            .and_then(|id| cx.global_mut::<ImageCache>().get_playlist(&id));
+            .and_then(|id| cache.get_playlist(&id))
+            .or_else(|| fallback_id.and_then(|id| cache.get(&id)));
+        let loading = cache.is_playlist_loading(playlist.id)
+            || playlist
+                .image_id
+                .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::Playlist))
+            || fallback_id.is_some_and(|id| {
+                cache.is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+            });
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -296,8 +311,7 @@ impl HomeSection {
                         *cx.global_mut::<LibraryRoutes>() = LibraryRoutes::Playlist(id);
                     }
                 })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
+                .child(image_with_loader(match thumbnail {
                         Some(image) => img(ImageSource::Render(image.clone()))
                             .size_full()
                             .object_fit(ObjectFit::Contain)
@@ -310,8 +324,9 @@ impl HomeSection {
                             .rounded_md()
                             .border_1()
                             .border_color(theme.border),
-                    }),
-                )
+                    }, loading, format!("old-home-playlist-loader-{}", playlist.id.0))
+                    .w_full()
+                    .aspect_square())
                 .child(
                     div()
                         .pt_1()
@@ -352,6 +367,12 @@ impl HomeSection {
         let thumbnail = track
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = track.image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(track.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         div().min_w(px(160.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -376,8 +397,7 @@ impl HomeSection {
                         *cx.global_mut::<Page>() = Page::Player;
                     }
                 })
-                .child(
-                    div().w_full().aspect_square().child(match thumbnail {
+                .child(image_with_loader(match thumbnail {
                         Some(image) => img(ImageSource::Render(image.clone()))
                             .size_full()
                             .object_fit(ObjectFit::Contain)
@@ -390,8 +410,9 @@ impl HomeSection {
                             .rounded_md()
                             .border_1()
                             .border_color(theme.border),
-                    }),
-                )
+                    }, loading, format!("old-home-track-loader-{:?}", track.id.0))
+                    .w_full()
+                    .aspect_square())
                 .child(
                     div()
                         .pt_1()

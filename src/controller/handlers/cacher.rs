@@ -193,12 +193,6 @@ impl Controller {
                 }
             }
             CacherEvent::MissingThumbnails(ids, kind) => {
-                let cache = cx.global_mut::<ImageCache>();
-
-                for id in ids {
-                    cache.inflight.remove(&(*id, *kind));
-                }
-
                 let state = self.state.read(cx);
                 let tracks = state.library.tracks.clone();
 
@@ -220,6 +214,8 @@ impl Controller {
                         let _ = self
                             .image_processor_tx
                             .send(ImageProcessorCommand::GetThumbnails(set, *kind));
+                    } else {
+                        cx.global_mut::<ImageCache>().inflight.remove(&(*id, *kind));
                     }
                 }
             }

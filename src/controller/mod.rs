@@ -535,72 +535,90 @@ impl Controller {
     }
 
     pub fn request_track_thumbnails(&self, track_ids: &[TrackId], cx: &mut App) {
-        let mut cache_ids = Vec::new();
-        let mut scan_jobs = HashSet::new();
+        self.request_track_thumbnails_of_kind(track_ids, ImageKind::ThumbnailSmall, cx);
+    }
 
-        let state = self.state.read(cx);
-        let tracks = &state.library.tracks;
+    fn request_track_thumbnails_of_kind(
+        &self,
+        track_ids: &[TrackId],
+        kind: ImageKind,
+        cx: &mut App,
+    ) {
+        let mut cache_ids = Vec::with_capacity(track_ids.len());
+        let scan_candidates = {
+            let mut candidates = Vec::with_capacity(track_ids.len());
+            let state = self.state.read(cx);
+            let tracks = &state.library.tracks;
 
-        for tid in track_ids {
-            if let Some(track) = tracks.get(tid) {
-                if let Some(image_id) = track.image_id {
-                    cache_ids.push(image_id);
-                } else if let Some(source) = track.get_valid_source() {
-                    scan_jobs.insert((track.id, source.path.clone()));
+            for tid in track_ids {
+                if let Some(track) = tracks.get(tid) {
+                    if let Some(image_id) = track.image_id {
+                        cache_ids.push(image_id);
+                    } else if let Some(source) = track.get_valid_source() {
+                        candidates.push((track.id, source.path.clone()));
+                    }
                 }
+            }
+            candidates
+        };
+
+        let mut scan_jobs = HashSet::with_capacity(scan_candidates.len());
+        let image_cache = cx.global_mut::<ImageCache>();
+        for (track_id, path) in scan_candidates {
+            if image_cache.pending_tracks.insert((track_id, kind)) {
+                scan_jobs.insert((track_id, path));
             }
         }
 
-        cx.global_mut::<ImageCache>().request(
-            cache_ids,
-            &self.cacher_tx,
-            ImageKind::ThumbnailSmall,
-        );
-
-        self.image_processor_tx
-            .send(ImageProcessorCommand::GetThumbnails(
-                scan_jobs,
-                ImageKind::ThumbnailSmall,
-            ))
-            .ok();
+        image_cache.request(cache_ids, &self.cacher_tx, kind);
+        if !scan_jobs.is_empty() {
+            self.image_processor_tx
+                .send(ImageProcessorCommand::GetThumbnails(scan_jobs, kind))
+                .ok();
+        }
     }
 
     pub fn request_playlist_thumbnails(&self, playlist_ids: &[PlaylistId], cx: &mut App) {
         let mut cache_ids = Vec::new();
+        let mut playlist_jobs = Vec::new();
 
-        let state = self.state.read(cx);
-        let playlists = &state.library.playlists;
+        {
+            let state = self.state.read(cx);
+            let playlists = &state.library.playlists;
 
-        for pid in playlist_ids {
-            if let Some(playlist) = playlists.get(pid) {
-                if let Some(image_id) = playlist.image_id {
-                    cache_ids.push(image_id);
-                } else {
-                    let playlist_tracks = playlist.tracks.clone();
-                    let thumb_tracks = {
-                        let state = self.state.read(cx);
-
-                        pick_playlist_thumbnail_tracks(&state.library.tracks, &playlist_tracks, 4)
-                    };
-
-                    if thumb_tracks.len() >= 4 {
-                        let _ = self.image_processor_tx.send(
-                            ImageProcessorCommand::PlaylistThumbnail {
-                                id: *pid,
-                                tracks: thumb_tracks,
-                            },
+            for pid in playlist_ids {
+                if let Some(playlist) = playlists.get(pid) {
+                    if let Some(image_id) = playlist.image_id {
+                        cache_ids.push(image_id);
+                    } else {
+                        let thumb_tracks = pick_playlist_thumbnail_tracks(
+                            &state.library.tracks,
+                            &playlist.tracks,
+                            4,
                         );
+
+                        if thumb_tracks.len() >= 4 {
+                            playlist_jobs.push((*pid, thumb_tracks));
+                        }
                     }
                 }
             }
         }
 
-        cx.global_mut::<ImageCache>()
-            .request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
+        let cache = cx.global_mut::<ImageCache>();
+        for (id, tracks) in playlist_jobs {
+            if cache.pending_playlists.insert(id) {
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::PlaylistThumbnail { id, tracks });
+            }
+        }
+        cache.request(cache_ids, &self.cacher_tx, ImageKind::Playlist);
     }
 
     pub fn request_album_thumbnails(&self, album_ids: &[AlbumId], cx: &mut App) {
         let mut cache_ids = Vec::new();
+        let mut track_ids = Vec::new();
 
         let state = self.state.read(cx);
         let albums = &state.library.albums;
@@ -616,6 +634,8 @@ impl Controller {
                     .find_map(|id| tracks.get(id).and_then(|t| t.image_id))
                 {
                     cache_ids.push(image_id);
+                } else if let Some(track_id) = album.tracks.first() {
+                    track_ids.push(*track_id);
                 }
             }
         }
@@ -625,10 +645,12 @@ impl Controller {
             &self.cacher_tx,
             ImageKind::ThumbnailLarge,
         );
+        self.request_track_thumbnails_of_kind(&track_ids, ImageKind::ThumbnailLarge, cx);
     }
 
     pub fn request_artist_thumbnails(&self, artist_ids: &[ArtistId], cx: &mut App) {
         let mut cache_ids = Vec::new();
+        let mut track_ids = Vec::new();
 
         let state = self.state.read(cx);
         let artists = &state.library.artists;
@@ -642,6 +664,8 @@ impl Controller {
                     if let Some(track) = tracks.get(track_id) {
                         if let Some(image_id) = track.image_id {
                             cache_ids.push(image_id);
+                        } else {
+                            track_ids.push(*track_id);
                         }
                     }
                 }
@@ -653,6 +677,7 @@ impl Controller {
             &self.cacher_tx,
             ImageKind::ThumbnailLarge,
         );
+        self.request_track_thumbnails_of_kind(&track_ids, ImageKind::ThumbnailLarge, cx);
     }
 
     pub fn get_lyrics(

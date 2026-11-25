@@ -8,7 +8,7 @@ use crate::{
             Page,
             bounds_observer::observe_bounds,
             icons::{Icons, icon},
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
             uniform_list::uniform_list_with_scroll_past,
         },
@@ -69,6 +69,12 @@ impl PlaylistViewSection {
         let thumbnail = track
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = track.image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(track.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         div().h_16().py_1().child(
             div()
@@ -107,24 +113,29 @@ impl PlaylistViewSection {
                         .gap_x_4()
                         .items_center()
                         .justify_start()
-                        .child(match thumbnail {
-                            Some(image) => div().w_11().h_11().flex_shrink_0().child(
-                                img(ImageSource::Render(image.clone()))
-                                    .object_fit(ObjectFit::Contain)
-                                    .size_full()
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .rounded_md(),
-                            ),
-                            None => div().w_11().h_11().flex_shrink_0().child(
-                                img("icons/placeholder.svg")
-                                    .object_fit(ObjectFit::Contain)
-                                    .size_full()
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .rounded_md(),
-                            ),
-                        })
+                        .child(
+                            image_with_loader(
+                                match thumbnail {
+                                    Some(image) => img(ImageSource::Render(image.clone()))
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .rounded_md(),
+                                    None => img("icons/placeholder.svg")
+                                        .object_fit(ObjectFit::Contain)
+                                        .size_full()
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .rounded_md(),
+                                },
+                                loading,
+                                format!("playlist-track-loader_{:?}", track.id.0),
+                            )
+                            .w_11()
+                            .h_11()
+                            .flex_shrink_0(),
+                        )
                         .child(
                             div().flex_1().flex().flex_col().justify_center().child(
                                 div()
@@ -213,6 +224,10 @@ impl Render for PlaylistViewSection {
 
         let cache = cx.global_mut::<ImageCache>();
         let thumbnail = playlist.image_id.and_then(|id| cache.get_playlist(&id));
+        let loading = cache.is_playlist_loading(playlist.id)
+            || playlist
+                .image_id
+                .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::Playlist));
 
         let track_ids = playlist.tracks.clone();
         let len = track_ids.len();
@@ -274,8 +289,7 @@ impl Render for PlaylistViewSection {
                     .flex()
                     .gap_8()
                     .items_end()
-                    .child(
-                        div().size_64().flex_shrink_0().child(match thumbnail {
+                    .child(image_with_loader(match thumbnail {
                             Some(image) => img(ImageSource::Render(image.clone()))
                                 .size_full()
                                 .object_fit(ObjectFit::Contain)
@@ -289,8 +303,9 @@ impl Render for PlaylistViewSection {
                                 .rounded_xl()
                                 .border_1()
                                 .border_color(theme.border),
-                        }),
-                    )
+                        }, loading, format!("playlist-view-loader-{}", playlist.id.0))
+                        .size_64()
+                        .flex_shrink_0())
                     .child(
                         div()
                             .flex()

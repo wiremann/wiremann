@@ -1,12 +1,19 @@
 use crate::cacher::ImageKind;
 use crate::controller::commands::CacherCommand;
-use crate::controller::state::ImageId;
+use crate::controller::state::{ImageId, PlaylistId, TrackId};
 use crossbeam_channel::Sender;
-use gpui::RenderImage;
+use gpui::{
+    Div, ElementId, IntoElement, ParentElement, RenderImage, Styled, div, prelude::FluentBuilder,
+    rgb, rgba,
+};
 use lru::LruCache;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::time::Duration;
+use wgpui_motion::prelude::{MotionExt, Params, Timeline, VisualParams};
+
+use super::icons::{Icons, icon};
 
 const IMAGE_CACHE_CAPACITY: usize = 256;
 
@@ -15,6 +22,8 @@ pub struct ImageCache {
     pub images: LruCache<(ImageId, ImageKind), Arc<RenderImage>>,
 
     pub inflight: HashSet<(ImageId, ImageKind)>,
+    pub pending_tracks: HashSet<(TrackId, ImageKind)>,
+    pub pending_playlists: HashSet<PlaylistId>,
 }
 
 impl Default for ImageCache {
@@ -23,6 +32,8 @@ impl Default for ImageCache {
             current: None,
             images: LruCache::new(NonZeroUsize::new(IMAGE_CACHE_CAPACITY).unwrap()),
             inflight: HashSet::new(),
+            pending_tracks: HashSet::new(),
+            pending_playlists: HashSet::new(),
         }
     }
 }
@@ -45,6 +56,21 @@ impl ImageCache {
 
     fn get_kind(&mut self, id: &ImageId, kind: ImageKind) -> Option<Arc<RenderImage>> {
         self.images.get(&(*id, kind)).cloned()
+    }
+
+    #[must_use]
+    pub fn is_loading(&self, id: ImageId, kind: ImageKind) -> bool {
+        self.inflight.contains(&(id, kind))
+    }
+
+    #[must_use]
+    pub fn is_track_loading(&self, id: TrackId, kind: ImageKind) -> bool {
+        self.pending_tracks.contains(&(id, kind))
+    }
+
+    #[must_use]
+    pub fn is_playlist_loading(&self, id: PlaylistId) -> bool {
+        self.pending_playlists.contains(&id)
     }
 
     pub fn clear(&mut self) {
@@ -93,6 +119,52 @@ impl ImageCache {
 }
 
 impl gpui::Global for ImageCache {}
+
+pub fn image_with_loader(
+    image: impl IntoElement,
+    loading: bool,
+    loader_id: impl Into<ElementId>,
+) -> Div {
+    let loader_id = loader_id.into();
+    div()
+        .size_full()
+        .relative()
+        .child(image)
+        .when(loading, |this| {
+            this.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .bottom_0()
+                    .left_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        div()
+                            .size_8()
+                            .rounded_full()
+                            .bg(rgba(0x000000A0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(
+                                icon(Icons::LoaderCircle)
+                                    .size_4()
+                                    .text_color(rgb(0xFFFFFF))
+                                    .motion(format!("image_loader_{loader_id:?}"))
+                                    .timeline(
+                                        Timeline::new(Duration::from_millis(900))
+                                            .looping()
+                                            .key(0.0, Params::new().opacity(0.35))
+                                            .key(1.0, Params::new().opacity(1.0)),
+                                    ),
+                            ),
+                    ),
+            )
+        })
+}
 
 #[cfg(test)]
 mod tests {

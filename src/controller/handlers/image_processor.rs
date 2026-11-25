@@ -6,25 +6,26 @@ use super::{
 use crate::controller::state::ImageId;
 use gpui::RenderImage;
 
-fn persist_render_image(
+fn persist_render_images(
     cx: &App,
     cacher_tx: crossbeam_channel::Sender<CacherCommand>,
-    id: ImageId,
     kind: ImageKind,
-    image: Arc<RenderImage>,
+    images: Vec<(ImageId, Arc<RenderImage>)>,
 ) {
     cx.background_executor()
         .spawn(async move {
-            let width = image.size(0).width.0.cast_unsigned();
-            let height = image.size(0).height.0.cast_unsigned();
-            if let Some(image) = image.as_bytes(0) {
-                let _ = cacher_tx.send(CacherCommand::WriteImage {
-                    id,
-                    kind,
-                    width,
-                    height,
-                    image: image.to_vec(),
-                });
+            for (id, image) in images {
+                let width = image.size(0).width.0.cast_unsigned();
+                let height = image.size(0).height.0.cast_unsigned();
+                if let Some(image) = image.as_bytes(0) {
+                    let _ = cacher_tx.send(CacherCommand::WriteImage {
+                        id,
+                        kind,
+                        width,
+                        height,
+                        image: image.to_vec(),
+                    });
+                }
             }
         })
         .detach();
@@ -42,12 +43,11 @@ impl Controller {
                 let image_cache = cx.global_mut::<ImageCache>();
                 image_cache.current = Some(image.clone());
 
-                persist_render_image(
+                persist_render_images(
                     cx,
                     self.cacher_tx.clone(),
-                    *image_id,
                     ImageKind::AlbumArt,
-                    image.clone(),
+                    vec![(*image_id, image.clone())],
                 );
 
                 let image = image.clone();
@@ -85,8 +85,9 @@ impl Controller {
             }
             ImageProcessorEvent::InsertThumbnails(thumbnails, kind) => {
                 let mut evicted_images = Vec::new();
+                let mut images_to_persist = Vec::with_capacity(thumbnails.len());
                 for (id, image) in thumbnails {
-                    persist_render_image(cx, self.cacher_tx.clone(), *id, *kind, image.clone());
+                    images_to_persist.push((*id, image.clone()));
                     let evicted = {
                         let thumbnail_cache = cx.global_mut::<ImageCache>();
                         thumbnail_cache.add_kind(*id, *kind, image.clone())
@@ -96,7 +97,31 @@ impl Controller {
                         evicted_images.push(image);
                     }
                 }
+                persist_render_images(cx, self.cacher_tx.clone(), *kind, images_to_persist);
                 drop_images_from_app(cx, evicted_images);
+                cx.notify(view.entity_id());
+            }
+            ImageProcessorEvent::ThumbnailJobsFinished(track_ids, kind) => {
+                let image_ids = {
+                    let state = self.state.read(cx);
+                    track_ids
+                        .iter()
+                        .filter_map(|track_id| {
+                            state
+                                .library
+                                .tracks
+                                .get(track_id)
+                                .and_then(|track| track.image_id)
+                        })
+                        .collect::<Vec<_>>()
+                };
+                let image_cache = cx.global_mut::<ImageCache>();
+                for track_id in track_ids {
+                    image_cache.pending_tracks.remove(&(*track_id, *kind));
+                }
+                for image_id in image_ids {
+                    image_cache.inflight.remove(&(image_id, *kind));
+                }
                 cx.notify(view.entity_id());
             }
             ImageProcessorEvent::UpdateImageLookup(lookup) => {
@@ -112,21 +137,28 @@ impl Controller {
                 let state = self.state.read(cx).library.clone();
                 let _ = self.cacher_tx.send(CacherCommand::WriteLibraryState(state));
             }
+            ImageProcessorEvent::PlaylistThumbnailUnavailable(id) => {
+                cx.global_mut::<ImageCache>().pending_playlists.remove(id);
+                let _ = self
+                    .image_processor_tx
+                    .send(ImageProcessorCommand::PlaylistJobFinished(*id));
+                cx.notify(view.entity_id());
+            }
             ImageProcessorEvent::InsertPlaylistThumbnail(id, image_id, image) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
 
                 thumbnail_cache.add_kind(*image_id, ImageKind::Playlist, image.clone());
+                thumbnail_cache.pending_playlists.remove(id);
 
                 let _ = self
                     .image_processor_tx
                     .send(ImageProcessorCommand::PlaylistJobFinished(*id));
 
-                persist_render_image(
+                persist_render_images(
                     cx,
                     self.cacher_tx.clone(),
-                    *image_id,
                     ImageKind::Playlist,
-                    image.clone(),
+                    vec![(*image_id, image.clone())],
                 );
 
                 self.state.update(cx, |this, cx| {

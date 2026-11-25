@@ -1,7 +1,7 @@
 use crate::controller::state::{ArtistId, TrackId};
 use crate::controller::{Controller, state::Track};
 use crate::ui::animations::page_transition;
-use crate::ui::components::image_cache::ImageCache;
+use crate::ui::components::image_cache::{ImageCache, image_with_loader};
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
 use gpui::{
@@ -54,6 +54,12 @@ impl Render for Item {
         };
 
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(self.data.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         let theme = *cx.global::<Theme>();
         let state = cx.global::<Controller>().state.read(cx);
@@ -71,17 +77,28 @@ impl Render for Item {
             .mb_2()
             .rounded_lg()
             .cursor_pointer()
-            .child(match thumbnail {
-                Some(image) => div().size_12().flex_shrink_0().child(
-                    img(ImageSource::Render(image.clone()))
-                        .object_fit(ObjectFit::Contain)
-                        .size_full()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border),
-                ),
-                None => div().size_12().flex_shrink_0(),
-            })
+            .child(
+                image_with_loader(
+                    match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                    },
+                    loading,
+                    format!("queue_loader_{:?}", self.data.id.0),
+                )
+                .size_12()
+                .flex_shrink_0(),
+            )
             .child(
                 div()
                     .flex_col()
