@@ -11,7 +11,6 @@ use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
-use wgpui_motion::prelude::{MotionExt, Params, Timeline, VisualParams};
 
 use super::icons::{Icons, icon};
 
@@ -142,26 +141,15 @@ pub fn image_with_loader(
                     .items_center()
                     .justify_center()
                     .child(
-                        div()
+                        icon(Icons::LoaderCircle)
                             .size_6()
-                            .child(
-                                icon(Icons::LoaderCircle)
-                                    .size_6()
-                                    .text_color(rgb(0xFFFFFF))
-                                    .with_animation(
-                                        format!("image_loader_spin_{loader_id:?}"),
-                                        Animation::new(Duration::from_millis(900))
-                                            .repeat()
-                                            .with_easing(linear),
-                                        |loader, delta| loader.rotate(percentage(delta)),
-                                    ),
-                            )
-                            .motion(format!("image_loader_{loader_id:?}"))
-                            .timeline(
-                                Timeline::new(Duration::from_millis(900))
-                                    .looping()
-                                    .key(0.0, Params::new().opacity(0.9))
-                                    .key(1.0, Params::new().opacity(1.0)),
+                            .text_color(rgb(0xFFFFFF))
+                            .with_animation(
+                                format!("image_loader_spin_{loader_id:?}"),
+                                Animation::new(Duration::from_millis(900))
+                                    .repeat()
+                                    .with_easing(linear),
+                                |loader, delta| loader.rotate(percentage(delta)),
                             ),
                     ),
             )

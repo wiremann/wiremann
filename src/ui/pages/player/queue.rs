@@ -94,7 +94,7 @@ impl Render for Item {
                             .border_color(theme.border),
                     },
                     loading,
-                    format!("queue_loader_{:?}", self.data.id.0),
+                    format!("queue_loader_{:?}_{}", self.data.id.0, self.idx),
                 )
                 .size_12()
                 .flex_shrink_0(),
@@ -135,7 +135,7 @@ impl Render for Item {
 
 #[derive(Clone)]
 pub struct Queue {
-    pub views: Entity<AHashMap<TrackId, Entity<Item>>>,
+    pub views: Entity<AHashMap<(TrackId, usize), Entity<Item>>>,
     pub scroll_handle: UniformListScrollHandle,
     pub stop_auto_scroll: Entity<bool>,
 
@@ -158,14 +158,15 @@ impl Queue {
     }
 
     fn get_or_create_item(
-        views: &Entity<AHashMap<TrackId, Entity<Item>>>,
+        views: &Entity<AHashMap<(TrackId, usize), Entity<Item>>>,
         track: Arc<Track>,
+        idx: usize,
         cx: &mut App,
     ) -> Entity<Item> {
-        let key = track.id;
+        let key = (track.id, idx);
         views.update(cx, |this, cx| {
             this.entry(key)
-                .or_insert_with(|| Item::new(cx, track, 0))
+                .or_insert_with(|| Item::new(cx, track, idx))
                 .clone()
         })
     }
@@ -255,7 +256,7 @@ impl Render for Queue {
                     controller.request_track_thumbnails(&thumb_tracks, cx);
 
                     views.update(cx, |map, _| {
-                        map.retain(|id, _| visible_tracks.contains(id));
+                        map.retain(|(id, _), _| visible_tracks.contains(id));
                     });
 
                     range
@@ -270,7 +271,7 @@ impl Render for Queue {
                                 let id = track.id;
 
                                 div()
-                                    .id(format!("track_{:?}", track.id.0))
+                                    .id(format!("track_{:?}_{i}", track.id.0))
                                     .w_full()
                                     .rounded_lg()
                                     .cursor_pointer()
@@ -292,7 +293,7 @@ impl Render for Queue {
                                             .bg(theme.queue_item_bg_current)
                                             .border_color(theme.border)
                                     })
-                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
+                                    .child(Queue::get_or_create_item(&views, track.clone(), i, cx))
                                     .into_any_element()
                             } else {
                                 div()
