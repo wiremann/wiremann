@@ -8,6 +8,8 @@ use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
+const IMAGE_CACHE_CAPACITY: usize = 256;
+
 pub struct ImageCache {
     pub current: Option<Arc<RenderImage>>,
     pub images: LruCache<(ImageId, ImageKind), Arc<RenderImage>>,
@@ -19,7 +21,7 @@ impl Default for ImageCache {
     fn default() -> Self {
         ImageCache {
             current: None,
-            images: LruCache::new(NonZeroUsize::new(128).unwrap()),
+            images: LruCache::new(NonZeroUsize::new(IMAGE_CACHE_CAPACITY).unwrap()),
             inflight: HashSet::new(),
         }
     }
