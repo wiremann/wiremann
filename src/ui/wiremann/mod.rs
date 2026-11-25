@@ -143,10 +143,14 @@ impl Wiremann {
     }
 
     pub fn notify_image_views(&mut self, cx: &mut Context<Self>) {
-        self.library_page
-            .update(cx, |this, cx| this.notify_image_views(cx));
-        self.player_page
-            .update(cx, |this, cx| this.notify_image_views(cx));
+        match *cx.global::<Page>() {
+            Page::Library => self
+                .library_page
+                .update(cx, |this, cx| this.notify_image_views(cx)),
+            Page::Player => self
+                .player_page
+                .update(cx, |this, cx| this.notify_image_views(cx)),
+        }
     }
 }
 

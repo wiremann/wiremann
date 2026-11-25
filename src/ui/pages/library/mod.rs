@@ -157,16 +157,19 @@ impl LibraryPage {
     }
 
     pub fn notify_image_views(&mut self, cx: &mut Context<Self>) {
-        self.album.update(cx, |_, cx| cx.notify());
-        self.albums.update(cx, |_, cx| cx.notify());
-        self.artist.update(cx, |_, cx| cx.notify());
-        self.artists.update(cx, |_, cx| cx.notify());
-        self.favorites.update(cx, |_, cx| cx.notify());
-        self.home.update(cx, |_, cx| cx.notify());
-        self.playlist.update(cx, |_, cx| cx.notify());
-        self.playlists.update(cx, |_, cx| cx.notify());
-        self.stats.update(cx, |_, cx| cx.notify());
-        self.tracks.update(cx, |_, cx| cx.notify());
+        match *cx.global::<LibraryRoutes>() {
+            LibraryRoutes::Home => self.home.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Favorites => self.favorites.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Stats => self.stats.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Tracks => self.tracks.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Albums => self.albums.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Artists => self.artists.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Playlists => self.playlists.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Album(_) => self.album.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Artist(_) => self.artist.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Playlist(_) => self.playlist.update(cx, |_, cx| cx.notify()),
+            LibraryRoutes::Settings | LibraryRoutes::Plugins => {}
+        }
     }
 }
 
