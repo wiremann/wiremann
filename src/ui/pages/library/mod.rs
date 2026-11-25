@@ -155,6 +155,19 @@ impl LibraryPage {
             }),
         }
     }
+
+    pub fn notify_image_views(&mut self, cx: &mut Context<Self>) {
+        self.album.update(cx, |_, cx| cx.notify());
+        self.albums.update(cx, |_, cx| cx.notify());
+        self.artist.update(cx, |_, cx| cx.notify());
+        self.artists.update(cx, |_, cx| cx.notify());
+        self.favorites.update(cx, |_, cx| cx.notify());
+        self.home.update(cx, |_, cx| cx.notify());
+        self.playlist.update(cx, |_, cx| cx.notify());
+        self.playlists.update(cx, |_, cx| cx.notify());
+        self.stats.update(cx, |_, cx| cx.notify());
+        self.tracks.update(cx, |_, cx| cx.notify());
+    }
 }
 
 impl Render for LibraryPage {

@@ -1,7 +1,7 @@
 use super::{
     App, Arc, CacherCommand, Controller, ControllerError, Entity, ImageCache, ImageKind,
     ImageProcessorCommand, ImageProcessorEvent, SystemIntegrationCommand, Wiremann,
-    drop_images_from_app,
+    drop_images_from_app, notify_image_views,
 };
 use crate::controller::state::ImageId;
 use gpui::RenderImage;
@@ -80,8 +80,6 @@ impl Controller {
                             .ok();
                     }
                 }
-
-                cx.notify(view.entity_id());
             }
             ImageProcessorEvent::InsertThumbnails(thumbnails, kind) => {
                 let mut evicted_images = Vec::new();
@@ -99,7 +97,6 @@ impl Controller {
                 }
                 persist_render_images(cx, self.cacher_tx.clone(), *kind, images_to_persist);
                 drop_images_from_app(cx, evicted_images);
-                cx.notify(view.entity_id());
             }
             ImageProcessorEvent::ThumbnailJobsFinished(track_ids, kind) => {
                 let image_ids = {
@@ -122,7 +119,6 @@ impl Controller {
                 for image_id in image_ids {
                     image_cache.inflight.remove(&(image_id, *kind));
                 }
-                cx.notify(view.entity_id());
             }
             ImageProcessorEvent::UpdateImageLookup(lookup) => {
                 self.state.update(cx, |this, cx| {
@@ -142,7 +138,6 @@ impl Controller {
                 let _ = self
                     .image_processor_tx
                     .send(ImageProcessorCommand::PlaylistJobFinished(*id));
-                cx.notify(view.entity_id());
             }
             ImageProcessorEvent::InsertPlaylistThumbnail(id, image_id, image) => {
                 let thumbnail_cache = cx.global_mut::<ImageCache>();
@@ -172,6 +167,7 @@ impl Controller {
             }
         }
 
+        notify_image_views(cx, view);
         Ok(())
     }
 }
