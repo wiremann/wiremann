@@ -1,7 +1,7 @@
 use crate::controller::state::{ArtistId, TrackId};
 use crate::controller::{Controller, state::Track};
 use crate::ui::animations::page_transition;
-use crate::ui::components::image_cache::ImageCache;
+use crate::ui::components::image_cache::{ImageCache, image_with_loader};
 use crate::ui::theme::Theme;
 use ahash::AHashMap;
 use gpui::{
@@ -54,6 +54,12 @@ impl Render for Item {
         };
 
         let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(self.data.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         let theme = *cx.global::<Theme>();
         let state = cx.global::<Controller>().state.read(cx);
@@ -71,17 +77,28 @@ impl Render for Item {
             .mb_2()
             .rounded_lg()
             .cursor_pointer()
-            .child(match thumbnail {
-                Some(image) => div().size_12().flex_shrink_0().child(
-                    img(ImageSource::Render(image.clone()))
-                        .object_fit(ObjectFit::Contain)
-                        .size_full()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border),
-                ),
-                None => div().size_12().flex_shrink_0(),
-            })
+            .child(
+                image_with_loader(
+                    match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                        None => img("icons/placeholder.svg")
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border),
+                    },
+                    loading,
+                    format!("queue_loader_{:?}_{}", self.data.id.0, self.idx),
+                )
+                .size_12()
+                .flex_shrink_0(),
+            )
             .child(
                 div()
                     .flex_col()
@@ -118,7 +135,7 @@ impl Render for Item {
 
 #[derive(Clone)]
 pub struct Queue {
-    pub views: Entity<AHashMap<TrackId, Entity<Item>>>,
+    pub views: Entity<AHashMap<(TrackId, usize), Entity<Item>>>,
     pub scroll_handle: UniformListScrollHandle,
     pub stop_auto_scroll: Entity<bool>,
 
@@ -141,14 +158,15 @@ impl Queue {
     }
 
     fn get_or_create_item(
-        views: &Entity<AHashMap<TrackId, Entity<Item>>>,
+        views: &Entity<AHashMap<(TrackId, usize), Entity<Item>>>,
         track: Arc<Track>,
+        idx: usize,
         cx: &mut App,
     ) -> Entity<Item> {
-        let key = track.id;
+        let key = (track.id, idx);
         views.update(cx, |this, cx| {
             this.entry(key)
-                .or_insert_with(|| Item::new(cx, track, 0))
+                .or_insert_with(|| Item::new(cx, track, idx))
                 .clone()
         })
     }
@@ -238,7 +256,7 @@ impl Render for Queue {
                     controller.request_track_thumbnails(&thumb_tracks, cx);
 
                     views.update(cx, |map, _| {
-                        map.retain(|id, _| visible_tracks.contains(id));
+                        map.retain(|(id, _), _| visible_tracks.contains(id));
                     });
 
                     range
@@ -253,7 +271,7 @@ impl Render for Queue {
                                 let id = track.id;
 
                                 div()
-                                    .id(format!("track_{:?}", track.id.0))
+                                    .id(format!("track_{:?}_{i}", track.id.0))
                                     .w_full()
                                     .rounded_lg()
                                     .cursor_pointer()
@@ -275,7 +293,7 @@ impl Render for Queue {
                                             .bg(theme.queue_item_bg_current)
                                             .border_color(theme.border)
                                     })
-                                    .child(Queue::get_or_create_item(&views, track.clone(), cx))
+                                    .child(Queue::get_or_create_item(&views, track.clone(), i, cx))
                                     .into_any_element()
                             } else {
                                 div()

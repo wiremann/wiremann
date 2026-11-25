@@ -122,17 +122,38 @@ impl ImageProcessor {
                 info!("image processor thumbnail worker started");
                 let mut image_batch = HashMap::with_capacity(64);
                 let mut lookup_batch = HashMap::with_capacity(64);
+                let mut finished_batch = Vec::with_capacity(64);
                 let mut last_kind = ImageKind::ThumbnailSmall;
 
                 loop {
                     select! {
                         recv(thumb_rx) -> job => {
                             let job_start = Instant::now();
-                            if let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job &&
-                                let Ok(Some(bytes)) = metadata::read_album_art(&path) && let Ok(hash) = ImageId::generate(&bytes) {
+                            let Ok(ImageJob::Thumbnail(id, path, kind, cached_images)) = job else {
+                                continue;
+                            };
+                            if kind != last_kind {
+                                if !image_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                        std::mem::take(&mut image_batch), last_kind
+                                    ));
+                                }
+                                if !lookup_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                        std::mem::take(&mut lookup_batch)
+                                    ));
+                                }
+                                if !finished_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                        std::mem::take(&mut finished_batch), last_kind
+                                    ));
+                                }
+                            }
+                            last_kind = kind;
+                            if let Ok(Some(bytes)) = metadata::read_album_art(&path) &&
+                                let Ok(hash) = ImageId::generate(&bytes) {
                                     trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", "received job {:?} {}", id, path.display());
                                     lookup_batch.insert(id, hash);
-                                    last_kind = kind;
                                     if seen_images.insert((hash, kind)) && !cached_images.contains(&hash) {
                                         match render_album_art(&bytes, kind) {
                                             Ok(image) => {
@@ -153,14 +174,39 @@ impl ImageProcessor {
                                 } else {
                                     trace!(thread_id = ?std::thread::current().id(), worker = "image-processor", elapsed_ms = ?job_start.elapsed().as_millis(), "skipped/invalid thumbnail job");
                                 }
+                            finished_batch.push(id);
+                            if finished_batch.len() >= 64 {
+                                if !image_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                        std::mem::take(&mut image_batch), kind
+                                    ));
+                                }
+                                if !lookup_batch.is_empty() {
+                                    let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                        std::mem::take(&mut lookup_batch)
+                                    ));
+                                }
+                                let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                    std::mem::take(&mut finished_batch), kind
+                                ));
+                            }
                         }
 
                         recv(ticker) -> _ => {
-                            if !image_batch.is_empty() || !lookup_batch.is_empty() {
-                                let _ = events_tx.send(
-                                    ImageProcessorEvent::InsertThumbnails(std::mem::take(&mut image_batch), last_kind)
-                                );
-                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(std::mem::take(&mut lookup_batch)));
+                            if !image_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                                    std::mem::take(&mut image_batch), last_kind
+                                ));
+                            }
+                            if !lookup_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(
+                                    std::mem::take(&mut lookup_batch)
+                                ));
+                            }
+                            if !finished_batch.is_empty() {
+                                let _ = events_tx.send(ImageProcessorEvent::ThumbnailJobsFinished(
+                                    std::mem::take(&mut finished_batch), last_kind
+                                ));
                             }
                         }
                     }
@@ -263,6 +309,7 @@ impl ImageProcessor {
                 }
 
                 if images.is_empty() {
+                    let _ = events_tx.send(ImageProcessorEvent::PlaylistThumbnailUnavailable(id));
                     continue;
                 }
 
@@ -272,6 +319,7 @@ impl ImageProcessor {
                     ));
                 } else {
                     warn!("Failed to generate playlist thumbnail");
+                    let _ = events_tx.send(ImageProcessorEvent::PlaylistThumbnailUnavailable(id));
                 }
             }
         });
@@ -386,12 +434,14 @@ fn download_and_send_album_art(
                 let _ = events_tx.send(ImageProcessorEvent::UpdateImageLookup(HashMap::from([(
                     id, hash,
                 )])));
-                // Also generate a small thumbnail for library lists.
-                if let Ok(thumb) = render_album_art(&img_bytes, ImageKind::ThumbnailSmall) {
-                    let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
-                        HashMap::from([(hash, thumb)]),
-                        ImageKind::ThumbnailSmall,
-                    ));
+                // Online covers need both variants because they may have no embedded source art.
+                for kind in [ImageKind::ThumbnailSmall, ImageKind::ThumbnailLarge] {
+                    if let Ok(thumb) = render_album_art(&img_bytes, kind) {
+                        let _ = events_tx.send(ImageProcessorEvent::InsertThumbnails(
+                            HashMap::from([(hash, thumb)]),
+                            kind,
+                        ));
+                    }
                 }
                 info!(track_id = ?id, "Fetched album art online");
             }

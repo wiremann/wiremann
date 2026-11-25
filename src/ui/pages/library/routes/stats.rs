@@ -12,7 +12,7 @@ use crate::{
     ui::{
         components::{
             Page,
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
         },
         pages::library::LibraryRoutes,
@@ -300,6 +300,12 @@ impl StatsSection {
         let thumbnail = track
             .image_id
             .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let loading = track.image_id.is_some_and(|id| {
+            cx.global::<ImageCache>()
+                .is_loading(id, crate::cacher::ImageKind::ThumbnailSmall)
+        }) || cx
+            .global::<ImageCache>()
+            .is_track_loading(track.id, crate::cacher::ImageKind::ThumbnailSmall);
 
         div()
             .w_full()
@@ -329,24 +335,29 @@ impl StatsSection {
                     .text_color(theme.library_stats_rank)
                     .child(format!("{:02}", index + 1)),
             )
-            .child(match thumbnail {
-                Some(image) => div().w_11().h_11().flex_shrink_0().child(
-                    img(ImageSource::Render(image.clone()))
-                        .object_fit(ObjectFit::Contain)
-                        .size_full()
-                        .border_1()
-                        .border_color(theme.border)
-                        .rounded_md(),
-                ),
-                None => div().w_11().h_11().flex_shrink_0().child(
-                    img("icons/placeholder.svg")
-                        .object_fit(ObjectFit::Contain)
-                        .size_full()
-                        .border_1()
-                        .border_color(theme.border)
-                        .rounded_md(),
-                ),
-            })
+            .child(
+                image_with_loader(
+                    match thumbnail {
+                        Some(image) => img(ImageSource::Render(image.clone()))
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .border_1()
+                            .border_color(theme.border)
+                            .rounded_md(),
+                        None => img("icons/placeholder.svg")
+                            .object_fit(ObjectFit::Contain)
+                            .size_full()
+                            .border_1()
+                            .border_color(theme.border)
+                            .rounded_md(),
+                    },
+                    loading,
+                    format!("stats-track-loader_{:?}", track.id.0),
+                )
+                .w_11()
+                .h_11()
+                .flex_shrink_0(),
+            )
             .child(
                 div()
                     .flex_1()
@@ -441,7 +452,13 @@ impl StatsSection {
             (artist.clone(), image_id)
         };
 
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id
+            .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge))
+            || artist.tracks.first().is_some_and(|id| {
+                cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+            });
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -463,20 +480,26 @@ impl StatsSection {
                     }
                 })
                 .child(
-                    div().w_full().aspect_square().child(match thumbnail {
-                        Some(image) => img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                        None => img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                    }),
+                    image_with_loader(
+                        match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
+                        },
+                        loading,
+                        format!("stats-artist-loader_{}", artist.id.0),
+                    )
+                    .w_full()
+                    .aspect_square(),
                 )
                 .child(
                     div()
@@ -517,7 +540,13 @@ impl StatsSection {
             (album.clone(), image_id)
         };
 
-        let thumbnail = image_id.and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id
+            .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge))
+            || album.tracks.first().is_some_and(|id| {
+                cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+            });
 
         div().min_w(px(180.0)).flex_1().max_w(px(220.0)).child(
             div()
@@ -539,20 +568,26 @@ impl StatsSection {
                     }
                 })
                 .child(
-                    div().w_full().aspect_square().child(match thumbnail {
-                        Some(image) => img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_md()
-                            .border_1()
-                            .border_color(theme.border),
-                        None => img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_md()
-                            .border_1()
-                            .border_color(theme.border),
-                    }),
+                    image_with_loader(
+                        match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_md()
+                                .border_1()
+                                .border_color(theme.border),
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_md()
+                                .border_1()
+                                .border_color(theme.border),
+                        },
+                        loading,
+                        format!("stats-album-loader_{}", album.id.0),
+                    )
+                    .w_full()
+                    .aspect_square(),
                 )
                 .child(
                     div()

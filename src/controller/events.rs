@@ -38,7 +38,9 @@ pub enum ScannerEvent {
 pub enum ImageProcessorEvent {
     InsertAlbumArt(ImageId, Arc<RenderImage>),
     InsertThumbnails(HashMap<ImageId, Arc<RenderImage>>, ImageKind),
+    ThumbnailJobsFinished(Vec<TrackId>, ImageKind),
     InsertPlaylistThumbnail(PlaylistId, ImageId, Arc<RenderImage>),
+    PlaylistThumbnailUnavailable(PlaylistId),
     UpdateImageLookup(HashMap<TrackId, ImageId>),
 }
 
@@ -47,12 +49,12 @@ pub enum CacherEvent {
     AppState(Box<AppState>),
 
     AlbumArt(Arc<RenderImage>),
-    Thumbnails(HashMap<ImageId, Arc<RenderImage>>),
+    Thumbnails(HashMap<ImageId, Arc<RenderImage>>, ImageKind),
     PlaylistThumbnail(ImageId, Arc<RenderImage>),
 
     Lyrics(TrackId, Option<Lyrics>),
 
-    MissingThumbnails(Vec<ImageId>),
+    MissingThumbnails(Vec<ImageId>, ImageKind),
     MissingAlbumArt(ImageId),
     MissingPlaylistThumbnail(ImageId),
 

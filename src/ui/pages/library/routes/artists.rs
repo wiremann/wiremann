@@ -1,14 +1,14 @@
 use gpui::{
     App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, img, px, rems,
+    div, img, prelude::FluentBuilder, px, rems,
 };
 
 use crate::{
     controller::{Controller, state::ArtistId},
     ui::{
         components::{
-            image_cache::ImageCache,
+            image_cache::{ImageCache, image_with_loader},
             scrollbar::{RightPad, floating_scrollbar},
             virtual_grid::{VirtualGridScrollController, vgrid},
         },
@@ -34,14 +34,19 @@ impl ArtistsSection {
             None => return div(),
         };
 
-        let thumbnail = artist
-            .image_id
-            .or_else(|| {
-                artist.tracks.first().and_then(|track_id| {
-                    state.library.tracks.get(track_id).and_then(|t| t.image_id)
-                })
-            })
-            .and_then(|id| cx.global_mut::<ImageCache>().get(&id));
+        let image_id = artist.image_id.or_else(|| {
+            artist
+                .tracks
+                .first()
+                .and_then(|track_id| state.library.tracks.get(track_id).and_then(|t| t.image_id))
+        });
+        let cache = cx.global_mut::<ImageCache>();
+        let thumbnail = image_id.and_then(|id| cache.get_large(&id));
+        let loading = image_id
+            .is_some_and(|id| cache.is_loading(id, crate::cacher::ImageKind::ThumbnailLarge))
+            || artist.tracks.first().is_some_and(|id| {
+                cache.is_track_loading(*id, crate::cacher::ImageKind::ThumbnailLarge)
+            });
 
         div().p_4().size_full().child(
             div()
@@ -60,25 +65,29 @@ impl ArtistsSection {
                 })
                 .flex()
                 .flex_col()
-                .child(match thumbnail {
-                    Some(image) => div().w_full().aspect_square().child(
-                        img(ImageSource::Render(image.clone()))
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                    ),
+                .child(
+                    image_with_loader(
+                        match thumbnail {
+                            Some(image) => img(ImageSource::Render(image.clone()))
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
 
-                    None => div().w_full().aspect_square().child(
-                        img("icons/placeholder.svg")
-                            .size_full()
-                            .object_fit(ObjectFit::Contain)
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.border),
-                    ),
-                })
+                            None => img("icons/placeholder.svg")
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .rounded_full()
+                                .border_1()
+                                .border_color(theme.border),
+                        },
+                        loading,
+                        format!("artist-loader-{}", artist.id.0),
+                    )
+                    .w_full()
+                    .aspect_square(),
+                )
                 .child(
                     div()
                         .h(px(56.0))
@@ -167,34 +176,33 @@ impl Render for ArtistsSection {
                             .child("Add some tracks to create artists."),
                     )
             } else {
-                div()
-                    .size_full()
-                    .child(
-                        vgrid(
-                            cx.entity(),
-                            "artists_grid",
-                            len,
-                            px(280.0),
-                            px(56.0),
-                            px(2.0),
-                            self.scroll_handle.clone(),
-                            &self.grid_controller,
-                            move |_, range, _, _, cx| {
-                                controller
-                                    .request_artist_thumbnails(&artist_ids[range.clone()], cx);
-
-                                range
-                                    .map(|i| Self::render_artist(artist_ids[i], cx))
-                                    .collect::<Vec<_>>()
-                            },
-                        )
-                        .scroll_past(px(128.0)),
-                    )
-                    .child(floating_scrollbar(
-                        "artists_scrollbar",
+                div().size_full().child(
+                    vgrid(
+                        cx.entity(),
+                        "artists_grid",
+                        len,
+                        px(280.0),
+                        px(56.0),
+                        px(2.0),
                         self.scroll_handle.clone(),
-                        RightPad::Pad,
-                    ))
+                        &self.grid_controller,
+                        move |_, range, _, _, cx| {
+                            controller.request_artist_thumbnails(&artist_ids[range.clone()], cx);
+
+                            range
+                                .map(|i| Self::render_artist(artist_ids[i], cx))
+                                .collect::<Vec<_>>()
+                        },
+                    )
+                    .scroll_past(px(128.0)),
+                )
             }))
+            .when(len > 0, |this| {
+                this.child(floating_scrollbar(
+                    "artists_scrollbar",
+                    self.scroll_handle.clone(),
+                    RightPad::Pad,
+                ))
+            })
     }
 }

@@ -11,6 +11,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const MAX_IMAGE_EVENTS_PER_TICK: usize = 8;
+
 pub fn spawn_event_loop(cx: &mut App, controller: Controller, arc_res: Arc<Entity<ResHandler>>) {
     cx.spawn(async move |cx| {
         let mut last_pos_request = Instant::now();
@@ -29,13 +31,19 @@ pub fn spawn_event_loop(cx: &mut App, controller: Controller, arc_res: Arc<Entit
                 });
             }
 
-            while let Ok(e) = controller.cacher_rx.try_recv() {
+            for _ in 0..MAX_IMAGE_EVENTS_PER_TICK {
+                let Ok(e) = controller.cacher_rx.try_recv() else {
+                    break;
+                };
                 arc_res.update(cx, |res_handler, cx| {
                     res_handler.handle(cx, Event::Cacher(Box::new(e)));
                 });
             }
 
-            while let Ok(e) = controller.image_processor_rx.try_recv() {
+            for _ in 0..MAX_IMAGE_EVENTS_PER_TICK {
+                let Ok(e) = controller.image_processor_rx.try_recv() else {
+                    break;
+                };
                 arc_res.update(cx, |res_handler, cx| {
                     res_handler.handle(cx, Event::ImageProcessor(e));
                 });

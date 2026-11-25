@@ -80,6 +80,11 @@ impl PlayerPage {
             album_bounds: None,
         }
     }
+
+    pub fn notify_image_views(&mut self, cx: &mut Context<Self>) {
+        self.queue.update(cx, |_, cx| cx.notify());
+        cx.notify();
+    }
 }
 
 impl Render for PlayerPage {

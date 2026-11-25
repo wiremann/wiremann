@@ -141,6 +141,17 @@ impl Wiremann {
             popout_player,
         }
     }
+
+    pub fn notify_image_views(&mut self, cx: &mut Context<Self>) {
+        match *cx.global::<Page>() {
+            Page::Library => self
+                .library_page
+                .update(cx, |this, cx| this.notify_image_views(cx)),
+            Page::Player => self
+                .player_page
+                .update(cx, |this, cx| this.notify_image_views(cx)),
+        }
+    }
 }
 
 impl Render for Wiremann {
