@@ -4,7 +4,7 @@ use crate::controller::state::{ImageId, PlaylistId, TrackId};
 use crossbeam_channel::Sender;
 use gpui::{
     Animation, AnimationExt, Div, ElementId, IntoElement, ParentElement, RenderImage, Styled, div,
-    linear, percentage, prelude::FluentBuilder, rgb, rgba,
+    linear, percentage, prelude::FluentBuilder, rgb,
 };
 use lru::LruCache;
 use std::collections::HashSet;
@@ -143,34 +143,25 @@ pub fn image_with_loader(
                     .justify_center()
                     .child(
                         div()
-                            .size_8()
-                            .rounded_full()
-                            .bg(rgba(0x000000A0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
+                            .size_6()
                             .child(
-                                div()
-                                    .size_4()
-                                    .child(
-                                        icon(Icons::LoaderCircle)
-                                            .size_4()
-                                            .text_color(rgb(0xFFFFFF))
-                                            .with_animation(
-                                                format!("image_loader_spin_{loader_id:?}"),
-                                                Animation::new(Duration::from_millis(900))
-                                                    .repeat()
-                                                    .with_easing(linear),
-                                                |loader, delta| loader.rotate(percentage(delta)),
-                                            ),
-                                    )
-                                    .motion(format!("image_loader_{loader_id:?}"))
-                                    .timeline(
-                                        Timeline::new(Duration::from_millis(900))
-                                            .looping()
-                                            .key(0.0, Params::new().opacity(0.9))
-                                            .key(1.0, Params::new().opacity(1.0)),
+                                icon(Icons::LoaderCircle)
+                                    .size_6()
+                                    .text_color(rgb(0xFFFFFF))
+                                    .with_animation(
+                                        format!("image_loader_spin_{loader_id:?}"),
+                                        Animation::new(Duration::from_millis(900))
+                                            .repeat()
+                                            .with_easing(linear),
+                                        |loader, delta| loader.rotate(percentage(delta)),
                                     ),
+                            )
+                            .motion(format!("image_loader_{loader_id:?}"))
+                            .timeline(
+                                Timeline::new(Duration::from_millis(900))
+                                    .looping()
+                                    .key(0.0, Params::new().opacity(0.9))
+                                    .key(1.0, Params::new().opacity(1.0)),
                             ),
                     ),
             )
