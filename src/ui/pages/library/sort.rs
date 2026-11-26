@@ -1,7 +1,4 @@
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    time::Duration,
-};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
@@ -9,7 +6,7 @@ use gpui::{
 };
 use wgpui_motion::{
     MotionExt,
-    prelude::{Transition, quint_out},
+    prelude::{MotionToken, Transition},
 };
 
 use crate::ui::{
@@ -221,7 +218,7 @@ pub fn sort_menu(
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
             .motion(format!("{id}_menu_motion"))
-            .transition(Transition::new(Duration::from_millis(180)).curve(quint_out()))
+            .transition(Transition::token(MotionToken::EffectsFast))
             .enter(|style| style.opacity(0.0))
             .base(|style| style.opacity(1.0))
             .exit_when(!current.menu_open, |style| style.opacity(0.0))
