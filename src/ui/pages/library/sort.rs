@@ -42,6 +42,15 @@ impl SortField {
             Self::AlbumCount => "Album Count",
         }
     }
+
+    const fn direction_icon(self, descending: bool) -> Icons {
+        match (self, descending) {
+            (Self::Duration | Self::TrackCount | Self::AlbumCount, false) => Icons::ArrowUp01,
+            (Self::Duration | Self::TrackCount | Self::AlbumCount, true) => Icons::ArrowDown10,
+            (_, false) => Icons::ArrowUpAZ,
+            (_, true) => Icons::ArrowDownZA,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,13 +148,9 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
                     }
                 })
                 .child(
-                    icon(if current.descending {
-                        Icons::MoveUp
-                    } else {
-                        Icons::MoveDown
-                    })
-                    .size_4()
-                    .text_color(theme.library_text),
+                    icon(current.field.direction_icon(current.descending))
+                        .size_4()
+                        .text_color(theme.library_text),
                 ),
         )
 }
