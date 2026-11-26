@@ -15,7 +15,7 @@ use crate::{
         },
         pages::library::LibraryRoutes,
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
         },
         theme::Theme,
     },
@@ -175,6 +175,7 @@ impl Render for PlaylistsSection {
         div()
             .w_full()
             .h_full()
+            .relative()
             .flex()
             .flex_col()
             .child(
@@ -206,7 +207,6 @@ impl Render for PlaylistsSection {
                             .child(sort_controls(
                                 "playlists_sort",
                                 self.sort.clone(),
-                                Self::SORT_FIELDS,
                                 cx,
                             ))
                             .child(
@@ -301,5 +301,16 @@ impl Render for PlaylistsSection {
                         RightPad::Pad,
                     ))
             }))
+            .when_some(
+                sort_menu(
+                    "playlists_sort",
+                    self.sort.clone(),
+                    Self::SORT_FIELDS,
+                    px(68.0),
+                    px(220.0),
+                    cx,
+                ),
+                |this, menu| this.child(menu),
+            )
     }
 }

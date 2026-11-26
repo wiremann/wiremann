@@ -15,7 +15,7 @@ use crate::{
         },
         pages::library::LibraryRoutes,
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
         },
         theme::Theme,
     },
@@ -192,6 +192,7 @@ impl Render for AlbumsSection {
         div()
             .w_full()
             .h_full()
+            .relative()
             .flex()
             .flex_col()
             .child(
@@ -216,12 +217,7 @@ impl Render for AlbumsSection {
                                     .bg(theme.library_albums_section_title),
                             ),
                     )
-                    .child(sort_controls(
-                        "albums_sort",
-                        self.sort.clone(),
-                        Self::SORT_FIELDS,
-                        cx,
-                    )),
+                    .child(sort_controls("albums_sort", self.sort.clone(), cx)),
             )
             .child(div().flex_1().relative().px_8().pb_4().child(if len == 0 {
                 div()
@@ -268,5 +264,16 @@ impl Render for AlbumsSection {
                     RightPad::Pad,
                 ))
             })
+            .when_some(
+                sort_menu(
+                    "albums_sort",
+                    self.sort.clone(),
+                    Self::SORT_FIELDS,
+                    px(68.0),
+                    px(32.0),
+                    cx,
+                ),
+                |this, menu| this.child(menu),
+            )
     }
 }

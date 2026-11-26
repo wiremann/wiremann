@@ -1,11 +1,21 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
-use gpui::{
-    App, Div, Entity, InteractiveElement, ParentElement, StatefulInteractiveElement, Styled, div,
-    prelude::FluentBuilder,
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    time::Duration,
 };
 
-use crate::ui::theme::Theme;
+use gpui::{
+    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+};
+use wgpui_motion::{
+    MotionExt,
+    prelude::{Transition, quint_out},
+};
+
+use crate::ui::{
+    components::icons::{Icons, icon},
+    theme::Theme,
+};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SortField {
@@ -39,6 +49,7 @@ pub struct SortControlsState {
     pub field: SortField,
     pub descending: bool,
     pub menu_open: bool,
+    pub menu_present: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,12 +72,7 @@ impl SortFingerprint {
     }
 }
 
-pub fn sort_controls(
-    id: &'static str,
-    state: Entity<SortControlsState>,
-    fields: &'static [SortField],
-    cx: &mut App,
-) -> Div {
+pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mut App) -> Div {
     let theme = *cx.global::<Theme>();
     let current = *state.read(cx);
     let state_for_toggle = state.clone();
@@ -75,15 +81,21 @@ pub fn sort_controls(
         .relative()
         .flex()
         .items_center()
-        .gap_2()
+        .gap_x_1()
+        .p_1()
+        .rounded_lg()
+        .border_1()
+        .border_color(theme.border)
+        .bg(theme.library_bg)
         .child(
             div()
                 .id(format!("{id}_field"))
+                .flex()
+                .items_center()
+                .gap_x_2()
                 .px_3()
                 .py_2()
                 .rounded_md()
-                .border_1()
-                .border_color(theme.border)
                 .text_sm()
                 .text_color(theme.library_text)
                 .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
@@ -91,20 +103,29 @@ pub fn sort_controls(
                 .on_click(move |_, _, cx| {
                     state_for_toggle.update(cx, |state, cx| {
                         state.menu_open = !state.menu_open;
+                        if state.menu_open {
+                            state.menu_present = true;
+                        }
                         cx.notify();
                     });
                 })
-                .child(format!("{}  v", current.field.label())),
+                .child(icon(Icons::Sort).size_4().text_color(theme.library_text))
+                .child(current.field.label())
+                .child(
+                    icon(Icons::ChevronDown)
+                        .size_4()
+                        .text_color(theme.library_tracks_section_table_header_text),
+                ),
         )
+        .child(div().w(px(1.0)).h_5().bg(theme.border))
         .child(
             div()
                 .id(format!("{id}_direction"))
-                .px_3()
-                .py_2()
+                .flex()
+                .items_center()
+                .justify_center()
+                .size_9()
                 .rounded_md()
-                .border_1()
-                .border_color(theme.border)
-                .text_sm()
                 .text_color(theme.library_text)
                 .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
                 .cursor_pointer()
@@ -117,54 +138,89 @@ pub fn sort_controls(
                         });
                     }
                 })
-                .child(if current.descending {
-                    "Descending"
-                } else {
-                    "Ascending"
-                }),
+                .child(
+                    icon(if current.descending {
+                        Icons::MoveUp
+                    } else {
+                        Icons::MoveDown
+                    })
+                    .size_4()
+                    .text_color(theme.library_text),
+                ),
         )
-        .when(current.menu_open, {
-            let state = state.clone();
-            move |this| {
-                this.child(
-                    div()
-                        .absolute()
-                        .top_10()
-                        .right_0()
-                        .min_w_40()
-                        .p_1()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border)
-                        .bg(theme.library_bg)
-                        .flex()
-                        .flex_col()
-                        .children(fields.iter().copied().map(|field| {
-                            let selected = field == current.field;
-                            let state = state.clone();
-                            div()
-                                .id(format!("{id}_option_{field:?}"))
-                                .w_full()
-                                .px_3()
-                                .py_2()
-                                .rounded_sm()
-                                .text_sm()
-                                .text_color(theme.library_text)
-                                .when(selected, |this| {
-                                    this.bg(theme.library_tracks_section_bg_hover)
-                                })
-                                .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
-                                .cursor_pointer()
-                                .on_click(move |_, _, cx| {
-                                    state.update(cx, |state, cx| {
-                                        state.field = field;
-                                        state.menu_open = false;
-                                        cx.notify();
-                                    });
-                                })
-                                .child(field.label())
-                        })),
-                )
-            }
-        })
+}
+
+pub fn sort_menu(
+    id: &'static str,
+    state: Entity<SortControlsState>,
+    fields: &'static [SortField],
+    top: gpui::Pixels,
+    right: gpui::Pixels,
+    cx: &mut App,
+) -> Option<AnyElement> {
+    let theme = *cx.global::<Theme>();
+    let current = *state.read(cx);
+    if !current.menu_present {
+        return None;
+    }
+
+    let state_for_exit = state.clone();
+    Some(
+        div()
+            .id(format!("{id}_menu"))
+            .absolute()
+            .top(top)
+            .right(right)
+            .min_w_48()
+            .p_1_5()
+            .rounded_lg()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.library_bg)
+            .flex()
+            .flex_col()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_click(|_, _, cx| cx.stop_propagation())
+            .motion(format!("{id}_menu_motion"))
+            .transition(Transition::new(Duration::from_millis(180)).curve(quint_out()))
+            .enter(|style| style.top(px(-4.0)).opacity(0.0))
+            .base(|style| style.top(px(0.0)).opacity(1.0))
+            .exit_when(!current.menu_open, |style| style.top(px(-4.0)).opacity(0.0))
+            .on_exit_complete(move |_, _, cx| {
+                state_for_exit.update(cx, |state, cx| {
+                    if !state.menu_open {
+                        state.menu_present = false;
+                        cx.notify();
+                    }
+                });
+            })
+            .children(fields.iter().copied().map(|field| {
+                let selected = field == current.field;
+                let state = state.clone();
+                div()
+                    .id(format!("{id}_option_{field:?}"))
+                    .w_full()
+                    .px_3()
+                    .py_2_5()
+                    .rounded_md()
+                    .text_sm()
+                    .text_color(theme.library_text)
+                    .when(selected, |this| {
+                        this.bg(theme.library_tracks_section_bg_hover)
+                    })
+                    .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
+                    .cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(move |_, _, cx| {
+                        cx.stop_propagation();
+                        state.update(cx, |state, cx| {
+                            state.field = field;
+                            state.menu_open = false;
+                            cx.notify();
+                        });
+                    })
+                    .child(field.label())
+            }))
+            .into_any_element(),
+    )
 }

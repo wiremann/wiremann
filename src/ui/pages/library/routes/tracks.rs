@@ -1,7 +1,7 @@
 use gpui::{
     App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, px, rems,
+    UniformListScrollHandle, Window, div, img, prelude::FluentBuilder, px, rems,
 };
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::{
             uniform_list::uniform_list_with_scroll_past,
         },
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
         },
         theme::Theme,
     },
@@ -308,6 +308,7 @@ impl Render for TracksSection {
         div()
             .w_full()
             .h_full()
+            .relative()
             .flex()
             .flex_col()
             .child(
@@ -332,12 +333,7 @@ impl Render for TracksSection {
                                     .bg(theme.library_tracks_section_title),
                             ),
                     )
-                    .child(sort_controls(
-                        "tracks_sort",
-                        self.sort.clone(),
-                        Self::SORT_FIELDS,
-                        cx,
-                    )),
+                    .child(sort_controls("tracks_sort", self.sort.clone(), cx)),
             )
             .child(
                 div()
@@ -441,5 +437,16 @@ impl Render for TracksSection {
                 scroll_handle,
                 RightPad::Pad,
             ))
+            .when_some(
+                sort_menu(
+                    "tracks_sort",
+                    self.sort.clone(),
+                    Self::SORT_FIELDS,
+                    px(68.0),
+                    px(48.0),
+                    cx,
+                ),
+                |this, menu| this.child(menu),
+            )
     }
 }
