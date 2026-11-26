@@ -377,7 +377,7 @@ impl Default for Theme {
             library_sort_controls_hover_bg: rgba(0xFFFFFF14),
             library_sort_menu_bg: rgb(0x111113),
             library_sort_menu_border: rgba(0xFFFFFF14),
-            library_sort_menu_item_text: rgba(0xFFFFFFE6),
+            library_sort_menu_item_text: rgba(0xFFFFFFCC),
             library_sort_menu_item_text_selected: rgb(0xFFFFFF),
             library_sort_menu_item_text_hover: rgb(0xFFFFFF),
             library_sort_menu_item_bg_selected: rgba(0xFFFFFF14),

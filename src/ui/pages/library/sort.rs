@@ -1,8 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use gpui::{
-    AnyElement, App, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Pixels, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 use wgpui_motion::{
     MotionExt,
@@ -10,10 +10,11 @@ use wgpui_motion::{
 };
 
 use crate::ui::{
-    components::bounds_observer::observe_bounds,
     components::icons::{Icons, icon},
     theme::Theme,
 };
+
+const SORT_MENU_WIDTH: f32 = 192.0;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SortField {
@@ -51,13 +52,12 @@ impl SortField {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SortControlsState {
     pub field: SortField,
     pub descending: bool,
     pub menu_open: bool,
     pub menu_present: bool,
-    pub control_width: Pixels,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,15 +80,11 @@ impl SortFingerprint {
     }
 }
 
-pub fn sort_controls(
-    id: &'static str,
-    state: Entity<SortControlsState>,
-    cx: &mut App,
-) -> impl IntoElement {
+pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mut App) -> Div {
     let theme = *cx.global::<Theme>();
     let current = *state.read(cx);
     let state_for_toggle = state.clone();
-    let controls = div()
+    div()
         .relative()
         .flex()
         .items_center()
@@ -103,8 +99,7 @@ pub fn sort_controls(
                 .id(format!("{id}_field"))
                 .flex()
                 .items_center()
-                .justify_between()
-                .w(px(136.0))
+                .gap_x_2()
                 .px_3()
                 .py_2()
                 .rounded_md()
@@ -164,27 +159,14 @@ pub fn sort_controls(
                         .size_4()
                         .text_color(theme.library_sort_controls_icon),
                 ),
-        );
-
-    observe_bounds(
-        format!("{id}_controls_bounds"),
-        controls,
-        move |bounds, _, cx| {
-            let width = bounds.size.width;
-            state.update(cx, |state, cx| {
-                if state.control_width != width {
-                    state.control_width = width;
-                    cx.notify();
-                }
-            });
-        },
-    )
+        )
 }
 
 pub fn sort_menu(
     id: &'static str,
     state: Entity<SortControlsState>,
     fields: &'static [SortField],
+    height: Pixels,
     top: gpui::Pixels,
     right: gpui::Pixels,
     cx: &mut App,
@@ -195,17 +177,6 @@ pub fn sort_menu(
         return None;
     }
 
-    let width = current.control_width;
-    if width == px(0.0) {
-        return None;
-    }
-
-    let row_height = 32.0;
-    let row_gap = 4.0;
-    let vertical_padding = 12.0;
-    let menu_height = fields.len() as f32 * row_height
-        + fields.len().saturating_sub(1) as f32 * row_gap
-        + vertical_padding;
     let state_for_exit = state.clone();
     let rows = fields.iter().copied().map(|field| {
         let selected = field == current.field;
@@ -215,7 +186,7 @@ pub fn sort_menu(
         div()
             .id(format!("{id}_option_{field:?}"))
             .w_full()
-            .h(px(row_height))
+            .h(px(32.0))
             .flex()
             .flex_shrink_0()
             .items_center()
@@ -253,8 +224,8 @@ pub fn sort_menu(
             .absolute()
             .top(top)
             .right(right)
-            .w(width)
-            .h(px(menu_height))
+            .w(px(SORT_MENU_WIDTH))
+            .h(height)
             .p_1_5()
             .rounded_lg()
             .border_1()
