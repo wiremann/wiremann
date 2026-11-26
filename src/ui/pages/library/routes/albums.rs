@@ -269,7 +269,7 @@ impl Render for AlbumsSection {
                     "albums_sort",
                     self.sort.clone(),
                     Self::SORT_FIELDS,
-                    px(68.0),
+                    px(72.0),
                     px(32.0),
                     cx,
                 ),

@@ -306,7 +306,7 @@ impl Render for PlaylistsSection {
                     "playlists_sort",
                     self.sort.clone(),
                     Self::SORT_FIELDS,
-                    px(68.0),
+                    px(72.0),
                     px(220.0),
                     cx,
                 ),

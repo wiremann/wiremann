@@ -1,7 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use gpui::{
-    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    AnyElement, App, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
     StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 use wgpui_motion::{
@@ -10,6 +10,7 @@ use wgpui_motion::{
 };
 
 use crate::ui::{
+    components::bounds_observer::observe_bounds,
     components::icons::{Icons, icon},
     theme::Theme,
 };
@@ -50,12 +51,13 @@ impl SortField {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SortControlsState {
     pub field: SortField,
     pub descending: bool,
     pub menu_open: bool,
     pub menu_present: bool,
+    pub control_width: Pixels,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,12 +80,15 @@ impl SortFingerprint {
     }
 }
 
-pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mut App) -> Div {
+pub fn sort_controls(
+    id: &'static str,
+    state: Entity<SortControlsState>,
+    cx: &mut App,
+) -> impl IntoElement {
     let theme = *cx.global::<Theme>();
     let current = *state.read(cx);
     let state_for_toggle = state.clone();
-
-    div()
+    let controls = div()
         .relative()
         .flex()
         .items_center()
@@ -91,20 +96,21 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
         .p_1()
         .rounded_lg()
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.library_bg)
+        .border_color(theme.library_sort_controls_border)
+        .bg(theme.library_sort_controls_bg)
         .child(
             div()
                 .id(format!("{id}_field"))
                 .flex()
                 .items_center()
-                .gap_x_2()
+                .justify_between()
+                .w(px(136.0))
                 .px_3()
                 .py_2()
                 .rounded_md()
                 .text_sm()
-                .text_color(theme.library_text)
-                .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
+                .text_color(theme.library_sort_controls_text)
+                .hover(|this| this.bg(theme.library_sort_controls_hover_bg))
                 .cursor_pointer()
                 .on_click(move |_, _, cx| {
                     state_for_toggle.update(cx, |state, cx| {
@@ -115,15 +121,24 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
                         cx.notify();
                     });
                 })
-                .child(icon(Icons::Sort).size_4().text_color(theme.library_text))
+                .child(
+                    icon(Icons::Sort)
+                        .size_4()
+                        .text_color(theme.library_sort_controls_icon),
+                )
                 .child(current.field.label())
                 .child(
                     icon(Icons::ChevronDown)
                         .size_4()
-                        .text_color(theme.library_tracks_section_table_header_text),
+                        .text_color(theme.library_sort_controls_icon),
                 ),
         )
-        .child(div().w(px(1.0)).h_5().bg(theme.border))
+        .child(
+            div()
+                .w(px(1.0))
+                .h_5()
+                .bg(theme.library_sort_controls_divider),
+        )
         .child(
             div()
                 .id(format!("{id}_direction"))
@@ -132,8 +147,8 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
                 .justify_center()
                 .size_9()
                 .rounded_md()
-                .text_color(theme.library_text)
-                .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
+                .text_color(theme.library_sort_controls_text)
+                .hover(|this| this.bg(theme.library_sort_controls_hover_bg))
                 .cursor_pointer()
                 .on_click({
                     let state = state.clone();
@@ -147,9 +162,23 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
                 .child(
                     icon(current.field.direction_icon(current.descending))
                         .size_4()
-                        .text_color(theme.library_text),
+                        .text_color(theme.library_sort_controls_icon),
                 ),
-        )
+        );
+
+    observe_bounds(
+        format!("{id}_controls_bounds"),
+        controls,
+        move |bounds, _, cx| {
+            let width = bounds.size.width;
+            state.update(cx, |state, cx| {
+                if state.control_width != width {
+                    state.control_width = width;
+                    cx.notify();
+                }
+            });
+        },
+    )
 }
 
 pub fn sort_menu(
@@ -166,26 +195,42 @@ pub fn sort_menu(
         return None;
     }
 
+    let width = current.control_width;
+    if width == px(0.0) {
+        return None;
+    }
+
+    let row_height = 32.0;
+    let row_gap = 4.0;
+    let vertical_padding = 12.0;
+    let menu_height = fields.len() as f32 * row_height
+        + fields.len().saturating_sub(1) as f32 * row_gap
+        + vertical_padding;
     let state_for_exit = state.clone();
     let rows = fields.iter().copied().map(|field| {
         let selected = field == current.field;
         let state = state.clone();
+        let hover_bg = theme.library_sort_menu_item_bg_hover;
+        let hover_text = theme.library_sort_menu_item_text_hover;
         div()
             .id(format!("{id}_option_{field:?}"))
-            .w(px(112.0))
-            .h(px(30.0))
+            .w_full()
+            .h(px(row_height))
             .flex()
             .flex_shrink_0()
             .items_center()
             .px_3()
             .rounded_md()
             .text_sm()
-            .text_color(theme.library_text)
+            .text_color(if selected {
+                theme.library_sort_menu_item_text_selected
+            } else {
+                theme.library_sort_menu_item_text
+            })
             .whitespace_nowrap()
             .when(selected, |this| {
-                this.bg(theme.library_tracks_section_bg_hover)
+                this.bg(theme.library_sort_menu_item_bg_selected)
             })
-            .hover(|this| this.bg(theme.library_tracks_section_bg_hover))
             .cursor_pointer()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(move |_, _, cx| {
@@ -197,6 +242,9 @@ pub fn sort_menu(
                 });
             })
             .child(field.label())
+            .motion(format!("{id}_item_{field:?}"))
+            .transition(Transition::token(MotionToken::EffectsFast))
+            .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
     });
 
     Some(
@@ -205,15 +253,17 @@ pub fn sort_menu(
             .absolute()
             .top(top)
             .right(right)
-            .w(px(128.0))
+            .w(width)
+            .h(px(menu_height))
             .p_1_5()
             .rounded_lg()
             .border_1()
-            .border_color(theme.border)
-            .bg(theme.toast_bg)
+            .border_color(theme.library_sort_menu_border)
+            .bg(theme.library_sort_menu_bg)
             .flex()
             .flex_col()
             .items_stretch()
+            .gap_y_1()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
