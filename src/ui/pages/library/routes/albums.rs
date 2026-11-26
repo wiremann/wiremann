@@ -1,8 +1,9 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
     div, img, prelude::FluentBuilder, px, rems,
 };
+use std::sync::Arc;
 
 use crate::{
     controller::{Controller, state::AlbumId},
@@ -13,6 +14,9 @@ use crate::{
             virtual_grid::{VirtualGridScrollController, vgrid},
         },
         pages::library::LibraryRoutes,
+        pages::library::sort::{
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls,
+        },
         theme::Theme,
     },
 };
@@ -20,9 +24,19 @@ use crate::{
 pub struct AlbumsSection {
     pub scroll_handle: ScrollHandle,
     pub grid_controller: VirtualGridScrollController,
+    pub sort: Entity<SortControlsState>,
+    pub(in crate::ui::pages::library) sorted_ids: Arc<Vec<AlbumId>>,
+    pub(in crate::ui::pages::library) sort_cache_key: Option<SortCacheKey>,
 }
 
 impl AlbumsSection {
+    const SORT_FIELDS: &'static [SortField] = &[
+        SortField::Name,
+        SortField::Artist,
+        SortField::TrackCount,
+        SortField::Duration,
+    ];
+
     fn render_album(id: AlbumId, cx: &mut App) -> Div {
         let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
@@ -122,15 +136,59 @@ impl Render for AlbumsSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
-
+        let sort = *self.sort.read(cx);
         let state = controller.state.read(cx);
-
-        let album_ids = state.library.albums.keys().copied().collect::<Vec<_>>();
-
+        let library = &state.library;
+        let mut fingerprint = SortFingerprint::default();
+        for (id, album) in &library.albums {
+            fingerprint.add(id);
+            match sort.field {
+                SortField::Artist => {
+                    for artist in album.artists.iter().filter_map(|id| library.artist(*id)) {
+                        fingerprint.add(artist.name.as_ref());
+                    }
+                }
+                SortField::TrackCount => fingerprint.add(&album.tracks.len()),
+                SortField::Duration => fingerprint.add(&album.duration),
+                _ => fingerprint.add(album.name.as_ref()),
+            }
+        }
+        let cache_key = SortCacheKey {
+            field: sort.field,
+            descending: sort.descending,
+            fingerprint: fingerprint.finish(),
+        };
+        if self.sort_cache_key != Some(cache_key) {
+            let mut ids = library.albums.keys().copied().collect::<Vec<_>>();
+            match sort.field {
+                SortField::Artist => ids.sort_by_cached_key(|id| {
+                    let album = &library.albums[id];
+                    let artists = album
+                        .artists
+                        .iter()
+                        .filter_map(|id| library.artist(*id))
+                        .map(|artist| artist.name.as_ref())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                        .to_lowercase();
+                    (artists, id.0)
+                }),
+                SortField::TrackCount => {
+                    ids.sort_by_cached_key(|id| (library.albums[id].tracks.len(), id.0))
+                }
+                SortField::Duration => {
+                    ids.sort_by_cached_key(|id| (library.albums[id].duration, id.0))
+                }
+                _ => ids.sort_by_cached_key(|id| (library.albums[id].name.to_lowercase(), id.0)),
+            }
+            if sort.descending {
+                ids.reverse();
+            }
+            self.sorted_ids = Arc::new(ids);
+            self.sort_cache_key = Some(cache_key);
+        }
+        let album_ids = self.sorted_ids.clone();
         let len = album_ids.len();
-
-        let _ = state;
-
         div()
             .w_full()
             .h_full()
@@ -141,8 +199,8 @@ impl Render for AlbumsSection {
                     .py_4()
                     .px_8()
                     .flex()
-                    .flex_col()
-                    .justify_center()
+                    .items_center()
+                    .justify_between()
                     .child(
                         div()
                             .text_size(rems(2.0))
@@ -157,7 +215,13 @@ impl Render for AlbumsSection {
                                     .mt_1()
                                     .bg(theme.library_albums_section_title),
                             ),
-                    ),
+                    )
+                    .child(sort_controls(
+                        "albums_sort",
+                        self.sort.clone(),
+                        Self::SORT_FIELDS,
+                        cx,
+                    )),
             )
             .child(div().flex_1().relative().px_8().pb_4().child(if len == 0 {
                 div()

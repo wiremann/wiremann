@@ -2,6 +2,7 @@ pub(crate) mod dock;
 mod helpers;
 mod routes;
 mod sidebar;
+mod sort;
 
 use crate::controller::state::{AlbumId, ArtistId, PlaylistId};
 use crate::ui::animations::page_transition;
@@ -20,6 +21,7 @@ use crate::ui::pages::library::routes::settings::SettingsSection;
 use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{COLLAPSED_SIDEBAR_WIDTH, Sidebar};
+use crate::ui::pages::library::sort::{SortControlsState, SortField};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -115,17 +117,31 @@ impl LibraryPage {
                 album_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            albums: cx.new(|_| AlbumsSection {
+            albums: cx.new(|cx| AlbumsSection {
                 scroll_handle: ScrollHandle::new(),
                 grid_controller: VirtualGridScrollController::new(),
+                sort: cx.new(|_| SortControlsState {
+                    field: SortField::Name,
+                    descending: false,
+                    menu_open: false,
+                }),
+                sorted_ids: Default::default(),
+                sort_cache_key: None,
             }),
             artist: cx.new(|cx| ArtistViewSection {
                 artist_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            artists: cx.new(|_| ArtistsSection {
+            artists: cx.new(|cx| ArtistsSection {
                 scroll_handle: ScrollHandle::new(),
                 grid_controller: VirtualGridScrollController::new(),
+                sort: cx.new(|_| SortControlsState {
+                    field: SortField::Name,
+                    descending: false,
+                    menu_open: false,
+                }),
+                sorted_ids: Default::default(),
+                sort_cache_key: None,
             }),
             playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
@@ -134,9 +150,16 @@ impl LibraryPage {
                 root_bounds: None,
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            playlists: cx.new(|_| PlaylistsSection {
+            playlists: cx.new(|cx| PlaylistsSection {
                 scroll_handle: ScrollHandle::new(),
                 grid_controller: VirtualGridScrollController::new(),
+                sort: cx.new(|_| SortControlsState {
+                    field: SortField::Name,
+                    descending: false,
+                    menu_open: false,
+                }),
+                sorted_ids: Default::default(),
+                sort_cache_key: None,
             }),
             favorites: cx.new(|_| FavoritesSection {
                 scroll_handle: UniformListScrollHandle::new(),
@@ -145,8 +168,15 @@ impl LibraryPage {
                 scroll_handle: ScrollHandle::new(),
                 avail_width: cx.new(|_| 800.0),
             }),
-            tracks: cx.new(|_| TracksSection {
+            tracks: cx.new(|cx| TracksSection {
                 scroll_handle: UniformListScrollHandle::new(),
+                sort: cx.new(|_| SortControlsState {
+                    field: SortField::Title,
+                    descending: false,
+                    menu_open: false,
+                }),
+                sorted_ids: Default::default(),
+                sort_cache_key: None,
             }),
             plugins: cx.new(|_| PluginsSection),
             settings: cx.new(|_| SettingsSection),
