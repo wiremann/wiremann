@@ -166,6 +166,12 @@ pub enum Icons {
     ChevronDown,
     MoveDown,
     MoveUp,
+    ArrowUpAZ,
+    ArrowDownZA,
+    ArrowUp01,
+    ArrowDown10,
+    CalendarArrowUp,
+    CalendarArrowDown,
 }
 
 impl Icons {
@@ -218,6 +224,12 @@ impl IconNamed for Icons {
             Icons::ChevronDown => "icons/chevron-down.svg",
             Icons::MoveDown => "icons/move-down.svg",
             Icons::MoveUp => "icons/move-up.svg",
+            Icons::ArrowUpAZ => "icons/arrow-up-a-z.svg",
+            Icons::ArrowDownZA => "icons/arrow-down-z-a.svg",
+            Icons::ArrowUp01 => "icons/arrow-up-0-1.svg",
+            Icons::ArrowDown10 => "icons/arrow-down-1-0.svg",
+            Icons::CalendarArrowUp => "icons/calendar-arrow-up.svg",
+            Icons::CalendarArrowDown => "icons/calendar-arrow-down.svg",
         }
         .into()
     }
