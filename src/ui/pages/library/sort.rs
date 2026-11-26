@@ -175,8 +175,8 @@ pub fn sort_menu(
         let state = state.clone();
         div()
             .id(format!("{id}_option_{field:?}"))
-            .w_full()
-            .h(px(36.0))
+            .w(px(112.0))
+            .h(px(30.0))
             .flex()
             .flex_shrink_0()
             .items_center()
@@ -208,37 +208,32 @@ pub fn sort_menu(
             .absolute()
             .top(top)
             .right(right)
-            .w(px(196.0))
-            .h(px(fields.len() as f32 * 36.0 + 12.0))
-            .flex_shrink_0()
+            .w(px(128.0))
             .p_1_5()
             .rounded_lg()
             .border_1()
             .border_color(theme.border)
             .bg(theme.toast_bg)
+            .flex()
+            .flex_col()
+            .items_stretch()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
-            .child(
-                div()
-                    .size_full()
-                    .flex()
-                    .flex_col()
-                    .children(rows)
-                    .motion(format!("{id}_menu_motion"))
-                    .transition(Transition::new(Duration::from_millis(180)).curve(quint_out()))
-                    .enter(|style| style.opacity(0.0))
-                    .base(|style| style.opacity(1.0))
-                    .exit_when(!current.menu_open, |style| style.opacity(0.0))
-                    .on_exit_complete(move |_, _, cx| {
-                        state_for_exit.update(cx, |state, cx| {
-                            if !state.menu_open {
-                                state.menu_present = false;
-                                cx.notify();
-                            }
-                        });
-                    }),
-            )
+            .motion(format!("{id}_menu_motion"))
+            .transition(Transition::new(Duration::from_millis(180)).curve(quint_out()))
+            .enter(|style| style.opacity(0.0))
+            .base(|style| style.opacity(1.0))
+            .exit_when(!current.menu_open, |style| style.opacity(0.0))
+            .on_exit_complete(move |_, _, cx| {
+                state_for_exit.update(cx, |state, cx| {
+                    if !state.menu_open {
+                        state.menu_present = false;
+                        cx.notify();
+                    }
+                });
+            })
+            .children(rows)
             .into_any_element(),
     )
 }
