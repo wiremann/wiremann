@@ -162,6 +162,10 @@ pub enum Icons {
     Trash,
     Chart,
     PopOut,
+    Sort,
+    ChevronDown,
+    MoveDown,
+    MoveUp,
 }
 
 impl Icons {
@@ -210,6 +214,10 @@ impl IconNamed for Icons {
             Icons::Trash => "icons/trash.svg",
             Icons::Chart => "icons/chart.svg",
             Icons::PopOut => "icons/pop-out.svg",
+            Icons::Sort => "icons/sort.svg",
+            Icons::ChevronDown => "icons/chevron-down.svg",
+            Icons::MoveDown => "icons/move-down.svg",
+            Icons::MoveUp => "icons/move-up.svg",
         }
         .into()
     }
