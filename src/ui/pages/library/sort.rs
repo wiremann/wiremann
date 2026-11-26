@@ -14,7 +14,7 @@ use crate::ui::{
     theme::Theme,
 };
 
-const SORT_MENU_WIDTH: f32 = 192.0;
+const SORT_MENU_WIDTH: f32 = 160.0;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SortField {
@@ -183,12 +183,10 @@ pub fn sort_menu(
         let state = state.clone();
         let hover_bg = theme.library_sort_menu_item_bg_hover;
         let hover_text = theme.library_sort_menu_item_text_hover;
-        div()
-            .id(format!("{id}_option_{field:?}"))
-            .w_full()
-            .h(px(32.0))
+        let contents = div()
+            .id(format!("{id}_option_contents_{field:?}"))
+            .size_full()
             .flex()
-            .flex_shrink_0()
             .items_center()
             .px_3()
             .rounded_md()
@@ -202,6 +200,15 @@ pub fn sort_menu(
             .when(selected, |this| {
                 this.bg(theme.library_sort_menu_item_bg_selected)
             })
+            .motion(format!("{id}_item_{field:?}"))
+            .transition(Transition::token(MotionToken::EffectsFast))
+            .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
+            .child(field.label());
+        div()
+            .id(format!("{id}_option_{field:?}"))
+            .w_full()
+            .h(px(32.0))
+            .flex_shrink_0()
             .cursor_pointer()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(move |_, _, cx| {
@@ -212,11 +219,31 @@ pub fn sort_menu(
                     cx.notify();
                 });
             })
-            .child(field.label())
-            .motion(format!("{id}_item_{field:?}"))
-            .transition(Transition::token(MotionToken::EffectsFast))
-            .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
+            .child(contents)
     });
+
+    let animated_contents = div()
+        .id(format!("{id}_animated_contents"))
+        .size_full()
+        .p_1_5()
+        .flex()
+        .flex_col()
+        .items_stretch()
+        .gap_y_1()
+        .children(rows)
+        .motion(format!("{id}_menu_motion"))
+        .transition(Transition::token(MotionToken::EffectsFast))
+        .enter(|style| style.opacity(0.0))
+        .base(|style| style.opacity(1.0))
+        .exit_when(!current.menu_open, |style| style.opacity(0.0))
+        .on_exit_complete(move |_, _, cx| {
+            state_for_exit.update(cx, |state, cx| {
+                if !state.menu_open {
+                    state.menu_present = false;
+                    cx.notify();
+                }
+            });
+        });
 
     Some(
         div()
@@ -226,32 +253,15 @@ pub fn sort_menu(
             .right(right)
             .w(px(SORT_MENU_WIDTH))
             .h(height)
-            .p_1_5()
             .rounded_lg()
             .border_1()
             .border_color(theme.library_sort_menu_border)
             .bg(theme.library_sort_menu_bg)
-            .flex()
-            .flex_col()
-            .items_stretch()
             .gap_y_1()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
-            .motion(format!("{id}_menu_motion"))
-            .transition(Transition::token(MotionToken::EffectsFast))
-            .enter(|style| style.opacity(0.0))
-            .base(|style| style.opacity(1.0))
-            .exit_when(!current.menu_open, |style| style.opacity(0.0))
-            .on_exit_complete(move |_, _, cx| {
-                state_for_exit.update(cx, |state, cx| {
-                    if !state.menu_open {
-                        state.menu_present = false;
-                        cx.notify();
-                    }
-                });
-            })
-            .children(rows)
+            .child(animated_contents)
             .into_any_element(),
     )
 }
