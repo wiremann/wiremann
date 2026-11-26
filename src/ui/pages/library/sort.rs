@@ -14,7 +14,7 @@ use crate::ui::{
     theme::Theme,
 };
 
-const SORT_MENU_WIDTH: f32 = 160.0;
+const SORT_MENU_WIDTH: f32 = 156.0;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SortField {
@@ -186,6 +186,7 @@ pub fn sort_menu(
         let contents = div()
             .id(format!("{id}_option_contents_{field:?}"))
             .size_full()
+            .max_w_full()
             .flex()
             .items_center()
             .px_3()
@@ -207,7 +208,8 @@ pub fn sort_menu(
         div()
             .id(format!("{id}_option_{field:?}"))
             .w_full()
-            .h(px(32.0))
+            .max_w_full()
+            .h(px(30.0))
             .flex_shrink_0()
             .cursor_pointer()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -225,7 +227,7 @@ pub fn sort_menu(
     let animated_contents = div()
         .id(format!("{id}_animated_contents"))
         .size_full()
-        .p_1_5()
+        .p_2()
         .flex()
         .flex_col()
         .items_stretch()
