@@ -1,8 +1,9 @@
 use gpui::{
-    App, Context, Div, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
+    App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, StyledImage, Window,
     div, img, prelude::FluentBuilder, px, rems,
 };
+use std::sync::Arc;
 
 use crate::{
     controller::{Controller, state::PlaylistId},
@@ -13,6 +14,9 @@ use crate::{
             virtual_grid::{VirtualGridScrollController, vgrid},
         },
         pages::library::LibraryRoutes,
+        pages::library::sort::{
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, SortMenu, sort_controls,
+        },
         theme::Theme,
     },
 };
@@ -20,9 +24,16 @@ use crate::{
 pub struct PlaylistsSection {
     pub scroll_handle: ScrollHandle,
     pub grid_controller: VirtualGridScrollController,
+    pub sort: Entity<SortControlsState>,
+    pub sort_menu: Entity<SortMenu>,
+    pub(in crate::ui::pages::library) sorted_ids: Arc<Vec<PlaylistId>>,
+    pub(in crate::ui::pages::library) sort_cache_key: Option<SortCacheKey>,
 }
 
 impl PlaylistsSection {
+    pub const SORT_FIELDS: &'static [SortField] =
+        &[SortField::Name, SortField::TrackCount, SortField::Duration];
+
     fn render_playlist(id: PlaylistId, cx: &mut App) -> Div {
         let controller = cx.global::<Controller>().clone();
         let theme = *cx.global::<Theme>();
@@ -126,18 +137,46 @@ impl Render for PlaylistsSection {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.global::<Theme>();
         let controller = cx.global::<Controller>().clone();
-
+        let sort = *self.sort.read(cx);
         let state = controller.state.read(cx);
-
-        let playlist_ids = state.library.playlists.keys().copied().collect::<Vec<_>>();
-
+        let library = &state.library;
+        let mut fingerprint = SortFingerprint::default();
+        for (id, playlist) in &library.playlists {
+            fingerprint.add(id);
+            match sort.field {
+                SortField::TrackCount => fingerprint.add(&playlist.tracks.len()),
+                SortField::Duration => fingerprint.add(&playlist.duration),
+                _ => fingerprint.add(playlist.name.as_ref()),
+            }
+        }
+        let cache_key = SortCacheKey {
+            field: sort.field,
+            descending: sort.descending,
+            fingerprint: fingerprint.finish(),
+        };
+        if self.sort_cache_key != Some(cache_key) {
+            let mut ids = library.playlists.keys().copied().collect::<Vec<_>>();
+            match sort.field {
+                SortField::TrackCount => {
+                    ids.sort_by_cached_key(|id| (library.playlists[id].tracks.len(), id.0))
+                }
+                SortField::Duration => {
+                    ids.sort_by_cached_key(|id| (library.playlists[id].duration, id.0))
+                }
+                _ => ids.sort_by_cached_key(|id| (library.playlists[id].name.to_lowercase(), id.0)),
+            }
+            if sort.descending {
+                ids.reverse();
+            }
+            self.sorted_ids = Arc::new(ids);
+            self.sort_cache_key = Some(cache_key);
+        }
+        let playlist_ids = self.sorted_ids.clone();
         let len = playlist_ids.len();
-
-        let _ = state;
-
         div()
             .w_full()
             .h_full()
+            .relative()
             .flex()
             .flex_col()
             .child(
@@ -165,6 +204,13 @@ impl Render for PlaylistsSection {
                     .child(
                         div().flex()
                             .items_center()
+                            .gap_2()
+                            .child(sort_controls(
+                                "playlists_sort",
+                                self.sort.clone(),
+                                self.sort_menu.clone(),
+                                cx,
+                            ))
                             .child(
                                 div()
                                 .id("library_playlists_section_create_button")
@@ -257,5 +303,6 @@ impl Render for PlaylistsSection {
                         RightPad::Pad,
                     ))
             }))
+            .child(self.sort_menu.clone())
     }
 }

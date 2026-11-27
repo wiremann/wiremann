@@ -91,6 +91,21 @@ pub struct Theme {
     pub library_bg: Rgba,
     pub library_text: Rgba,
 
+    // Library sort controls
+    pub library_sort_controls_bg: Rgba,
+    pub library_sort_controls_border: Rgba,
+    pub library_sort_controls_text: Rgba,
+    pub library_sort_controls_icon: Rgba,
+    pub library_sort_controls_divider: Rgba,
+    pub library_sort_controls_hover_bg: Rgba,
+    pub library_sort_menu_bg: Rgba,
+    pub library_sort_menu_border: Rgba,
+    pub library_sort_menu_item_text: Rgba,
+    pub library_sort_menu_item_text_selected: Rgba,
+    pub library_sort_menu_item_text_hover: Rgba,
+    pub library_sort_menu_item_bg_selected: Rgba,
+    pub library_sort_menu_item_bg_hover: Rgba,
+
     // Sidebar
     pub library_sidebar_bg: Rgba,
     pub library_sidebar_item_text: Rgba,
@@ -353,6 +368,20 @@ impl Default for Theme {
 
             library_bg: rgb(0x050505),
             library_text: rgb(0xFAFAFA),
+
+            library_sort_controls_bg: rgb(0x050505),
+            library_sort_controls_border: rgba(0xFFFFFF22),
+            library_sort_controls_text: rgba(0xFFFFFFE6),
+            library_sort_controls_icon: rgba(0xFFFFFFB8),
+            library_sort_controls_divider: rgba(0xFFFFFF22),
+            library_sort_controls_hover_bg: rgba(0xFFFFFF14),
+            library_sort_menu_bg: rgb(0x111113),
+            library_sort_menu_border: rgba(0xFFFFFF14),
+            library_sort_menu_item_text: rgba(0xFFFFFFCC),
+            library_sort_menu_item_text_selected: rgb(0xFFFFFF),
+            library_sort_menu_item_text_hover: rgb(0xFFFFFF),
+            library_sort_menu_item_bg_selected: rgba(0xFFFFFF14),
+            library_sort_menu_item_bg_hover: rgba(0xFFFFFF24),
 
             library_sidebar_bg: rgb(0x050505),
             library_sidebar_group_text: rgb(0x71717A),
