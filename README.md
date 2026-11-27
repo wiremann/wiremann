@@ -292,3 +292,13 @@ Keep changes focused, and update screenshots or documentation when relevant.
 Wiremann is licensed under the GNU General Public License v3.0.
 
 See [LICENSE](LICENSE) or the [official GPL v3 text](https://www.gnu.org/licenses/gpl-3.0.en.html).
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=wiremann%2Fwiremann&type=timeline&releases=&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=wiremann/wiremann&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=wiremann/wiremann&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=wiremann/wiremann&type=date&legend=bottom-right" />
+ </picture>
+</a>
