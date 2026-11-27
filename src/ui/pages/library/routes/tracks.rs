@@ -442,7 +442,7 @@ impl Render for TracksSection {
                     "tracks_sort",
                     self.sort.clone(),
                     Self::SORT_FIELDS,
-                    px(190.0),
+                    px(184.0),
                     px(72.0),
                     px(48.0),
                     cx,

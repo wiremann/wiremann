@@ -1,13 +1,11 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::time::Duration;
 
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Pixels, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
-use wgpui_motion::{
-    MotionExt,
-    prelude::{MotionToken, Transition},
-};
+use wgpui_motion::{MotionExt, prelude::Transition};
 
 use crate::ui::{
     components::icons::{Icons, icon},
@@ -202,7 +200,7 @@ pub fn sort_menu(
                 this.bg(theme.library_sort_menu_item_bg_selected)
             })
             .motion(format!("{id}_item_{field:?}"))
-            .transition(Transition::token(MotionToken::EffectsFast))
+            .transition(Transition::new(Duration::from_millis(90)))
             .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
             .child(field.label());
         div()
@@ -233,8 +231,12 @@ pub fn sort_menu(
         .items_stretch()
         .gap_y_1()
         .children(rows)
+        .rounded_lg()
+        .border_1()
+        .border_color(theme.library_sort_menu_border)
+        .bg(theme.library_sort_menu_bg)
         .motion(format!("{id}_menu_motion"))
-        .transition(Transition::token(MotionToken::EffectsFast))
+        .transition(Transition::new(Duration::from_millis(90)))
         .enter(|style| style.opacity(0.0))
         .base(|style| style.opacity(1.0))
         .exit_when(!current.menu_open, |style| style.opacity(0.0))
@@ -255,11 +257,6 @@ pub fn sort_menu(
             .right(right)
             .w(px(SORT_MENU_WIDTH))
             .h(height)
-            .rounded_lg()
-            .border_1()
-            .border_color(theme.library_sort_menu_border)
-            .bg(theme.library_sort_menu_bg)
-            .gap_y_1()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())

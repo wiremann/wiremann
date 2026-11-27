@@ -251,7 +251,7 @@ impl Render for ArtistsSection {
                     "artists_sort",
                     self.sort.clone(),
                     Self::SORT_FIELDS,
-                    px(118.0),
+                    px(116.0),
                     px(72.0),
                     px(32.0),
                     cx,
