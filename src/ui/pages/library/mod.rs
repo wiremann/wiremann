@@ -21,7 +21,7 @@ use crate::ui::pages::library::routes::settings::SettingsSection;
 use crate::ui::pages::library::routes::stats::StatsSection;
 use crate::ui::pages::library::routes::tracks::TracksSection;
 use crate::ui::pages::library::sidebar::{COLLAPSED_SIDEBAR_WIDTH, Sidebar};
-use crate::ui::pages::library::sort::{SortControlsState, SortField};
+use crate::ui::pages::library::sort::{SortControlsState, SortField, SortMenu};
 use crate::ui::theme::Theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -117,33 +117,55 @@ impl LibraryPage {
                 album_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            albums: cx.new(|cx| AlbumsSection {
-                scroll_handle: ScrollHandle::new(),
-                grid_controller: VirtualGridScrollController::new(),
-                sort: cx.new(|_| SortControlsState {
+            albums: cx.new(|cx| {
+                let sort = cx.new(|_| SortControlsState {
                     field: SortField::Name,
                     descending: false,
-                    menu_open: false,
-                    menu_present: false,
-                }),
-                sorted_ids: Default::default(),
-                sort_cache_key: None,
+                });
+                AlbumsSection {
+                    scroll_handle: ScrollHandle::new(),
+                    grid_controller: VirtualGridScrollController::new(),
+                    sort_menu: cx.new(|_| {
+                        SortMenu::new(
+                            "albums_sort",
+                            sort.clone(),
+                            AlbumsSection::SORT_FIELDS,
+                            px(150.0),
+                            px(72.0),
+                            px(32.0),
+                        )
+                    }),
+                    sort,
+                    sorted_ids: Default::default(),
+                    sort_cache_key: None,
+                }
             }),
             artist: cx.new(|cx| ArtistViewSection {
                 artist_id: cx.new(|_| None),
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            artists: cx.new(|cx| ArtistsSection {
-                scroll_handle: ScrollHandle::new(),
-                grid_controller: VirtualGridScrollController::new(),
-                sort: cx.new(|_| SortControlsState {
+            artists: cx.new(|cx| {
+                let sort = cx.new(|_| SortControlsState {
                     field: SortField::Name,
                     descending: false,
-                    menu_open: false,
-                    menu_present: false,
-                }),
-                sorted_ids: Default::default(),
-                sort_cache_key: None,
+                });
+                ArtistsSection {
+                    scroll_handle: ScrollHandle::new(),
+                    grid_controller: VirtualGridScrollController::new(),
+                    sort_menu: cx.new(|_| {
+                        SortMenu::new(
+                            "artists_sort",
+                            sort.clone(),
+                            ArtistsSection::SORT_FIELDS,
+                            px(116.0),
+                            px(72.0),
+                            px(32.0),
+                        )
+                    }),
+                    sort,
+                    sorted_ids: Default::default(),
+                    sort_cache_key: None,
+                }
             }),
             playlist: cx.new(|cx| PlaylistViewSection {
                 playlist_id: cx.new(|_| None),
@@ -152,17 +174,28 @@ impl LibraryPage {
                 root_bounds: None,
                 scroll_handle: UniformListScrollHandle::new(),
             }),
-            playlists: cx.new(|cx| PlaylistsSection {
-                scroll_handle: ScrollHandle::new(),
-                grid_controller: VirtualGridScrollController::new(),
-                sort: cx.new(|_| SortControlsState {
+            playlists: cx.new(|cx| {
+                let sort = cx.new(|_| SortControlsState {
                     field: SortField::Name,
                     descending: false,
-                    menu_open: false,
-                    menu_present: false,
-                }),
-                sorted_ids: Default::default(),
-                sort_cache_key: None,
+                });
+                PlaylistsSection {
+                    scroll_handle: ScrollHandle::new(),
+                    grid_controller: VirtualGridScrollController::new(),
+                    sort_menu: cx.new(|_| {
+                        SortMenu::new(
+                            "playlists_sort",
+                            sort.clone(),
+                            PlaylistsSection::SORT_FIELDS,
+                            px(116.0),
+                            px(72.0),
+                            px(220.0),
+                        )
+                    }),
+                    sort,
+                    sorted_ids: Default::default(),
+                    sort_cache_key: None,
+                }
             }),
             favorites: cx.new(|_| FavoritesSection {
                 scroll_handle: UniformListScrollHandle::new(),
@@ -171,16 +204,27 @@ impl LibraryPage {
                 scroll_handle: ScrollHandle::new(),
                 avail_width: cx.new(|_| 800.0),
             }),
-            tracks: cx.new(|cx| TracksSection {
-                scroll_handle: UniformListScrollHandle::new(),
-                sort: cx.new(|_| SortControlsState {
+            tracks: cx.new(|cx| {
+                let sort = cx.new(|_| SortControlsState {
                     field: SortField::Title,
                     descending: false,
-                    menu_open: false,
-                    menu_present: false,
-                }),
-                sorted_ids: Default::default(),
-                sort_cache_key: None,
+                });
+                TracksSection {
+                    scroll_handle: UniformListScrollHandle::new(),
+                    sort_menu: cx.new(|_| {
+                        SortMenu::new(
+                            "tracks_sort",
+                            sort.clone(),
+                            TracksSection::SORT_FIELDS,
+                            px(184.0),
+                            px(72.0),
+                            px(48.0),
+                        )
+                    }),
+                    sort,
+                    sorted_ids: Default::default(),
+                    sort_cache_key: None,
+                }
             }),
             plugins: cx.new(|_| PluginsSection),
             settings: cx.new(|_| SettingsSection),

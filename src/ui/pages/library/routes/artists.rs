@@ -15,7 +15,7 @@ use crate::{
         },
         pages::library::LibraryRoutes,
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, SortMenu, sort_controls,
         },
         theme::Theme,
     },
@@ -25,12 +25,13 @@ pub struct ArtistsSection {
     pub scroll_handle: ScrollHandle,
     pub grid_controller: VirtualGridScrollController,
     pub sort: Entity<SortControlsState>,
+    pub sort_menu: Entity<SortMenu>,
     pub(in crate::ui::pages::library) sorted_ids: Arc<Vec<ArtistId>>,
     pub(in crate::ui::pages::library) sort_cache_key: Option<SortCacheKey>,
 }
 
 impl ArtistsSection {
-    const SORT_FIELDS: &'static [SortField] = &[
+    pub const SORT_FIELDS: &'static [SortField] = &[
         SortField::Name,
         SortField::AlbumCount,
         SortField::TrackCount,
@@ -199,7 +200,12 @@ impl Render for ArtistsSection {
                                     .bg(theme.library_artists_section_title),
                             ),
                     )
-                    .child(sort_controls("artists_sort", self.sort.clone(), cx)),
+                    .child(sort_controls(
+                        "artists_sort",
+                        self.sort.clone(),
+                        self.sort_menu.clone(),
+                        cx,
+                    )),
             )
             .child(div().flex_1().relative().px_8().pb_4().child(if len == 0 {
                 div()
@@ -246,17 +252,6 @@ impl Render for ArtistsSection {
                     RightPad::Pad,
                 ))
             })
-            .when_some(
-                sort_menu(
-                    "artists_sort",
-                    self.sort.clone(),
-                    Self::SORT_FIELDS,
-                    px(116.0),
-                    px(72.0),
-                    px(32.0),
-                    cx,
-                ),
-                |this, menu| this.child(menu),
-            )
+            .child(self.sort_menu.clone())
     }
 }

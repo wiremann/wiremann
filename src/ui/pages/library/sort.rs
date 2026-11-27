@@ -2,8 +2,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Pixels, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    App, Context, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
+    Render, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use wgpui_motion::{MotionExt, prelude::Transition};
 
@@ -54,8 +54,6 @@ impl SortField {
 pub struct SortControlsState {
     pub field: SortField,
     pub descending: bool,
-    pub menu_open: bool,
-    pub menu_present: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,10 +76,48 @@ impl SortFingerprint {
     }
 }
 
-pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mut App) -> Div {
+pub struct SortMenu {
+    id: &'static str,
+    sort: Entity<SortControlsState>,
+    fields: &'static [SortField],
+    height: Pixels,
+    top: Pixels,
+    right: Pixels,
+    open: bool,
+    present: bool,
+}
+
+impl SortMenu {
+    pub fn new(
+        id: &'static str,
+        sort: Entity<SortControlsState>,
+        fields: &'static [SortField],
+        height: Pixels,
+        top: Pixels,
+        right: Pixels,
+    ) -> Self {
+        Self {
+            id,
+            sort,
+            fields,
+            height,
+            top,
+            right,
+            open: false,
+            present: false,
+        }
+    }
+}
+
+pub fn sort_controls(
+    id: &'static str,
+    state: Entity<SortControlsState>,
+    menu: Entity<SortMenu>,
+    cx: &mut App,
+) -> Div {
     let theme = *cx.global::<Theme>();
     let current = *state.read(cx);
-    let state_for_toggle = state.clone();
+    let menu_for_toggle = menu.clone();
     div()
         .relative()
         .flex()
@@ -105,14 +141,15 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
                 .text_color(theme.library_sort_controls_text)
                 .hover(|this| this.bg(theme.library_sort_controls_hover_bg))
                 .cursor_pointer()
-                .on_click(move |_, _, cx| {
-                    state_for_toggle.update(cx, |state, cx| {
-                        state.menu_open = !state.menu_open;
-                        if state.menu_open {
-                            state.menu_present = true;
+                .on_click(move |_, window, cx| {
+                    menu_for_toggle.update(cx, |menu, cx| {
+                        menu.open = !menu.open;
+                        if menu.open {
+                            menu.present = true;
                         }
                         cx.notify();
                     });
+                    window.refresh();
                 })
                 .child(
                     icon(Icons::Sort)
@@ -160,107 +197,94 @@ pub fn sort_controls(id: &'static str, state: Entity<SortControlsState>, cx: &mu
         )
 }
 
-pub fn sort_menu(
-    id: &'static str,
-    state: Entity<SortControlsState>,
-    fields: &'static [SortField],
-    height: Pixels,
-    top: gpui::Pixels,
-    right: gpui::Pixels,
-    cx: &mut App,
-) -> Option<AnyElement> {
-    let theme = *cx.global::<Theme>();
-    let current = *state.read(cx);
-    if !current.menu_present {
-        return None;
-    }
+impl Render for SortMenu {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if !self.present {
+            return div().into_any_element();
+        }
 
-    let state_for_exit = state.clone();
-    let rows = fields.iter().copied().map(|field| {
-        let selected = field == current.field;
-        let state = state.clone();
-        let hover_bg = theme.library_sort_menu_item_bg_hover;
-        let hover_text = theme.library_sort_menu_item_text_hover;
-        let contents = div()
-            .id(format!("{id}_option_contents_{field:?}"))
-            .size_full()
-            .max_w_full()
-            .flex()
-            .items_center()
-            .px_3()
-            .rounded_md()
-            .text_sm()
-            .text_color(if selected {
-                theme.library_sort_menu_item_text_selected
-            } else {
-                theme.library_sort_menu_item_text
-            })
-            .whitespace_nowrap()
-            .when(selected, |this| {
-                this.bg(theme.library_sort_menu_item_bg_selected)
-            })
-            .motion(format!("{id}_item_{field:?}"))
-            .transition(Transition::new(Duration::from_millis(90)))
-            .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
-            .child(field.label());
-        div()
-            .id(format!("{id}_option_{field:?}"))
-            .w_full()
-            .max_w_full()
-            .h(px(30.0))
-            .flex_shrink_0()
-            .cursor_pointer()
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-            .on_click(move |_, _, cx| {
-                cx.stop_propagation();
-                state.update(cx, |state, cx| {
-                    state.field = field;
-                    state.menu_open = false;
-                    cx.notify();
-                });
-            })
-            .child(contents)
-    });
-
-    let animated_contents = div()
-        .id(format!("{id}_animated_contents"))
-        .size_full()
-        .p_2()
-        .flex()
-        .flex_col()
-        .items_stretch()
-        .gap_y_1()
-        .children(rows)
-        .rounded_lg()
-        .border_1()
-        .border_color(theme.library_sort_menu_border)
-        .bg(theme.library_sort_menu_bg)
-        .motion(format!("{id}_menu_motion"))
-        .transition(Transition::new(Duration::from_millis(90)))
-        .enter(|style| style.opacity(0.0))
-        .base(|style| style.opacity(1.0))
-        .exit_when(!current.menu_open, |style| style.opacity(0.0))
-        .on_exit_complete(move |_, _, cx| {
-            state_for_exit.update(cx, |state, cx| {
-                if !state.menu_open {
-                    state.menu_present = false;
-                    cx.notify();
-                }
-            });
+        let theme = *cx.global::<Theme>();
+        let sort = *self.sort.read(cx);
+        let menu = cx.entity();
+        let rows = self.fields.iter().copied().map(|field| {
+            let selected = field == sort.field;
+            let sort = self.sort.clone();
+            let menu_for_select = menu.clone();
+            let hover_bg = theme.library_sort_menu_item_bg_hover;
+            let hover_text = theme.library_sort_menu_item_text_hover;
+            div()
+                .id(format!("{}_option_{field:?}", self.id))
+                .w_full()
+                .max_w_full()
+                .h(px(30.0))
+                .flex()
+                .flex_shrink_0()
+                .items_center()
+                .px_3()
+                .rounded_md()
+                .text_sm()
+                .text_color(if selected {
+                    theme.library_sort_menu_item_text_selected
+                } else {
+                    theme.library_sort_menu_item_text
+                })
+                .whitespace_nowrap()
+                .when(selected, |this| {
+                    this.bg(theme.library_sort_menu_item_bg_selected)
+                })
+                .cursor_pointer()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(move |_, _, cx| {
+                    cx.stop_propagation();
+                    sort.update(cx, |sort, cx| {
+                        sort.field = field;
+                        cx.notify();
+                    });
+                    menu_for_select.update(cx, |menu, cx| {
+                        menu.open = false;
+                        cx.notify();
+                    });
+                })
+                .child(field.label())
+                .motion(format!("{}_option_motion_{field:?}", self.id))
+                .transition(Transition::new(Duration::from_millis(90)))
+                .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
         });
 
-    Some(
+        let menu_for_exit = menu.clone();
         div()
-            .id(format!("{id}_menu"))
+            .id(format!("{}_menu", self.id))
             .absolute()
-            .top(top)
-            .right(right)
+            .top(self.top)
+            .right(self.right)
             .w(px(SORT_MENU_WIDTH))
-            .h(height)
+            .h(self.height)
+            .p_2()
+            .flex()
+            .flex_col()
+            .items_stretch()
+            .gap_y_1()
+            .rounded_lg()
+            .border_1()
+            .border_color(theme.library_sort_menu_border)
+            .bg(theme.library_sort_menu_bg)
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
-            .child(animated_contents)
-            .into_any_element(),
-    )
+            .children(rows)
+            .motion(format!("{}_menu_motion", self.id))
+            .transition(Transition::new(Duration::from_millis(90)))
+            .enter(|style| style.opacity(0.0))
+            .base(|style| style.opacity(1.0))
+            .exit_when(!self.open, |style| style.opacity(0.0))
+            .on_exit_complete(move |_, _, cx| {
+                menu_for_exit.update(cx, |menu, cx| {
+                    if !menu.open {
+                        menu.present = false;
+                        cx.notify();
+                    }
+                });
+            })
+            .into_any_element()
+    }
 }

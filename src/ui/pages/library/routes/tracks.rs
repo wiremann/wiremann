@@ -1,7 +1,7 @@
 use gpui::{
     App, Context, Div, Entity, FontWeight, ImageSource, InteractiveElement, IntoElement, ObjectFit,
     ParentElement, Render, StatefulInteractiveElement, Styled, StyledImage,
-    UniformListScrollHandle, Window, div, img, prelude::FluentBuilder, px, rems,
+    UniformListScrollHandle, Window, div, img, px, rems,
 };
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::{
             uniform_list::uniform_list_with_scroll_past,
         },
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, SortMenu, sort_controls,
         },
         theme::Theme,
     },
@@ -26,12 +26,13 @@ const THUMBNAIL_MARGIN: usize = 16;
 pub struct TracksSection {
     pub scroll_handle: UniformListScrollHandle,
     pub sort: Entity<SortControlsState>,
+    pub sort_menu: Entity<SortMenu>,
     pub(in crate::ui::pages::library) sorted_ids: Arc<Vec<TrackId>>,
     pub(in crate::ui::pages::library) sort_cache_key: Option<SortCacheKey>,
 }
 
 impl TracksSection {
-    const SORT_FIELDS: &'static [SortField] = &[
+    pub const SORT_FIELDS: &'static [SortField] = &[
         SortField::Title,
         SortField::Artist,
         SortField::Album,
@@ -333,7 +334,12 @@ impl Render for TracksSection {
                                     .bg(theme.library_tracks_section_title),
                             ),
                     )
-                    .child(sort_controls("tracks_sort", self.sort.clone(), cx)),
+                    .child(sort_controls(
+                        "tracks_sort",
+                        self.sort.clone(),
+                        self.sort_menu.clone(),
+                        cx,
+                    )),
             )
             .child(
                 div()
@@ -437,17 +443,6 @@ impl Render for TracksSection {
                 scroll_handle,
                 RightPad::Pad,
             ))
-            .when_some(
-                sort_menu(
-                    "tracks_sort",
-                    self.sort.clone(),
-                    Self::SORT_FIELDS,
-                    px(184.0),
-                    px(72.0),
-                    px(48.0),
-                    cx,
-                ),
-                |this, menu| this.child(menu),
-            )
+            .child(self.sort_menu.clone())
     }
 }

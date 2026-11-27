@@ -15,7 +15,7 @@ use crate::{
         },
         pages::library::LibraryRoutes,
         pages::library::sort::{
-            SortCacheKey, SortControlsState, SortField, SortFingerprint, sort_controls, sort_menu,
+            SortCacheKey, SortControlsState, SortField, SortFingerprint, SortMenu, sort_controls,
         },
         theme::Theme,
     },
@@ -25,12 +25,13 @@ pub struct PlaylistsSection {
     pub scroll_handle: ScrollHandle,
     pub grid_controller: VirtualGridScrollController,
     pub sort: Entity<SortControlsState>,
+    pub sort_menu: Entity<SortMenu>,
     pub(in crate::ui::pages::library) sorted_ids: Arc<Vec<PlaylistId>>,
     pub(in crate::ui::pages::library) sort_cache_key: Option<SortCacheKey>,
 }
 
 impl PlaylistsSection {
-    const SORT_FIELDS: &'static [SortField] =
+    pub const SORT_FIELDS: &'static [SortField] =
         &[SortField::Name, SortField::TrackCount, SortField::Duration];
 
     fn render_playlist(id: PlaylistId, cx: &mut App) -> Div {
@@ -207,6 +208,7 @@ impl Render for PlaylistsSection {
                             .child(sort_controls(
                                 "playlists_sort",
                                 self.sort.clone(),
+                                self.sort_menu.clone(),
                                 cx,
                             ))
                             .child(
@@ -301,17 +303,6 @@ impl Render for PlaylistsSection {
                         RightPad::Pad,
                     ))
             }))
-            .when_some(
-                sort_menu(
-                    "playlists_sort",
-                    self.sort.clone(),
-                    Self::SORT_FIELDS,
-                    px(116.0),
-                    px(72.0),
-                    px(220.0),
-                    cx,
-                ),
-                |this, menu| this.child(menu),
-            )
+            .child(self.sort_menu.clone())
     }
 }
