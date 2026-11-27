@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use gpui::{
     App, Context, Div, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Render, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    Render, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, rems,
 };
 use wgpui_motion::{MotionExt, prelude::Transition};
 
@@ -248,7 +248,11 @@ impl Render for SortMenu {
                 .child(field.label())
                 .motion(format!("{}_option_motion_{field:?}", self.id))
                 .transition(Transition::new(Duration::from_millis(90)))
-                .while_hovered(move |this| this.bg(hover_bg).text_color(hover_text))
+                .while_hovered(move |this| {
+                    this.bg(hover_bg)
+                        .text_color(hover_text)
+                        .text_size(rems(0.875))
+                })
         });
 
         let menu_for_exit = menu.clone();
